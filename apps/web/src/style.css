@@ -42,14 +42,17 @@ body {
 #frame {
   position: absolute;
   inset: 0;
+  overflow: hidden;
   border: clamp(13px, 1.7vw, 28px) solid transparent;
   border-image: url("/assets/ui/frame_oak.png") 64 stretch;
   filter: drop-shadow(0 5px 14px #0006);
 }
 #frame canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
-  width: 100%;
-  height: 100%;
+  transform-origin: 0 0;
   touch-action: none;
 }
 .fps {

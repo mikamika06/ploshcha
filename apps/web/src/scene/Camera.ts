@@ -1,46 +1,48 @@
-import type { Application, Container } from "pixi.js";
-
-/** Пан (перетягування) + зум (колесо) світу, з cover-обмеженням (без порожніх країв). */
+/**
+ * Пан (перетягування) + зум (колесо) через CSS-трансформ полотна.
+ * Рендер лишається нативним (world scale=1), тож Pixi-фільтр води не зʼїжджає.
+ * Полотно внутрішньо worldW×worldH; CSS масштабує/зсуває його в межах рами.
+ */
 export class Camera {
   private scale = 1;
   private minScale = 1;
-  private maxScale = 3;
+  private maxScale = 1;
   private x = 0;
   private y = 0;
   private dragging = false;
   private lastX = 0;
   private lastY = 0;
   private moved = false;
-  private readonly view: HTMLCanvasElement;
 
   constructor(
-    private app: Application,
-    private world: Container,
+    private view: HTMLCanvasElement,
+    private frame: HTMLElement,
     private worldW: number,
     private worldH: number,
     private focus?: { x: number; y: number },
   ) {
-    this.view = app.view as unknown as HTMLCanvasElement;
-    this.view.style.cursor = "grab";
-    this.view.style.touchAction = "none";
-    this.view.addEventListener("pointerdown", this.onDown);
+    view.style.transformOrigin = "0 0";
+    view.style.touchAction = "none";
+    view.style.cursor = "grab";
+    view.style.willChange = "transform";
+    view.addEventListener("pointerdown", this.onDown);
     window.addEventListener("pointermove", this.onMove);
     window.addEventListener("pointerup", this.onUp);
-    this.view.addEventListener("wheel", this.onWheel, { passive: false });
-    this.fit();
+    view.addEventListener("wheel", this.onWheel, { passive: false });
+    // fit після лейауту рами (інакше розміри ще не фінальні → нема пан-простору)
+    requestAnimationFrame(() => this.fit());
   }
 
   private get vw(): number {
-    return this.app.screen.width;
+    return this.frame.clientWidth;
   }
   private get vh(): number {
-    return this.app.screen.height;
+    return this.frame.clientHeight;
   }
 
-  /** Стартова рамка: наближено на майдан (щоб село було по центру, а не річка). */
   fit(): void {
-    this.recomputeBounds();
-    this.scale = this.minScale * 1.25;
+    this.recompute();
+    this.scale = Math.min(this.maxScale, this.minScale * 1.25);
     const fx = this.focus ? this.focus.x : this.worldW / 2;
     const fy = this.focus ? this.focus.y : this.worldH / 2;
     this.x = this.vw / 2 - fx * this.scale;
@@ -49,20 +51,20 @@ export class Camera {
   }
 
   resize(): void {
-    this.recomputeBounds();
+    this.recompute();
     this.apply();
   }
 
-  /** true, якщо останній жест був перетягуванням (щоб клік не зарахувався). */
   consumeDrag(): boolean {
     const m = this.moved;
     this.moved = false;
     return m;
   }
 
-  private recomputeBounds(): void {
+  private recompute(): void {
+    // cover раму, крізь 1:1 (крипко) як стеля зуму
     this.minScale = Math.max(this.vw / this.worldW, this.vh / this.worldH);
-    this.maxScale = this.minScale * 3.2;
+    this.maxScale = Math.max(this.minScale, 1.0);
   }
 
   private apply(): void {
@@ -71,8 +73,7 @@ export class Camera {
     const sh = this.worldH * this.scale;
     this.x = sw <= this.vw ? (this.vw - sw) / 2 : Math.min(0, Math.max(this.vw - sw, this.x));
     this.y = sh <= this.vh ? (this.vh - sh) / 2 : Math.min(0, Math.max(this.vh - sh, this.y));
-    this.world.scale.set(this.scale);
-    this.world.position.set(this.x, this.y);
+    this.view.style.transform = `translate(${this.x.toFixed(1)}px, ${this.y.toFixed(1)}px) scale(${this.scale.toFixed(4)})`;
   }
 
   private onDown = (e: PointerEvent): void => {
@@ -103,9 +104,9 @@ export class Camera {
 
   private onWheel = (e: WheelEvent): void => {
     e.preventDefault();
-    const rect = this.view.getBoundingClientRect();
-    const cx = e.clientX - rect.left;
-    const cy = e.clientY - rect.top;
+    const r = this.frame.getBoundingClientRect();
+    const cx = e.clientX - r.left;
+    const cy = e.clientY - r.top;
     const wx = (cx - this.x) / this.scale;
     const wy = (cy - this.y) / this.scale;
     this.scale *= e.deltaY < 0 ? 1.12 : 1 / 1.12;

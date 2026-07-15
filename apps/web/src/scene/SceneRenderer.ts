@@ -8,7 +8,10 @@ import { Intro } from "./Intro";
 import { Weather } from "./Weather";
 import { Camera } from "./Camera";
 
-/** Pixi-сцена: земля+вода, рослинність, вітер, інтро, погода + камера (пан/зум). */
+/**
+ * Pixi-сцена нативного розміру (world scale=1 → фільтр води не зʼїжджає).
+ * Пан/зум — CSS-трансформ полотна через Camera. Глибина = zIndex(y).
+ */
 export class SceneRenderer {
   readonly app: Application;
   readonly world: Container;
@@ -19,17 +22,16 @@ export class SceneRenderer {
   private waterFilter?: Filter;
   private wind?: Wind;
   private intro?: Intro;
-  private frameEl?: HTMLElement;
 
   constructor(public scene: SceneSpec) {
     this.app = new Application({
+      width: scene.size.w,
+      height: scene.size.h,
       antialias: true,
       backgroundColor: 0x6f7a45,
       powerPreference: "high-performance",
       autoDensity: true,
       resolution: Math.min(2, window.devicePixelRatio || 1),
-      width: 800,
-      height: 600,
     });
     this.world = new Container();
     this.world.sortableChildren = true;
@@ -37,29 +39,15 @@ export class SceneRenderer {
   }
 
   mount(el: HTMLElement): void {
-    this.frameEl = el;
-    el.insertBefore(this.app.view as unknown as HTMLCanvasElement, el.firstChild);
-    this.resizeToFrame();
+    const canvas = this.app.view as unknown as HTMLCanvasElement;
+    el.insertBefore(canvas, el.firstChild);
     const heart =
       this.scene.pois.find((p) => p.kind === "square") ??
       this.scene.pois.find((p) => p.kind === "well");
     const focus = heart ? { x: heart.x, y: heart.y } : undefined;
-    this.camera = new Camera(this.app, this.world, this.scene.size.w, this.scene.size.h, focus);
-    window.addEventListener("resize", this.onResize);
+    this.camera = new Camera(canvas, el, this.scene.size.w, this.scene.size.h, focus);
+    window.addEventListener("resize", () => this.camera?.resize());
   }
-
-  private resizeToFrame(): void {
-    if (!this.frameEl) return;
-    const w = this.frameEl.clientWidth || window.innerWidth;
-    const h = this.frameEl.clientHeight || window.innerHeight;
-    this.app.renderer.resize(w, h);
-  }
-
-  private onResize = (): void => {
-    this.resizeToFrame();
-    this.camera?.resize();
-    this.weather?.resize();
-  };
 
   async loadGround(): Promise<void> {
     const tex = await loadGraded(assetUrl(this.scene.background));
