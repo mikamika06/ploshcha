@@ -1,0 +1,75 @@
+* { box-sizing: border-box; }
+:root {
+  --gold: #c9a23f; --wood: #8a6a2e; --parch: #f0e6ca; --ink: #33240f;
+}
+html, body { margin: 0; height: 100%; }
+body {
+  overflow: hidden; color: #efe6d2; background: #0c0a08;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+#app { display: flex; height: 100vh; }
+
+/* ---- сцена в різьбленій рамі ---- */
+#stage { flex: 1; min-width: 0; position: relative; background: #1a1206; }
+#frame {
+  position: absolute; inset: 0;
+  border: clamp(13px, 1.9vw, 30px) solid transparent;
+  border-image: url("/assets/ui/frame_oak.png") 64 stretch;
+  filter: drop-shadow(0 5px 14px #0006);
+}
+#frame canvas {
+  display: block; width: 100%; height: 100%;
+  object-fit: cover; box-shadow: inset 0 0 40px #0006;
+}
+.fps {
+  position: absolute; right: 12px; bottom: 10px; font-size: 11px;
+  color: #d9c68e99; font-variant-numeric: tabular-nums; z-index: 7; pointer-events: none;
+}
+
+/* ---- панель Оповідача (субтитр) ---- */
+.narrator {
+  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+  max-width: min(78%, 900px); z-index: 8; pointer-events: none;
+  padding: 12px 20px; border-radius: 12px;
+  background: linear-gradient(#20160acc, #12100acc);
+  border: 1px solid #c9a23f66; color: #f4ecd6;
+  font-size: 16px; line-height: 1.5; text-align: center; text-wrap: balance;
+  box-shadow: 0 6px 22px #0007; backdrop-filter: blur(2px);
+  opacity: 0; transition: opacity .5s ease;
+}
+.narrator.show { opacity: 1; }
+.narrator .who { color: var(--gold); font-weight: 700; letter-spacing: .3px; margin-right: 6px; }
+
+/* ---- бічна панель: хроніка ---- */
+#side {
+  width: 412px; flex: 0 0 412px; height: 100vh; display: flex; flex-direction: column;
+  overflow: hidden; color: #3a2a14;
+  background: linear-gradient(#f0e6ca, #ddc9a2);
+  border-left: 3px solid var(--wood); box-shadow: -10px 0 30px #0006 inset;
+}
+#side .sh {
+  display: flex; align-items: center; gap: 9px; padding: 12px 15px;
+  border-bottom: 2px solid #a8842e; background: linear-gradient(#dcb54e, #b98e2d); color: #20160a;
+}
+#side .sh b { font-size: 16px; letter-spacing: .6px; color: #3a2708; }
+#side .sh .day { margin-left: auto; font-size: 12px; color: #5a3d10; font-weight: 700; }
+
+.chat {
+  flex: 1; min-height: 0; overflow: auto; padding: 12px 12px 16px;
+  display: flex; flex-direction: column; gap: 9px; background: #f5ecd4;
+}
+.msg { display: flex; gap: 8px; opacity: 0; transform: translateY(8px); transition: opacity .4s, transform .4s; }
+.msg.show { opacity: 1; transform: none; }
+.msg .bd {
+  background: #fffaf0; border: 1px solid #d8c6a0; border-radius: 12px; border-top-left-radius: 3px;
+  padding: 7px 11px; font-size: 13px; line-height: 1.42; color: #3a2a14; box-shadow: 0 1px 3px #0002;
+}
+.msg .bd .nm { color: #a85f15; font-weight: 800; font-size: 11.5px; display: block; margin-bottom: 1px; }
+.msg.sys { justify-content: center; }
+.msg.sys .bd {
+  background: #f7e7ba; border: 1px solid #c89a2f; color: #5a3d10; font-style: italic;
+  text-align: center; border-top-left-radius: 12px;
+}
+.msg.chron .bd { background: #efe0b8; border-color: #c89a2f; }
+.chat::-webkit-scrollbar { width: 8px; }
+.chat::-webkit-scrollbar-thumb { background: #c3ac7d; border-radius: 5px; }
