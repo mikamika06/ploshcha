@@ -23,15 +23,7 @@ const TIME_UA: Record<string, string> = {
   dusk: "сутінки",
   night: "ніч",
 };
-const TIME_ICON: Record<string, string> = {
-  dawn: "🌅",
-  morning: "🌄",
-  noon: "☀️",
-  evening: "🌆",
-  dusk: "🌇",
-  night: "🌙",
-};
-const clockLabel = (t: string): string => `${TIME_ICON[t] ?? "·"} ${TIME_UA[t] ?? t}`;
+const clockLabel = (t: string): string => TIME_UA[t] ?? t;
 
 function tuftUrls(dir: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `/assets/nb/${dir}/0${i}.png`);
@@ -74,7 +66,9 @@ async function boot(): Promise<void> {
   await renderer.loadGround();
 
   const grid = new WalkGrid(scene.masks.space.w, scene.masks.space.h, SCL);
-  await grid.load(scene.masks.walk, scene.masks.keepout);
+  // NB: keepout маска = «не саджати» (стежки+хати+вода), а не «тут хата» — тому для
+  // walk-grid її НЕ використовуємо (інакше вирізає всю ходьбу). Ходьба лише за walk2.
+  await grid.load(scene.masks.walk);
 
   const [vegTex, chars] = await Promise.all([loadVegTextures(), loadCharTextures()]);
   await renderer.buildVegetation(vegTex, shadowTex);
@@ -122,7 +116,7 @@ async function boot(): Promise<void> {
       case "report.compiled":
         narrator.say(ev.payload.chronicle.narration);
         chat.chronicle(ev.payload.chronicle.title);
-        chat.setClock(`📜 день ${ev.payload.chronicle.day}`);
+        chat.setClock(`день ${ev.payload.chronicle.day}`);
         renderer.weather?.setMood(ev.payload.chronicle.mood.valence);
         break;
       case "run.done":

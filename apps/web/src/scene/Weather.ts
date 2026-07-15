@@ -1,18 +1,29 @@
-import { Container, Graphics } from "pixi.js";
+import { Graphics } from "pixi.js";
+import type { Application } from "pixi.js";
 
 /**
- * Погода настрою: холодний серпанок над сценою тим густіший, чим нижчий настрій села.
- * Валентність +1 (радість) → ясно; −1 (туга) → тьмяно й туманно.
+ * Погода настрою: холодний серпанок над сценою (екранний оверлей) тим густіший,
+ * чим нижчий настрій села. Валентність +1 → ясно; −1 → тьмяно й туманно.
  */
 export class Weather {
   private overlay = new Graphics();
   private cur = 0;
   private target = 0;
+  private readonly color = 0x2a3348;
 
-  constructor(stage: Container, w: number, h: number) {
-    this.overlay.beginFill(0x2a3348).drawRect(0, 0, w, h).endFill();
-    this.overlay.alpha = 0;
-    stage.addChild(this.overlay);
+  constructor(private app: Application) {
+    app.stage.addChild(this.overlay);
+    this.draw();
+  }
+
+  private draw(): void {
+    this.overlay.clear();
+    this.overlay.beginFill(this.color).drawRect(0, 0, this.app.screen.width, this.app.screen.height).endFill();
+    this.overlay.alpha = this.cur;
+  }
+
+  resize(): void {
+    this.draw();
   }
 
   setMood(valence: number): void {

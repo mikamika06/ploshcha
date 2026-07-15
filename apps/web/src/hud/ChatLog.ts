@@ -16,11 +16,11 @@ export class ChatLog {
   }
 
   sys(text: string): void {
-    this.add(`✦ ${escapeHtml(text)}`, "evt");
+    this.add(escapeHtml(text), "evt");
   }
 
   chronicle(title: string): void {
-    this.add(`📜 ${escapeHtml(title)}`, "chron");
+    this.add(escapeHtml(title), "chron");
   }
 
   setClock(label: string): void {
