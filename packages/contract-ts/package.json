@@ -1,0 +1,22 @@
+{
+  "name": "@ploshcha/contract-ts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "validate": "tsx src/validate.ts",
+    "test": "tsx src/validate.ts",
+    "gen": "echo 'v1 hand-authored to match ../../contracts/*.schema.json; json-schema-to-zod codegen wiring is a follow-up'"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.9.0"
+  }
+}

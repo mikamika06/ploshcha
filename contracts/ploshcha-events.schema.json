@@ -1,0 +1,410 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ploshcha.dev/contracts/ploshcha-events.schema.json",
+  "title": "ПЛОЩА event stream (v1)",
+  "description": "Заморожений контракт потоку подій симуляції ПЛОЩА (живе село generative-агентів). Кожна подія — це Envelope із дискримінатором `type` і типізованим `payload`. Проєкція spectator (за замовч.) несе лише видиму поведінку; analytics (auth-gated) додає внутрішню когніцію. Джерело правди для фронту (contract-ts) і беку (Pydantic).",
+  "oneOf": [
+    { "$ref": "#/$defs/RunStarted" },
+    { "$ref": "#/$defs/CastingBegin" },
+    { "$ref": "#/$defs/CastingDone" },
+    { "$ref": "#/$defs/TickBegin" },
+    { "$ref": "#/$defs/PlanFormed" },
+    { "$ref": "#/$defs/AgentMoved" },
+    { "$ref": "#/$defs/UtteranceSpoken" },
+    { "$ref": "#/$defs/EventHappened" },
+    { "$ref": "#/$defs/ReflectionFormed" },
+    { "$ref": "#/$defs/ReportCompiled" },
+    { "$ref": "#/$defs/RunDegraded" },
+    { "$ref": "#/$defs/RunDone" },
+    { "$ref": "#/$defs/RunError" }
+  ],
+
+  "$defs": {
+    "Envelope": {
+      "type": "object",
+      "description": "Спільний конверт усіх подій.",
+      "properties": {
+        "protocol": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "description": "semver контракту (contracts/VERSION)" },
+        "runId": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" },
+        "seq": { "type": "integer", "minimum": 0, "description": "монотонний лічильник у межах прогону; фронт ловить розриви/реордер" },
+        "ts": { "type": "string", "format": "date-time" },
+        "tick": { "type": "integer", "minimum": 0, "description": "тік симуляції (крок дня)" },
+        "type": { "type": "string" },
+        "note": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["protocol", "runId", "seq", "ts", "tick", "type", "payload"]
+    },
+
+    "TimeOfDay": { "type": "string", "enum": ["dawn", "morning", "noon", "evening", "dusk", "night"] },
+    "CastingMode": { "type": "string", "enum": ["library", "generate", "mixed"] },
+
+    "MoodView": {
+      "type": "object",
+      "description": "Колективний настрій села (для Хору й погоди).",
+      "properties": {
+        "valence": { "type": "number", "minimum": -1, "maximum": 1, "description": "−1 туга … +1 радість" },
+        "label": { "type": "string", "description": "укр. підпис настрою (радість/тривога/спокій/туга/піднесення)" }
+      },
+      "required": ["valence", "label"],
+      "additionalProperties": false
+    },
+
+    "PlaceRef": {
+      "type": "object",
+      "description": "Місце на сцені: POI-ідентифікатор та/або координати в просторі 2816×1536.",
+      "properties": {
+        "poi": { "type": "string", "description": "id POI зі SceneSpec (напр. 'krynytsia')" },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "anyOf": [ { "required": ["poi"] }, { "required": ["x", "y"] } ],
+      "additionalProperties": false
+    },
+
+    "VillagerPublic": {
+      "type": "object",
+      "description": "Публічний профіль селянина (spectator). Внутрішні seed_beliefs/памʼять — лише в analytics.",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "description": "сільська роль: koval/mirosh/pip/sheptu/starosta/shynkar/chumak/diak/did/mati/parubok/divchyna або згенерована" },
+        "bio": { "type": "string" },
+        "traits": { "type": "array", "items": { "type": "string" } },
+        "home": { "type": "string", "description": "id POI-домівки (optional)" }
+      },
+      "required": ["id", "name", "role", "bio"],
+      "additionalProperties": false
+    },
+
+    "SceneRef": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "назва села, напр. «Верболози»" }
+      },
+      "required": ["id", "name"],
+      "additionalProperties": false
+    },
+
+    "PublicConfig": {
+      "type": "object",
+      "properties": {
+        "maxTicks": { "type": "integer", "minimum": 1 },
+        "castingMode": { "$ref": "#/$defs/CastingMode" },
+        "season": { "type": "string", "description": "пора року (optional)" },
+        "seed": { "type": "integer", "description": "сід прогону (optional)" }
+      },
+      "required": ["maxTicks", "castingMode"],
+      "additionalProperties": false
+    },
+
+    "VillageEvent": {
+      "type": "object",
+      "description": "«Подія дня» — насіння емерджентної драми.",
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string", "description": "машинний ключ: wedding/matchmaking/fair/toloka/holiday/dispute/guest/weather/harvest або згенерований" },
+        "label": { "type": "string", "description": "укр. підпис події" },
+        "description": { "type": "string" },
+        "place": { "$ref": "#/$defs/PlaceRef" },
+        "involves": { "type": "array", "items": { "type": "string" }, "description": "id залучених селян" }
+      },
+      "required": ["id", "kind", "label", "description"],
+      "additionalProperties": false
+    },
+
+    "RelationDelta": {
+      "type": "object",
+      "properties": {
+        "a": { "type": "string" },
+        "b": { "type": "string" },
+        "change": { "type": "string", "enum": ["closer", "apart", "neutral"] },
+        "note": { "type": "string" }
+      },
+      "required": ["a", "b", "change"],
+      "additionalProperties": false
+    },
+
+    "DayChronicle": {
+      "type": "object",
+      "description": "Хроніка дня від Оповідача (карта подій, а не таблиця).",
+      "properties": {
+        "day": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "narration": { "type": "string", "description": "проза-оповідь" },
+        "highlights": { "type": "array", "items": { "type": "string" } },
+        "mood": { "$ref": "#/$defs/MoodView" },
+        "relationships": { "type": "array", "items": { "$ref": "#/$defs/RelationDelta" } }
+      },
+      "required": ["day", "title", "narration", "mood"],
+      "additionalProperties": false
+    },
+
+    "RunCounts": {
+      "type": "object",
+      "properties": {
+        "utterances": { "type": "integer", "minimum": 0 },
+        "events": { "type": "integer", "minimum": 0 },
+        "reflections": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["utterances", "events", "reflections"],
+      "additionalProperties": false
+    },
+
+    "RunStarted": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "run.started" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "config": { "$ref": "#/$defs/PublicConfig" },
+                "scene": { "$ref": "#/$defs/SceneRef" },
+                "startedAt": { "type": "string", "format": "date-time" }
+              },
+              "required": ["config", "scene", "startedAt"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "CastingBegin": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "casting.begin" },
+            "payload": {
+              "type": "object",
+              "properties": { "mode": { "$ref": "#/$defs/CastingMode" } },
+              "required": ["mode"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "CastingDone": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "casting.done" },
+            "payload": {
+              "type": "object",
+              "properties": { "cast": { "type": "array", "items": { "$ref": "#/$defs/VillagerPublic" }, "minItems": 1 } },
+              "required": ["cast"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "TickBegin": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "tick.begin" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "timeOfDay": { "$ref": "#/$defs/TimeOfDay" },
+                "mood": { "$ref": "#/$defs/MoodView" }
+              },
+              "required": ["timeOfDay"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "PlanFormed": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "plan.formed" },
+            "payload": {
+              "type": "object",
+              "description": "Денний план селянина (spectator: короткий підсумок; analytics додає повне міркування).",
+              "properties": {
+                "agentId": { "type": "string" },
+                "summary": { "type": "string" },
+                "steps": { "type": "array", "items": { "type": "string" } }
+              },
+              "required": ["agentId", "summary"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "AgentMoved": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "agent.moved" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "agentId": { "type": "string" },
+                "to": { "$ref": "#/$defs/PlaceRef" },
+                "activity": { "type": "string", "description": "що робить на місці (кує/меле/набирає воду)" }
+              },
+              "required": ["agentId", "to"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "UtteranceSpoken": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "utterance.spoken" },
+            "payload": {
+              "type": "object",
+              "description": "Репліка селянина (публічне мовлення → бульбашка + рядок у чаті).",
+              "properties": {
+                "agentId": { "type": "string" },
+                "to": { "type": "array", "items": { "type": "string" }, "description": "адресати (id); порожньо = до громади" },
+                "text": { "type": "string", "minLength": 1 },
+                "place": { "$ref": "#/$defs/PlaceRef" },
+                "tone": { "type": "string", "description": "тон для стилю бульбашки (тепло/жарт/гнів/сум…)" }
+              },
+              "required": ["agentId", "text"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "EventHappened": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "event.happened" },
+            "payload": {
+              "type": "object",
+              "properties": { "event": { "$ref": "#/$defs/VillageEvent" } },
+              "required": ["event"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "ReflectionFormed": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "reflection.formed" },
+            "payload": {
+              "type": "object",
+              "description": "Думка селянина, що спливає як серпанок Хору (spectator: один рядок; analytics додає повні beliefs + памʼять, з якої синтезовано).",
+              "properties": {
+                "agentId": { "type": "string" },
+                "thought": { "type": "string", "minLength": 1 }
+              },
+              "required": ["agentId", "thought"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "ReportCompiled": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "report.compiled" },
+            "payload": {
+              "type": "object",
+              "properties": { "chronicle": { "$ref": "#/$defs/DayChronicle" } },
+              "required": ["chronicle"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "RunDegraded": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "run.degraded" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "stage": { "type": "string" },
+                "reason": { "type": "string" }
+              },
+              "required": ["stage"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "RunDone": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "run.done" },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "ticks": { "type": "integer", "minimum": 0 },
+                "tokens": { "type": "integer", "minimum": 0 },
+                "counts": { "$ref": "#/$defs/RunCounts" }
+              },
+              "required": ["ticks", "tokens", "counts"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+
+    "RunError": {
+      "allOf": [
+        { "$ref": "#/$defs/Envelope" },
+        {
+          "properties": {
+            "type": { "const": "run.error" },
+            "payload": {
+              "type": "object",
+              "description": "Санітизована помилка (без стека/секретів/промптів).",
+              "properties": { "message": { "type": "string" } },
+              "required": ["message"],
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

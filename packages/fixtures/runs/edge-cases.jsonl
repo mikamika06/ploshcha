@@ -1,0 +1,3 @@
+{"protocol":"1.0.0","runId":"edge-cases","seq":0,"ts":"2026-07-15T05:00:00Z","tick":0,"type":"run.started","payload":{"config":{"maxTicks":6,"castingMode":"mixed"},"scene":{"id":"verbolozy","name":"Верболози"},"startedAt":"2026-07-15T05:00:00Z"}}
+{"protocol":"1.0.0","runId":"edge-cases","seq":1,"ts":"2026-07-15T05:00:05Z","tick":0,"type":"run.degraded","payload":{"stage":"reflection","reason":"наближено погодинний ліміт токенів — глибоку рефлексію пропущено"}}
+{"protocol":"1.0.0","runId":"edge-cases","seq":2,"ts":"2026-07-15T05:00:07Z","tick":0,"type":"run.error","payload":{"message":"LLM недоступний після повторів; прогін зупинено"}}

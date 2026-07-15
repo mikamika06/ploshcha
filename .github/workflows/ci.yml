@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  contract:
+    name: contract conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Кожен рядок фікстур мусить валідуватися проти zod-контракту (13/13 типів).
+      # Коли зʼявиться Pydantic-дзеркало (Фаза 4) — сюди додається гейт паритету TS↔Py.
+      - run: pnpm --filter @ploshcha/contract-ts validate

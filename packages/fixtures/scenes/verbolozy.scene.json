@@ -1,0 +1,24 @@
+{
+  "id": "verbolozy",
+  "name": "Верболози",
+  "size": { "w": 2816, "h": 1536 },
+  "background": "assets/backgrounds/ground2_baked.png",
+  "masks": {
+    "walk": "assets/backgrounds/walk2.png",
+    "zone": "assets/backgrounds/zone2.png",
+    "keepout": "assets/backgrounds/keepout2.png",
+    "flow": "assets/backgrounds/flow_map2.png",
+    "space": { "w": 1408, "h": 768 }
+  },
+  "pois": [
+    { "id": "krynytsia", "name": "Криниця", "kind": "well", "x": 1402, "y": 785, "meaning": "серце села; збір розмов і памʼять" },
+    { "id": "doshka", "name": "Дошка-вісник", "kind": "board", "x": 1199, "y": 764, "meaning": "тут оголошуються події дня" },
+    { "id": "dzvin", "name": "Дзвіниця", "kind": "bell", "x": 1614, "y": 777, "meaning": "відбиває час і скликає громаду" },
+    { "id": "stavok", "name": "Ставок", "kind": "pond", "x": 1790, "y": 1227, "meaning": "вода, млин, спокій" },
+    { "id": "ploshcha", "name": "Площа", "kind": "square", "x": 1450, "y": 900, "provisional": true },
+    { "id": "tserkva", "name": "Церква", "kind": "church", "x": 1050, "y": 620, "provisional": true, "meaning": "віра, злагода" },
+    { "id": "mlyn", "name": "Млин", "kind": "mill", "x": 1900, "y": 1150, "provisional": true, "meaning": "господарка, чутки" },
+    { "id": "kuznya", "name": "Кузня", "kind": "forge", "x": 950, "y": 980, "provisional": true },
+    { "id": "shynok", "name": "Шинок", "kind": "tavern", "x": 1300, "y": 980, "provisional": true, "meaning": "розмови, гостина" }
+  ]
+}

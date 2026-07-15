@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ploshcha.dev/contracts/scene.schema.json",
+  "title": "ПЛОЩА SceneSpec (v1)",
+  "description": "Опис статичної сцени-села. «Статичний світ» = один рукотворний SceneSpec; гіпотетична майбутня процедурність = Lapa-згенерований SceneSpec тієї ж форми (ADR-0001). Координати — у нативному просторі фону (2816×1536).",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string", "description": "назва села" },
+    "size": {
+      "type": "object",
+      "properties": {
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["w", "h"],
+      "additionalProperties": false
+    },
+    "background": { "type": "string", "description": "шлях до запеченої землі" },
+    "masks": {
+      "type": "object",
+      "description": "маски у своєму просторі (напр. 1408×768): walk=ходьба, zone=зони рослинності, keepout=заборона, flow=потік води",
+      "properties": {
+        "walk": { "type": "string" },
+        "zone": { "type": "string" },
+        "keepout": { "type": "string" },
+        "flow": { "type": "string" },
+        "space": {
+          "type": "object",
+          "properties": { "w": { "type": "integer" }, "h": { "type": "integer" } },
+          "required": ["w", "h"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["walk", "space"],
+      "additionalProperties": false
+    },
+    "pois": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/POI" },
+      "minItems": 1
+    }
+  },
+  "required": ["id", "name", "size", "background", "masks", "pois"],
+  "additionalProperties": false,
+
+  "$defs": {
+    "POI": {
+      "type": "object",
+      "description": "Точка інтересу на карті (місце дії/зустрічей).",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "name": { "type": "string", "description": "укр. назва" },
+        "kind": {
+          "type": "string",
+          "enum": ["well", "church", "mill", "forge", "tavern", "board", "bell", "home", "field", "pond", "square", "gate"],
+          "description": "машинний вид → рендер обирає спрайт/поведінку"
+        },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "meaning": { "type": "string", "description": "лор/тема місця (optional)" },
+        "provisional": { "type": "boolean", "description": "true = координати приблизні, калібруються під час порту фронту (2c)" }
+      },
+      "required": ["id", "name", "kind", "x", "y"],
+      "additionalProperties": false
+    }
+  }
+}
