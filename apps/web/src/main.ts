@@ -1,9 +1,11 @@
 import "./style.css";
+import { Texture } from "pixi.js";
 import { SceneSpec } from "@ploshcha/contract-ts";
 import type { POI } from "@ploshcha/contract-ts";
 import sceneJson from "@fixtures/scenes/verbolozy.scene.json";
 import quietDayRaw from "@fixtures/runs/quiet-day.jsonl?raw";
 import { SceneRenderer } from "./scene/SceneRenderer";
+import type { VegTextures, VegType } from "./scene/Vegetation";
 import { WalkGrid } from "./agents/WalkGrid";
 import { AgentDirector } from "./agents/AgentDirector";
 import { SimStore } from "./store/SimStore";
@@ -22,9 +24,41 @@ const TIME_UA: Record<string, string> = {
   night: "ніч",
 };
 
+function tuftUrls(dir: string, count: number): string[] {
+  return Array.from({ length: count }, (_, i) => `/assets/nb/${dir}/0${i}.png`);
+}
+
+const VEG_SRC: Record<VegType, string[]> = {
+  wheat: tuftUrls("tuft_wheat2", 6),
+  flower: tuftUrls("tuft_flower2", 8),
+  reed: tuftUrls("tuft_reed2", 6),
+  grass: tuftUrls("tuft_grass", 6),
+  tree: ["1_trees/00", "1_trees/01", "1_trees/02", "v2_trees/00", "v2_trees/01", "v2_trees/02"].map((s) => `/assets/nb/${s}.png`),
+  bush: ["1_trees/03", "v2_trees/03", "v2_trees/04"].map((s) => `/assets/nb/${s}.png`),
+};
+const VEG_CAP: Partial<Record<VegType, number>> = { tree: 220, bush: 180 };
+
+async function loadVegTextures(): Promise<VegTextures> {
+  const out = {} as VegTextures;
+  for (const key of Object.keys(VEG_SRC) as VegType[]) {
+    const loaded = await Promise.all(VEG_SRC[key].map((u) => loadGraded(u, VEG_CAP[key] ?? 150).catch(() => null)));
+    out[key] = loaded.filter((t): t is Texture => t !== null);
+  }
+  return out;
+}
+
+async function loadCharTextures(): Promise<Texture[]> {
+  const urls: string[] = [];
+  for (let i = 0; i < 6; i++) urls.push(`/assets/nb/c1_chars_a/0${i}.png`);
+  for (let i = 0; i < 6; i++) urls.push(`/assets/nb/c2_chars_b/0${i}.png`);
+  const loaded = await Promise.all(urls.map((u) => loadGraded(u, 130).catch(() => null)));
+  return loaded.filter((t): t is Texture => t !== null);
+}
+
 async function boot(): Promise<void> {
   const scene = SceneSpec.parse(sceneJson);
   const SCL = scene.size.w / scene.masks.space.w;
+  const shadowTex = makeShadowTexture();
 
   const renderer = new SceneRenderer(scene);
   renderer.mount(document.getElementById("frame")!);
@@ -33,16 +67,15 @@ async function boot(): Promise<void> {
   const grid = new WalkGrid(scene.masks.space.w, scene.masks.space.h, SCL);
   await grid.load(scene.masks.walk);
 
-  const charUrls: string[] = [];
-  for (let i = 0; i < 6; i++) charUrls.push(`/assets/nb/c1_chars_a/0${i}.png`);
-  for (let i = 0; i < 6; i++) charUrls.push(`/assets/nb/c2_chars_b/0${i}.png`);
-  const loaded = await Promise.all(charUrls.map((u) => loadGraded(u, 130).catch(() => null)));
-  const chars = loaded.filter((t): t is NonNullable<typeof t> => t !== null);
+  const [vegTex, chars] = await Promise.all([loadVegTextures(), loadCharTextures()]);
+  await renderer.buildVegetation(vegTex, shadowTex);
+  renderer.initWeather();
+  renderer.playIntro();
 
   const pois = new Map<string, POI>();
   for (const p of scene.pois) pois.set(p.id, p);
 
-  const director = new AgentDirector(renderer.world, grid, pois, chars, makeShadowTexture(), SCL);
+  const director = new AgentDirector(renderer.world, grid, pois, chars, shadowTex, SCL);
   const narrator = new Narrator();
   const chat = new ChatLog();
   const store = new SimStore();
@@ -58,6 +91,7 @@ async function boot(): Promise<void> {
         break;
       case "tick.begin":
         chat.setDay(TIME_UA[ev.payload.timeOfDay] ?? ev.payload.timeOfDay);
+        if (ev.payload.mood) renderer.weather?.setMood(ev.payload.mood.valence);
         break;
       case "agent.moved":
         director.moveTo(ev.payload.agentId, ev.payload.to);
@@ -80,6 +114,7 @@ async function boot(): Promise<void> {
         narrator.say(ev.payload.chronicle.narration, "Літописець", 12000);
         chat.chronicle(ev.payload.chronicle.title);
         chat.setDay(`день ${ev.payload.chronicle.day}`);
+        renderer.weather?.setMood(ev.payload.chronicle.mood.valence);
         break;
       case "run.done":
         chat.sys("Село засинає. Кінець дня.");
@@ -97,6 +132,7 @@ async function boot(): Promise<void> {
 
   renderer.app.ticker.add(() => {
     const dt = Math.min(renderer.app.ticker.deltaMS / 1000, 0.05);
+    renderer.update(dt);
     director.update(dt);
   });
 

@@ -47,7 +47,7 @@ export class AgentDirector {
       const tex = this.charTex[this.nextTex++ % Math.max(1, this.charTex.length)];
       const sprite = new Sprite(tex);
       sprite.anchor.set(0.5, 1);
-      const sc = (30 * this.SCL) / (tex.height || 1);
+      const sc = (42 * this.SCL) / (tex.height || 1);
       const shadow = new Sprite(this.shadowTex);
       shadow.anchor.set(0.5, 0.5);
       shadow.width = tex.width * sc * 0.8;
