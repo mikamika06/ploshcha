@@ -23,6 +23,15 @@ const TIME_UA: Record<string, string> = {
   dusk: "сутінки",
   night: "ніч",
 };
+const TIME_ICON: Record<string, string> = {
+  dawn: "🌅",
+  morning: "🌄",
+  noon: "☀️",
+  evening: "🌆",
+  dusk: "🌇",
+  night: "🌙",
+};
+const clockLabel = (t: string): string => `${TIME_ICON[t] ?? "·"} ${TIME_UA[t] ?? t}`;
 
 function tuftUrls(dir: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `/assets/nb/${dir}/0${i}.png`);
@@ -65,7 +74,7 @@ async function boot(): Promise<void> {
   await renderer.loadGround();
 
   const grid = new WalkGrid(scene.masks.space.w, scene.masks.space.h, SCL);
-  await grid.load(scene.masks.walk);
+  await grid.load(scene.masks.walk, scene.masks.keepout);
 
   const [vegTex, chars] = await Promise.all([loadVegTextures(), loadCharTextures()]);
   await renderer.buildVegetation(vegTex, shadowTex);
@@ -84,13 +93,13 @@ async function boot(): Promise<void> {
     switch (ev.type) {
       case "run.started":
         narrator.say(`Ранок у селі ${ev.payload.scene.name}. Село прокидається…`);
-        chat.sys(`Прогін «${ev.payload.scene.name}» почався`);
+        chat.setClock(ev.payload.scene.name);
         break;
       case "casting.done":
         director.spawn(ev.payload.cast);
         break;
       case "tick.begin":
-        chat.setDay(TIME_UA[ev.payload.timeOfDay] ?? ev.payload.timeOfDay);
+        chat.setClock(clockLabel(ev.payload.timeOfDay));
         if (ev.payload.mood) renderer.weather?.setMood(ev.payload.mood.valence);
         break;
       case "agent.moved":
@@ -103,7 +112,7 @@ async function boot(): Promise<void> {
         break;
       }
       case "event.happened":
-        chat.sys(`✦ ${ev.payload.event.label}: ${ev.payload.event.description}`);
+        chat.sys(`${ev.payload.event.label}: ${ev.payload.event.description}`);
         break;
       case "reflection.formed": {
         const name = state.villagers.get(ev.payload.agentId)?.name ?? ev.payload.agentId;
@@ -111,9 +120,9 @@ async function boot(): Promise<void> {
         break;
       }
       case "report.compiled":
-        narrator.say(ev.payload.chronicle.narration, "Літописець", 12000);
+        narrator.say(ev.payload.chronicle.narration);
         chat.chronicle(ev.payload.chronicle.title);
-        chat.setDay(`день ${ev.payload.chronicle.day}`);
+        chat.setClock(`📜 день ${ev.payload.chronicle.day}`);
         renderer.weather?.setMood(ev.payload.chronicle.mood.valence);
         break;
       case "run.done":

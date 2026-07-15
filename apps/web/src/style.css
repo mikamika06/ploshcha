@@ -1,75 +1,227 @@
-* { box-sizing: border-box; }
-:root {
-  --gold: #c9a23f; --wood: #8a6a2e; --parch: #f0e6ca; --ink: #33240f;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
-html, body { margin: 0; height: 100%; }
-body {
-  overflow: hidden; color: #efe6d2; background: #0c0a08;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-#app { display: flex; height: 100vh; }
 
-/* ---- сцена в різьбленій рамі ---- */
-#stage { flex: 1; min-width: 0; position: relative; background: #1a1206; }
+:root {
+  /* дерево / золото / кремовий — айдентика оправи */
+  --wood-deep: #1b1207;
+  --wood: #3a2714;
+  --gold: #e6bf55;
+  --gold-soft: #f6df9e;
+  --gold-deep: #b98e2d;
+  --cream: #f3ead2;
+  --cream-dim: #cfc1a0;
+  --name: #f0b552;
+
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Georgia", serif;
+  --sans: -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --z-hud: 20;
+  --z-clock: 22;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+body {
+  overflow: hidden;
+  background: #0c0a08;
+  color: var(--cream);
+  font-family: var(--sans);
+}
+
+/* ---- повноширинна сцена в дубовій рамі ---- */
+#stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #1a1206;
+}
 #frame {
-  position: absolute; inset: 0;
-  border: clamp(13px, 1.9vw, 30px) solid transparent;
+  position: absolute;
+  inset: 0;
+  border: clamp(13px, 1.7vw, 28px) solid transparent;
   border-image: url("/assets/ui/frame_oak.png") 64 stretch;
   filter: drop-shadow(0 5px 14px #0006);
 }
 #frame canvas {
-  display: block; width: 100%; height: 100%;
-  object-fit: cover; box-shadow: inset 0 0 40px #0006;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  box-shadow: inset 0 0 46px #0007;
 }
 .fps {
-  position: absolute; right: 12px; bottom: 10px; font-size: 11px;
-  color: #d9c68e99; font-variant-numeric: tabular-nums; z-index: 7; pointer-events: none;
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  font-size: 11px;
+  color: #d9c68e77;
+  font-variant-numeric: tabular-nums;
+  z-index: 9;
+  pointer-events: none;
 }
 
-/* ---- панель Оповідача (субтитр) ---- */
-.narrator {
-  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
-  max-width: min(78%, 900px); z-index: 8; pointer-events: none;
-  padding: 12px 20px; border-radius: 12px;
-  background: linear-gradient(#20160acc, #12100acc);
-  border: 1px solid #c9a23f66; color: #f4ecd6;
-  font-size: 16px; line-height: 1.5; text-align: center; text-wrap: balance;
-  box-shadow: 0 6px 22px #0007; backdrop-filter: blur(2px);
-  opacity: 0; transition: opacity .5s ease;
+/* ================= НИЖНЯ СТРІЧКА-ХРОНІКА ================= */
+.hud {
+  position: absolute;
+  left: clamp(18px, 2.2vw, 46px);
+  right: clamp(18px, 2.2vw, 46px);
+  bottom: clamp(16px, 2vw, 34px);
+  z-index: var(--z-hud);
+  display: grid;
+  grid-template-columns: 1.45fr auto 1fr;
+  min-height: 128px;
+  max-height: 27vh;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #241812d9 0%, #16100889 34%, #120c05f5 100%);
+  backdrop-filter: blur(8px) saturate(1.15);
+  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+  border: 1px solid #7a5a2a4d;
+  box-shadow: 0 14px 46px #000a, inset 0 1px 0 #f6df9e26;
 }
-.narrator.show { opacity: 1; }
-.narrator .who { color: var(--gold); font-weight: 700; letter-spacing: .3px; margin-right: 6px; }
+/* золота волосінь по верху — вʼяже з рамою */
+.hud::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #e6bf55b3 18%, #f6df9ee6 50%, #e6bf55b3 82%, transparent);
+}
 
-/* ---- бічна панель: хроніка ---- */
-#side {
-  width: 412px; flex: 0 0 412px; height: 100vh; display: flex; flex-direction: column;
-  overflow: hidden; color: #3a2a14;
-  background: linear-gradient(#f0e6ca, #ddc9a2);
-  border-left: 3px solid var(--wood); box-shadow: -10px 0 30px #0006 inset;
+.hud-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 600 11px/1 var(--sans);
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--gold);
 }
-#side .sh {
-  display: flex; align-items: center; gap: 9px; padding: 12px 15px;
-  border-bottom: 2px solid #a8842e; background: linear-gradient(#dcb54e, #b98e2d); color: #20160a;
+.hud-label .quill {
+  font-size: 13px;
+  filter: drop-shadow(0 1px 2px #0008);
 }
-#side .sh b { font-size: 16px; letter-spacing: .6px; color: #3a2708; }
-#side .sh .day { margin-left: auto; font-size: 12px; color: #5a3d10; font-weight: 700; }
 
-.chat {
-  flex: 1; min-height: 0; overflow: auto; padding: 12px 12px 16px;
-  display: flex; flex-direction: column; gap: 9px; background: #f5ecd4;
+/* — Літописець — */
+.hud-narrator {
+  padding: 17px 24px 19px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
 }
-.msg { display: flex; gap: 8px; opacity: 0; transform: translateY(8px); transition: opacity .4s, transform .4s; }
-.msg.show { opacity: 1; transform: none; }
-.msg .bd {
-  background: #fffaf0; border: 1px solid #d8c6a0; border-radius: 12px; border-top-left-radius: 3px;
-  padding: 7px 11px; font-size: 13px; line-height: 1.42; color: #3a2a14; box-shadow: 0 1px 3px #0002;
+.hud-narration {
+  margin: 0;
+  font: italic 400 clamp(15px, 1.15vw, 19px) / 1.5 var(--serif);
+  color: var(--cream);
+  text-wrap: pretty;
+  max-width: 62ch;
+  text-shadow: 0 1px 6px #000a;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.msg .bd .nm { color: #a85f15; font-weight: 800; font-size: 11.5px; display: block; margin-bottom: 1px; }
-.msg.sys { justify-content: center; }
-.msg.sys .bd {
-  background: #f7e7ba; border: 1px solid #c89a2f; color: #5a3d10; font-style: italic;
-  text-align: center; border-top-left-radius: 12px;
+.hud-narration.show {
+  opacity: 1;
+  transform: none;
 }
-.msg.chron .bd { background: #efe0b8; border-color: #c89a2f; }
-.chat::-webkit-scrollbar { width: 8px; }
-.chat::-webkit-scrollbar-thumb { background: #c3ac7d; border-radius: 5px; }
+
+/* — розділювач — */
+.hud-div {
+  width: 1px;
+  margin: 18px 0;
+  background: linear-gradient(#0000, #e6bf5540 22%, #e6bf5540 78%, #0000);
+}
+
+/* — Хроніка (живий фід) — */
+.hud-chronicle {
+  padding: 17px 22px 15px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hud-feed {
+  margin-top: 9px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  overflow: hidden;
+}
+.hud-feed .ln {
+  font: 13.5px/1.42 var(--sans);
+  color: var(--cream);
+  text-shadow: 0 1px 5px #000a;
+  opacity: 0;
+  transform: translateY(7px);
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hud-feed .ln.show {
+  opacity: 1;
+  transform: none;
+}
+.hud-feed .ln:not(:last-child) {
+  opacity: 0.5;
+}
+.hud-feed .ln .nm {
+  color: var(--name);
+  font-weight: 700;
+}
+.hud-feed .ln.evt {
+  color: var(--gold-soft);
+  font-style: italic;
+}
+.hud-feed .ln.chron {
+  color: var(--gold-soft);
+  font-weight: 600;
+}
+
+/* — годинник дня — */
+.clock {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: var(--z-clock);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2a1c11e6, #150d06f2);
+  border: 1px solid #e6bf5547;
+  color: var(--gold-soft);
+  font: 600 12.5px/1 var(--sans);
+  letter-spacing: 0.03em;
+  box-shadow: 0 6px 18px #0008, inset 0 1px 0 #f6df9e22;
+}
+
+/* — вузькі екрани: стек — */
+@media (max-width: 760px) {
+  .hud {
+    grid-template-columns: 1fr;
+    max-height: 42vh;
+  }
+  .hud-div {
+    display: none;
+  }
+  .hud-narrator {
+    padding-bottom: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-narration,
+  .hud-feed .ln {
+    transition: opacity 0.2s ease;
+    transform: none;
+  }
+}

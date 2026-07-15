@@ -18,8 +18,10 @@ export class WalkGrid {
     private CELL = 14,
   ) {}
 
-  async load(maskUrl: string): Promise<void> {
+  async load(maskUrl: string, keepoutUrl?: string): Promise<void> {
     const d = await readPixels(assetUrl(maskUrl), this.MW, this.MH);
+    // keepout маркує забудову — виключаємо її з прохідності, щоб селяни не ходили по хатах
+    const ko = keepoutUrl ? await readPixels(assetUrl(keepoutUrl), this.MW, this.MH) : null;
     this.GW = (this.MW / this.CELL) | 0;
     this.GH = (this.MH / this.CELL) | 0;
     this.grid = new Uint8Array(this.GW * this.GH);
@@ -28,7 +30,9 @@ export class WalkGrid {
         const px = (gx * this.CELL + 7) | 0;
         const py = (gy * this.CELL + 7) | 0;
         const i = (py * this.MW + px) * 4;
-        this.grid[gy * this.GW + gx] = d[i] > 100 || d[i + 1] > 100 ? 1 : 0;
+        const walk = d[i] > 100 || d[i + 1] > 100;
+        const blocked = ko ? ko[i] > 110 : false;
+        this.grid[gy * this.GW + gx] = walk && !blocked ? 1 : 0;
       }
     }
   }

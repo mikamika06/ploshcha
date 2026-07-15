@@ -7,16 +7,26 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8F%98%EF%B8%8F%3C/text%3E%3C/svg%3E" />
   </head>
   <body>
-    <div id="app">
-      <div id="stage">
-        <div id="frame"></div>
-        <div id="narrator" class="narrator" aria-live="polite"></div>
-        <div class="fps"><span id="fps">…</span> fps</div>
+    <div id="stage">
+      <div id="frame"></div>
+
+      <div id="hud" class="hud" aria-live="polite">
+        <div id="clock" class="clock"></div>
+
+        <section class="hud-narrator">
+          <div class="hud-label"><span class="quill">🪶</span> Літописець</div>
+          <p id="narration" class="hud-narration"></p>
+        </section>
+
+        <div class="hud-div" aria-hidden="true"></div>
+
+        <section class="hud-chronicle">
+          <div class="hud-label">Хроніка</div>
+          <div id="chron" class="hud-feed"></div>
+        </section>
       </div>
-      <aside id="side">
-        <header class="sh"><b>ПЛОЩА</b><span id="daylabel" class="day"></span></header>
-        <div id="chat" class="chat"></div>
-      </aside>
+
+      <div class="fps"><span id="fps">…</span> fps</div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

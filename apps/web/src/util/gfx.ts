@@ -9,8 +9,8 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-// GRD=0.5 (референс): злегка приглушує насиченість для цілісного вигляду.
-const GRADE = "saturate(0.83) sepia(0.07) brightness(0.97)";
+// Легкий грейд для цілісного вигляду — трохи живіший, ніж у референсі.
+const GRADE = "saturate(0.96) sepia(0.04) brightness(1.02)";
 const texCache = new Map<string, Texture>();
 
 export async function loadGraded(url: string, maxH?: number): Promise<Texture> {

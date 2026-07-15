@@ -1,24 +1,25 @@
-/** Оповідач/Літописець — субтитр-панель знизу. */
+/** Оповідач/Літописець — голос у лівій колонці нижньої стрічки (кросфейд при зміні). */
 export class Narrator {
   private el: HTMLElement;
-  private hideTimer: ReturnType<typeof setTimeout> | undefined;
+  private swap: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(elId = "narrator") {
+  constructor(elId = "narration") {
     const el = document.getElementById(elId);
-    if (!el) throw new Error(`narrator element #${elId} not found`);
+    if (!el) throw new Error(`narration element #${elId} not found`);
     this.el = el;
   }
 
-  say(text: string, who = "Оповідач", holdMs = 6000): void {
-    this.el.innerHTML = `<span class="who">${escapeHtml(who)}:</span>${escapeHtml(text)}`;
-    this.el.classList.add("show");
-    if (this.hideTimer) clearTimeout(this.hideTimer);
-    this.hideTimer = setTimeout(() => this.el.classList.remove("show"), holdMs);
+  say(text: string): void {
+    if (this.swap) clearTimeout(this.swap);
+    if (!this.el.classList.contains("show")) {
+      this.el.textContent = text;
+      requestAnimationFrame(() => this.el.classList.add("show"));
+      return;
+    }
+    this.el.classList.remove("show");
+    this.swap = setTimeout(() => {
+      this.el.textContent = text;
+      this.el.classList.add("show");
+    }, 200);
   }
-}
-
-function escapeHtml(s: string): string {
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
 }

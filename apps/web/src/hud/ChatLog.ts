@@ -1,39 +1,39 @@
-/** Бічна хроніка: репліки селян, події, підсумкова хроніка дня. */
+/** Хроніка: живий фід реплік/подій у правій колонці стрічки + годинник дня. */
 export class ChatLog {
-  private el: HTMLElement;
-  private dayEl: HTMLElement | null;
+  private feed: HTMLElement;
+  private clockEl: HTMLElement | null;
+  private readonly MAX = 6;
 
   constructor() {
-    const el = document.getElementById("chat");
-    if (!el) throw new Error("chat element #chat not found");
-    this.el = el;
-    this.dayEl = document.getElementById("daylabel");
+    const feed = document.getElementById("chron");
+    if (!feed) throw new Error("feed element #chron not found");
+    this.feed = feed;
+    this.clockEl = document.getElementById("clock");
   }
 
   line(name: string, text: string): void {
-    this.add(`<div class="bd"><span class="nm">${escapeHtml(name)}</span>${escapeHtml(text)}</div>`, "");
+    this.add(`<span class="nm">${escapeHtml(name)}</span> ${escapeHtml(text)}`, "");
   }
 
   sys(text: string): void {
-    this.add(`<div class="bd">${escapeHtml(text)}</div>`, "sys");
+    this.add(`✦ ${escapeHtml(text)}`, "evt");
   }
 
   chronicle(title: string): void {
-    this.add(`<div class="bd">📜 ${escapeHtml(title)}</div>`, "chron");
+    this.add(`📜 ${escapeHtml(title)}`, "chron");
   }
 
-  setDay(label: string): void {
-    if (this.dayEl) this.dayEl.textContent = label;
+  setClock(label: string): void {
+    if (this.clockEl) this.clockEl.textContent = label;
   }
 
   private add(html: string, cls: string): void {
     const d = document.createElement("div");
-    d.className = "msg" + (cls ? " " + cls : "");
+    d.className = "ln" + (cls ? " " + cls : "");
     d.innerHTML = html;
-    this.el.appendChild(d);
-    while (this.el.children.length > 60) this.el.removeChild(this.el.firstChild!);
+    this.feed.appendChild(d);
+    while (this.feed.children.length > this.MAX) this.feed.removeChild(this.feed.firstChild!);
     requestAnimationFrame(() => d.classList.add("show"));
-    this.el.scrollTop = this.el.scrollHeight;
   }
 }
 
