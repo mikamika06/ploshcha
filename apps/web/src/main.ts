@@ -133,6 +133,9 @@ async function boot(): Promise<void> {
     }
   });
 
+  const hudEl = document.getElementById("hud");
+  document.getElementById("hud-toggle")?.addEventListener("click", () => hudEl?.classList.toggle("collapsed"));
+
   renderer.app.ticker.add(() => {
     const dt = Math.min(renderer.app.ticker.deltaMS / 1000, 0.05);
     renderer.update(dt);

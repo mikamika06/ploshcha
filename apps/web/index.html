@@ -11,19 +11,22 @@
       <div id="frame"></div>
 
       <div id="hud" class="hud" aria-live="polite">
-        <div id="clock" class="clock"></div>
-
-        <section class="hud-narrator">
-          <div class="hud-label">Літописець</div>
-          <p id="narration" class="hud-narration"></p>
-        </section>
-
-        <div class="hud-div" aria-hidden="true"></div>
-
-        <section class="hud-chronicle">
-          <div class="hud-label">Хроніка</div>
-          <div id="chron" class="hud-feed"></div>
-        </section>
+        <div class="hud-bar">
+          <button id="hud-toggle" class="hud-toggle" type="button" aria-label="Згорнути хроніку"></button>
+          <span class="hud-title">Верболози</span>
+          <span id="clock" class="clock"></span>
+        </div>
+        <div class="hud-body">
+          <section class="hud-narrator">
+            <div class="hud-label">Літописець</div>
+            <p id="narration" class="hud-narration"></p>
+          </section>
+          <div class="hud-div" aria-hidden="true"></div>
+          <section class="hud-chronicle">
+            <div class="hud-label">Хроніка</div>
+            <div id="chron" class="hud-feed"></div>
+          </section>
+        </div>
       </div>
 
       <div class="fps"><span id="fps">…</span> fps</div>

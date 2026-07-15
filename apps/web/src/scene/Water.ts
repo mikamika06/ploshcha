@@ -10,7 +10,7 @@ float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
 void main(){ vec2 uv=vTextureCoord; vec4 fl=texture2D(flowTex,uv); float wmask=fl.b;
   vec2 fn=normalize(fl.rg*2.0-1.0+1e-5); vec2 perp=vec2(-fn.y,fn.x); vec2 as=vec2(aspect,1.0);
   float cross=dot(uv*as,perp);
-  float ph2=fract(t*0.05*wa*2.0); float amp2=0.050;
+  float ph2=fract(t*0.05*wa*2.0); float amp2=0.072;
   float p1=dot(uv*as,fn)*34.0 - t*2.6*wa;
   float ripple=(n2(vec2(p1,cross*26.0))*0.62+n2(vec2(p1*0.55+11.,cross*13.))*0.38)*2.-1.;
   vec2 rp=perp*ripple*0.0014;
@@ -27,5 +27,5 @@ void main(){ vec2 uv=vTextureCoord; vec4 fl=texture2D(flowTex,uv); float wmask=f
 
 export function makeWaterFilter(flowUrl: string, aspect: number): Filter {
   const flowTex = Texture.from(assetUrl(flowUrl));
-  return new Filter(undefined, waterFrag, { flowTex, t: 0, aspect, wa: 1.0 });
+  return new Filter(undefined, waterFrag, { flowTex, t: 0, aspect, wa: 1.7 });
 }

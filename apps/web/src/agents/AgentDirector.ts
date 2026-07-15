@@ -47,7 +47,7 @@ export class AgentDirector {
       const tex = this.charTex[this.nextTex++ % Math.max(1, this.charTex.length)];
       const sprite = new Sprite(tex);
       sprite.anchor.set(0.5, 1);
-      const sc = (42 * this.SCL) / (tex.height || 1);
+      const sc = (26 * this.SCL) / (tex.height || 1);
       const shadow = new Sprite(this.shadowTex);
       shadow.anchor.set(0.5, 0.5);
       shadow.width = tex.width * sc * 0.8;
@@ -118,17 +118,25 @@ export class AgentDirector {
             r.x += (dx / d) * step;
             r.y += (dy / d) * step;
             if (Math.abs(dx) > 0.5) r.face = dx < 0 ? -1 : 1;
-            r.bob += dt * 9;
+            r.bob += dt * 11;
           }
         }
       }
-      const bounce = r.state === "walk" ? Math.abs(Math.sin(r.bob)) * r.tex.height * r.sc * 0.02 : 0;
+      const walking = r.state === "walk" && r.path !== null;
+      if (!walking) r.bob += dt * 2.3; // повільне «дихання» у спокої
+      const baseH = r.tex.height * r.sc;
+      const s = Math.sin(r.bob);
+      const bounce = walking ? Math.abs(s) * baseH * 0.05 : 0;
+      const lean = (walking ? s * 0.05 : s * 0.012) * r.face; // похитування / легкий подих
+      const breath = walking ? 1 : 1 + Math.abs(s) * 0.02;
       r.sprite.x = r.x;
       r.sprite.y = r.y - bounce;
-      r.sprite.scale.set(r.sc * r.face, r.sc);
+      r.sprite.rotation = lean;
+      r.sprite.scale.set(r.sc * r.face, r.sc * breath);
       r.sprite.zIndex = r.y;
       r.shadow.x = r.x;
       r.shadow.y = r.y;
+      r.shadow.alpha = walking ? 1 - Math.abs(s) * 0.22 : 1;
       r.shadow.zIndex = r.y - 0.5;
       if (r.bubble) {
         r.bubbleT -= dt;
@@ -150,35 +158,38 @@ export class AgentDirector {
 
   private makeBubble(text: string): Container {
     const c = new Container();
-    const label = text.length > 64 ? text.slice(0, 62) + "…" : text;
+    const label = text.length > 70 ? text.slice(0, 68) + "…" : text;
     const t = new Text(label, {
       fontFamily: "-apple-system, Segoe UI, Roboto, sans-serif",
-      fontSize: 26,
-      fill: 0x2a1c0e,
+      fontSize: 21,
+      fontWeight: "500",
+      fill: 0xf0e8d6,
       wordWrap: true,
-      wordWrapWidth: 460,
+      wordWrapWidth: 380,
       align: "left",
+      lineHeight: 27,
     });
-    const padX = 16;
-    const padY = 11;
+    const padX = 14;
+    const padY = 9;
+    const tail = 11;
     const w = t.width + padX * 2;
     const h = t.height + padY * 2;
     const bg = new Graphics();
-    bg.beginFill(0xfffaf0, 0.96);
-    bg.lineStyle(2, 0xc89a2f, 1);
-    bg.drawRoundedRect(0, 0, w, h, 14);
+    bg.beginFill(0x17130d, 0.9);
+    bg.lineStyle(1, 0xf2ecdb, 0.16);
+    bg.drawRoundedRect(0, 0, w, h, 11);
     bg.endFill();
-    bg.beginFill(0xfffaf0, 0.96);
     bg.lineStyle(0);
-    bg.moveTo(22, h - 1);
-    bg.lineTo(32, h + 15);
-    bg.lineTo(44, h - 1);
+    bg.beginFill(0x17130d, 0.9);
+    bg.moveTo(w / 2 - 7, h - 1);
+    bg.lineTo(w / 2, h + tail);
+    bg.lineTo(w / 2 + 7, h - 1);
     bg.endFill();
     t.x = padX;
     t.y = padY;
     c.addChild(bg);
     c.addChild(t);
-    c.pivot.set(w / 2, h + 15);
+    c.pivot.set(w / 2, h + tail);
     return c;
   }
 }
