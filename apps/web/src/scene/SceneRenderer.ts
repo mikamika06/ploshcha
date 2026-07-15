@@ -40,7 +40,11 @@ export class SceneRenderer {
     this.frameEl = el;
     el.insertBefore(this.app.view as unknown as HTMLCanvasElement, el.firstChild);
     this.resizeToFrame();
-    this.camera = new Camera(this.app, this.world, this.scene.size.w, this.scene.size.h);
+    const heart =
+      this.scene.pois.find((p) => p.kind === "square") ??
+      this.scene.pois.find((p) => p.kind === "well");
+    const focus = heart ? { x: heart.x, y: heart.y } : undefined;
+    this.camera = new Camera(this.app, this.world, this.scene.size.w, this.scene.size.h, focus);
     window.addEventListener("resize", this.onResize);
   }
 

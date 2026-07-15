@@ -18,6 +18,7 @@ export class Camera {
     private world: Container,
     private worldW: number,
     private worldH: number,
+    private focus?: { x: number; y: number },
   ) {
     this.view = app.view as unknown as HTMLCanvasElement;
     this.view.style.cursor = "grab";
@@ -36,12 +37,14 @@ export class Camera {
     return this.app.screen.height;
   }
 
-  /** Стартова рамка: трохи наближено, щоб було куди листати. */
+  /** Стартова рамка: наближено на майдан (щоб село було по центру, а не річка). */
   fit(): void {
     this.recomputeBounds();
-    this.scale = this.minScale * 1.4;
-    this.x = (this.vw - this.worldW * this.scale) / 2;
-    this.y = (this.vh - this.worldH * this.scale) / 2;
+    this.scale = this.minScale * 1.25;
+    const fx = this.focus ? this.focus.x : this.worldW / 2;
+    const fy = this.focus ? this.focus.y : this.worldH / 2;
+    this.x = this.vw / 2 - fx * this.scale;
+    this.y = this.vh / 2 - fy * this.scale;
     this.apply();
   }
 

@@ -5,14 +5,14 @@
 }
 
 :root {
-  /* стримана темна скло-панель, теплий нейтрал, без золота */
-  --panel: #13110bf2;
-  --panel-top: #1e1912d6;
-  --edge: #ffffff16;
-  --txt: #ece5d4;
-  --txt-dim: #a79e8a;
-  --txt-name: #ddd0b6;
-  --accent: #c39d6a; /* єдиний стриманий теплий акцент */
+  /* світла чиста скло-панель, теплий нейтрал, без золота й без темряви */
+  --panel: rgba(248, 244, 237, 0.9);
+  --panel-top: rgba(253, 250, 245, 0.86);
+  --edge: rgba(64, 48, 26, 0.16);
+  --txt: #2e2618;
+  --txt-dim: #8a7c63;
+  --txt-name: #9a5a24;
+  --accent: #b0682f; /* стриманий теплий акцент (сієна), без золота */
 
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Georgia", serif;
   --sans: -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -78,7 +78,7 @@ body {
   backdrop-filter: blur(10px) saturate(1.04);
   -webkit-backdrop-filter: blur(10px) saturate(1.04);
   border: 1px solid var(--edge);
-  box-shadow: 0 16px 44px #0009, inset 0 1px 0 #ffffff0f;
+  box-shadow: 0 16px 40px #00000059, inset 0 1px 0 rgba(255, 255, 255, 0.6);
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -99,12 +99,12 @@ body {
   place-items: center;
   border: 1px solid var(--edge);
   border-radius: 7px;
-  background: #ffffff08;
+  background: rgba(0, 0, 0, 0.05);
   cursor: pointer;
   padding: 0;
 }
 .hud-toggle:hover {
-  background: #ffffff16;
+  background: rgba(0, 0, 0, 0.09);
 }
 .hud-toggle::before {
   content: "";
@@ -130,7 +130,7 @@ body {
   margin-left: auto;
   padding: 5px 12px;
   border-radius: 999px;
-  background: #ffffff0c;
+  background: rgba(0, 0, 0, 0.05);
   border: 1px solid var(--edge);
   color: var(--txt);
   font: 600 12px/1 var(--sans);
