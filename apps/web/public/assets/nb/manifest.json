@@ -1,0 +1,155 @@
+{
+"categories": [
+{
+"name": "Дерева й кущі",
+"items": [
+"1_trees/00",
+"1_trees/01",
+"1_trees/02",
+"1_trees/03",
+"1_trees/04",
+"1_trees/05",
+"v2_trees/00",
+"v2_trees/01",
+"v2_trees/02",
+"v2_trees/03",
+"v2_trees/04",
+"v2_trees/05"
+]
+},
+{
+"name": "Квіти",
+"items": [
+"v3_flowers/00",
+"v3_flowers/01",
+"v3_flowers/02",
+"v3_flowers/03",
+"v3_flowers/04",
+"v3_flowers/05",
+"v3_flowers/06",
+"v3_flowers/07"
+]
+},
+{
+"name": "Будівлі",
+"items": [
+"2_buildings/00",
+"2_buildings/01",
+"2_buildings/02",
+"b2_buildings/00",
+"b2_buildings/01",
+"b2_buildings/02",
+"b2_buildings/03",
+"b2_buildings/04",
+"b2_buildings/05"
+]
+},
+{
+"name": "Хати · ракурси",
+"items": [
+"ba_khata/00",
+"ba_khata/01",
+"ba_khata/02",
+"ba_khata/03",
+"ba_zrub/00",
+"ba_zrub/01",
+"ba_zrub/02",
+"ba_zrub/03"
+]
+},
+{
+"name": "Фішки · декор",
+"items": [
+"3_props/00",
+"3_props/01",
+"3_props/02",
+"3_props/03",
+"3_props/04",
+"3_props/05",
+"p2_props/00",
+"p2_props/01",
+"p2_props/02",
+"p2_props/03",
+"p2_props/04",
+"p2_props/05"
+]
+},
+{
+"name": "Терейн",
+"items": [
+"t1_terrain/00",
+"t1_terrain/01",
+"t1_terrain/02",
+"t1_terrain/03",
+"t1_terrain/04",
+"t1_terrain/05"
+]
+},
+{
+"name": "Земля · дрібниці",
+"items": [
+"5_ground/00",
+"5_ground/01",
+"5_ground/02",
+"5_ground/03",
+"5_ground/04",
+"5_ground/05",
+"5_ground/06",
+"5_ground/07"
+]
+},
+{
+"name": "Персонажі",
+"items": [
+"c1_chars_a/00",
+"c1_chars_a/01",
+"c1_chars_a/02",
+"c1_chars_a/03",
+"c1_chars_a/04",
+"c1_chars_a/05",
+"c2_chars_b/00",
+"c2_chars_b/01",
+"c2_chars_b/02",
+"c2_chars_b/03",
+"c2_chars_b/04",
+"c2_chars_b/05"
+]
+},
+{
+"name": "Люди (ще)",
+"items": [
+"4_chars/00",
+"4_chars/01",
+"4_chars/02",
+"4_chars/03"
+]
+},
+{
+"name": "Ролі-духи",
+"items": [
+"8_roles/00",
+"8_roles/01",
+"8_roles/02",
+"8_roles/03"
+]
+},
+{
+"name": "Крук (кадри)",
+"items": [
+"9_raven/00",
+"9_raven/01",
+"9_raven/02",
+"9_raven/03",
+"9_raven/04",
+"9_raven/05"
+]
+},
+{
+"name": "Млин (розбірний)",
+"items": [
+"10_mill/00",
+"10_mill/01"
+]
+}
+]
+}

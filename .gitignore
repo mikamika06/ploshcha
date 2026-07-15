@@ -1,0 +1,36 @@
+# === секрети (НІКОЛИ в трек) ===
+.env
+.env.*
+!.env.example
+**/.secrets/
+*.key
+*.pem
+
+# === важкі ваги моделей (качаються окремо) ===
+*.gguf
+*.safetensors
+models/
+weights/
+
+# === бази й стан прогонів ===
+*.db
+*.db-shm
+*.db-wal
+data/ploshcha/*.json
+!data/fixtures/**
+eval/reports/
+
+# === збірка / залежності ===
+node_modules/
+dist/
+.vite/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# === ОС / редактор ===
+.DS_Store
+*.swp
+.idea/
+.vscode/

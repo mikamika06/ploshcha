@@ -1,0 +1,9 @@
+#!/bin/sh
+# Тверде правило проєкту: ЖОДНОЇ AI-атрибуції в комітах.
+msg_file="$1"
+if grep -iEq 'co-authored-by:[[:space:]]*(claude|anthropic|gpt|openai|copilot|cursor|codex)|generated with[[:space:]]+(claude|chatgpt|copilot|cursor)|🤖[[:space:]]*generated' "$msg_file"; then
+  echo "✖ commit-msg: виявлено AI-атрибуцію — заборонено правилами проєкту." >&2
+  echo "  Прибери рядок co-authored-by/generated-with і повтори коміт." >&2
+  exit 1
+fi
+exit 0

@@ -1,0 +1,21 @@
+#!/bin/sh
+# Скан секретів перед комітом. gitleaks якщо встановлено, інакше базовий grep.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner || {
+    echo "✖ gitleaks: знайдено секрет у staged-змінах. Коміт скасовано." >&2; exit 1; }
+  exit 0
+fi
+
+# fallback: базовий скан staged-diff на очевидні секрети
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+hits=$(git diff --cached -U0 --diff-filter=ACM \
+  | grep -nE '(sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(API_KEY|SECRET|TOKEN)[[:space:]]*=[[:space:]]*[^[:space:]]{12,})' \
+  || true)
+if [ -n "$hits" ]; then
+  echo "✖ pre-commit: схоже на секрет у staged-змінах:" >&2
+  echo "$hits" >&2
+  echo "  (постав повний скан: brew install gitleaks)" >&2
+  exit 1
+fi
+exit 0

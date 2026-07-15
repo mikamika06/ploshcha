@@ -1,0 +1,15 @@
+{
+  "name": "ploshcha",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ПЛОЩА — живе українське село generative-агентів на Lapa",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint",
+    "contract:gen": "pnpm --filter @ploshcha/contract-ts gen"
+  },
+  "packageManager": "pnpm@10.24.0"
+}

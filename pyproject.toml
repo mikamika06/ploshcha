@@ -1,0 +1,19 @@
+[project]
+name = "ploshcha"
+version = "0.0.0"
+description = "ПЛОЩА — generative-agents бек (Python side; наповнюється у Фазі 4)"
+requires-python = ">=3.11"
+dependencies = []
+
+# Робочі залежності (fastapi, pydantic, openai, pytest…) додаються у Фазі 4,
+# коли пишемо services/sim. Зараз — лише валідний плейсхолдер для uv/hatch.
+
+[tool.uv.workspace]
+members = ["services/*"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["services", "eval"]

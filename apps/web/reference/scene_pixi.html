@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="uk"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ПЛОЩА — PixiJS сцена</title>
+<style>
+  *{box-sizing:border-box}
+  :root{--gold:#c9a23f;--gold-hi:#f4d98a;--wood:#3a2714;--wood2:#2a1c0e;--parch:#e9dcc0;--ink:#33240f}
+  body{margin:0;height:100vh;overflow:hidden;color:#efe6d2;background:#0c0a08;
+    font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  #app{display:flex;height:100vh}
+  /* ---- сцена в різьбленій рамі ---- */
+  #stage{flex:1;min-width:0;position:relative;padding:0;background:#1a1206}
+  #frame{position:absolute;inset:0;padding:0;background:none;
+    border:clamp(13px,1.9vw,30px) solid transparent;
+    border-image:url('assets/ui/frame_oak.png') 64 stretch;
+    filter:drop-shadow(0 5px 14px #0006)}
+  #frame canvas{display:block;width:100%;height:100%;object-fit:cover;box-shadow:inset 0 0 40px #0006}
+  .corner{display:none}   /* замінено суцільною дубовою рамою (border-image) */
+  .fps{position:absolute;right:10px;bottom:8px;font-size:11px;color:#d9c68e99;font-variant-numeric:tabular-nums;z-index:7;pointer-events:none}
+  /* ---- бічна панель ---- */
+  #side{width:412px;flex:0 0 412px;height:100vh;display:flex;flex-direction:column;overflow:hidden;color:#3a2a14;
+    background:linear-gradient(#f0e6ca,#ddc9a2);border-left:3px solid #8a6a2e;box-shadow:-10px 0 30px #0006 inset;
+    transition:flex-basis .3s ease,width .3s ease}
+  body.nopanel #side{flex-basis:0;width:0;border:none}
+  #showPanel{position:absolute;right:12px;top:12px;z-index:9;display:none;font-size:14px}
+  body.nopanel #showPanel{display:block}
+  #side .sh{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:2px solid #a8842e;
+    background:linear-gradient(#dcb54e,#b98e2d);color:#20160a}
+  #side .sh b{font-size:15px;letter-spacing:.5px;color:#3a2708}
+  #side .sh .sp{margin-left:auto;display:flex;gap:6px}
+  .ibtn{border:1px solid #a8842e;background:#f6ecce;color:#5a3d10;border-radius:7px;padding:5px 9px;font-size:12px;cursor:pointer}
+  .ibtn:hover{background:#fff7e2}.ibtn.on{background:#8a5a1e;color:#fbeecb;border-color:#8a5a1e;font-weight:700}
+  .sec{border-bottom:1px solid #c3ac7d}
+  .sec .t{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:#96601c;padding:9px 14px 4px;font-weight:800}
+  #news{padding:2px 12px 12px}
+  #news textarea{width:100%;height:58px;resize:none;border-radius:8px;border:1px solid #c3ac7d;background:#fff8ea;
+    color:#3a2a14;padding:8px 10px;font-size:13px;font-family:inherit}
+  #news textarea::placeholder{color:#a8926a}
+  #news .row{display:flex;gap:8px;margin-top:7px}
+  #news button{flex:1;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:800;cursor:pointer;
+    background:linear-gradient(#e8c458,#c89a2f);color:#3a2708;box-shadow:0 2px 0 #a8842e}
+  #news button:active{transform:translateY(1px);box-shadow:none}
+  #roster{padding:6px 10px 10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:222px;overflow:auto}
+  .rc{display:flex;gap:8px;align-items:center;background:#fbf3df;border:1px solid #cdb98c;border-radius:9px;padding:5px 7px}
+  .rc img{width:34px;height:34px;border-radius:50%;background:#e8dcc0;border:2px solid #c89a2f;object-fit:cover}
+  .rc .nm{font-size:12px;font-weight:700;color:#33240f;line-height:1.15}
+  .rc .ac{font-size:10.5px;color:#8a7550}
+  #chat{flex:1;min-height:0;overflow:auto;padding:11px 12px 14px;display:flex;flex-direction:column;gap:9px;background:#f5ecd4}
+  .msg{display:flex;gap:8px;opacity:0;transform:translateY(8px);transition:opacity .4s,transform .4s}
+  .msg.show{opacity:1;transform:none}
+  .msg img{width:32px;height:32px;border-radius:50%;flex:0 0 32px;border:2px solid #c89a2f;background:#e8dcc0;object-fit:cover}
+  .msg .bd{background:#fffaf0;border:1px solid #d8c6a0;border-radius:12px;border-top-left-radius:3px;padding:7px 11px;
+    font-size:13px;line-height:1.42;color:#3a2a14;box-shadow:0 1px 3px #0002}
+  .msg .bd .nm{color:#a85f15;font-weight:800;font-size:11.5px;display:block;margin-bottom:1px}
+  .msg.sys{justify-content:center}
+  .msg.sys .bd{background:#f7e7ba;border:1px solid #c89a2f;color:#5a3d10;font-style:italic;text-align:center;border-top-left-radius:12px}
+  #chat::-webkit-scrollbar,#roster::-webkit-scrollbar{width:8px}
+  #chat::-webkit-scrollbar-thumb,#roster::-webkit-scrollbar-thumb{background:#c3ac7d;border-radius:5px}
+</style></head>
+<body>
+<div id="app">
+  <div id="stage"><button id="showPanel" class="ibtn" title="показати панель">☰ панель</button><div id="frame">
+    <img class="corner tl" src="assets/ui/frame_corner.png" alt="">
+    <img class="corner tr" src="assets/ui/frame_corner.png" alt="">
+    <img class="corner bl" src="assets/ui/frame_corner.png" alt="">
+    <img class="corner br" src="assets/ui/frame_corner.png" alt="">
+    <div class="fps"><span id="fps">…</span> fps</div>
+  </div></div>
+</div>
+<!-- панель прибрано — новий HUD проєктують дизайн-агенти -->
+<script src="vendor/pixi.min.js"></script>
+<script>
+// ================= БЕЙСЛАЙН =================
+const WIND=0.5, FREQ=0.35, DEN=9, TREE=1.3, GRD=0.5;
+const NATW=2816, NATH=1536;            // нативний фон
+const MW=1408, MH=768;                 // простір масок
+const CXf=782/1408, CYf=377/768;       // центр площі (частка)
+
+// ================= Pixi app (повна роздільність — GPU батчить) =================
+const app=new PIXI.Application({width:NATW,height:NATH,antialias:true,backgroundColor:0x6f7a45,powerPreference:'high-performance'});
+document.getElementById('frame').insertBefore(app.view, document.getElementById('frame').firstChild);
+const Wn=NATW, Hn=NATH, SCL=Wn/MW;
+const world=new PIXI.Container(); world.sortableChildren=true; app.stage.addChild(world);
+
+// ================= грейд + зменшення (пам'ять) =================
+const GFs='saturate('+(1-0.35*GRD).toFixed(2)+') sepia('+(0.14*GRD).toFixed(2)+') brightness('+(1-0.06*GRD).toFixed(2)+')';
+function gradeCanvas(img,maxH){const nw=img.naturalWidth||img.width,nh=img.naturalHeight||img.height;
+  const sc=maxH?Math.min(1,maxH/nh):1;const c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(nw*sc));c.height=Math.max(1,Math.round(nh*sc));
+  const x=c.getContext('2d');x.filter=GFs;x.drawImage(img,0,0,c.width,c.height);return c;}
+
+// ================= шум =================
+function hash(x,y){let n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.floor(n);}
+function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=hash(xi,yi),b=hash(xi+1,yi),c=hash(xi,yi+1),d=hash(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;}
+
+// ================= ВОДА як Pixi-фільтр =================
+const flowTex=PIXI.Texture.from('assets/backgrounds/flow_map2.png');
+const waterFrag=`
+varying vec2 vTextureCoord; uniform sampler2D uSampler,flowTex; uniform float t,aspect,wa;
+float h2(vec2 p){return fract(sin(dot(p,vec2(41.3,289.1)))*43758.5453);}
+float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+ return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
+void main(){ vec2 uv=vTextureCoord; vec4 fl=texture2D(flowTex,uv); float wmask=fl.b;
+  vec2 fn=normalize(fl.rg*2.0-1.0+1e-5); vec2 perp=vec2(-fn.y,fn.x); vec2 as=vec2(aspect,1.0);
+  float cross=dot(uv*as,perp);
+  float ph2=fract(t*0.05*wa*2.0); float amp2=0.050;
+  float p1=dot(uv*as,fn)*34.0 - t*2.6*wa;
+  float ripple=(n2(vec2(p1,cross*26.0))*0.62+n2(vec2(p1*0.55+11.,cross*13.))*0.38)*2.-1.;
+  vec2 rp=perp*ripple*0.0014;
+  vec2 uvA=clamp(uv-fn*(ph2*amp2)+rp,0.001,0.999);
+  vec2 uvB=clamp(uv-fn*(fract(ph2+0.5)*amp2)+rp,0.001,0.999);
+  vec3 wA=texture2D(uSampler,uvA).rgb, wB=texture2D(uSampler,uvB).rgb;
+  vec3 water=mix(wA,wB,abs(ph2-0.5)*2.0);
+  water*=vec3(0.82,0.90,0.97); water=mix(water,vec3(0.10,0.20,0.26),0.18);
+  float sp=n2(vec2(p1+3.,cross*20.)); float streak=smoothstep(0.70,0.96,sp)*wmask;
+  vec4 base=texture2D(uSampler,uv);
+  vec3 col=mix(base.rgb, water, clamp(wmask*1.2,0.,1.)); col+=streak*0.4*vec3(0.10,0.14,0.17);
+  gl_FragColor=vec4(col, base.a);
+}`;
+const waterFilter=new PIXI.Filter(undefined,waterFrag,{flowTex:flowTex,t:0,aspect:Wn/Hn,wa:1.0});
+const ground=new PIXI.Sprite(PIXI.Texture.from('assets/backgrounds/ground2_baked.png'));  // доми впечено у фон
+ground.width=Wn; ground.height=Hn; ground.zIndex=-1e9; ground.filters=[waterFilter];
+world.addChild(ground);
+
+// ================= спрайти-текстури =================
+const SRC={ wheat:[0,1,2,3,4,5].map(i=>'nb/tuft_wheat2/0'+i), flower:[0,1,2,3,4,5,6,7].map(i=>'nb/tuft_flower2/0'+i),
+  reed:[0,1,2,3,4,5].map(i=>'nb/tuft_reed2/0'+i), grass:[0,1,2,3,4,5].map(i=>'nb/tuft_grass/0'+i),
+  tree:['nb/1_trees/00','nb/1_trees/01','nb/1_trees/02','nb/v2_trees/00','nb/v2_trees/01','nb/v2_trees/02'],
+  bush:['nb/1_trees/03','nb/v2_trees/03','nb/v2_trees/04'] };
+const CAP={tree:220,bush:180}; const TEX={wheat:[],flower:[],reed:[],grass:[],tree:[],bush:[]};
+let sprTotal=0,sprLoaded=0;
+for(const ty in SRC){for(const s of SRC[ty]){sprTotal++;const im=new Image();
+  im.onload=()=>{TEX[ty].push(PIXI.Texture.from(gradeCanvas(im,CAP[ty]||150)));sprLoaded++;ready();};
+  im.onerror=()=>{sprLoaded++;ready();}; im.src='assets/'+s+'.png';}}
+
+// тінь-текстура (радіальний еліпс)
+const shadowTex=(()=>{const c=document.createElement('canvas');c.width=128;c.height=64;const x=c.getContext('2d');
+  const g=x.createRadialGradient(64,32,2,64,32,60);g.addColorStop(0,'rgba(20,16,8,0.5)');g.addColorStop(1,'rgba(20,16,8,0)');
+  x.fillStyle=g;x.beginPath();x.ellipse(64,32,60,30,0,0,6.283);x.fill();return PIXI.Texture.from(c);})();
+
+// ================= маски =================
+const mask=new Image(),keep=new Image(),walkImg=new Image(); let mReady=0;
+function mrk(){mReady++;ready();}
+mask.onload=mrk; keep.onload=mrk; keep.onerror=mrk; walkImg.onload=()=>{buildWalkGrid();mrk();}; walkImg.onerror=mrk;
+mask.src='assets/backgrounds/zone2.png'; keep.src='assets/backgrounds/keepout2.png'; walkImg.src='assets/backgrounds/walk2.png';
+function readpx(img,w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
+  try{x.drawImage(img,0,0,w,h);return x.getImageData(0,0,w,h).data;}catch(e){return null;}}
+
+// ================= layout (ФАЙЛ → localStorage) =================
+const BUILD_RE=/(2_buildings|b2_buildings|ba_khata|ba_zrub|10_mill|8_roles)/;
+const BG_NATIVE={fieldhi:2816,base1:1408,base2:1408,map1:2562,map2:2562,grass:1408,dark:1408,dusk:1408};
+let placements=[],foundations=[],placeReady=false,layoutBGW=2816;
+function loadLayout(){ placements=[]; placeReady=true; }  // доми ВПЕЧЕНО у baked-фон → окремо не вантажимо (ready() спрацює від спрайтів)
+loadLayout();
+
+// ================= збірка сцени =================
+let windList=[];   // рослини, що хитаються {sprite, x, y, stiff, phase}
+let built=false;
+function ready(){ if(!built && sprLoaded>=sprTotal && mReady>=3 && placeReady && flowTex.baseTexture.valid!==false){ built=true; buildScene(); } }
+function addSprite(tex,x,y,targetH,opts={}){ const sp=new PIXI.Sprite(tex); sp.anchor.set(0.5,1);
+  sp.x=x; sp.y=y; const sc=(targetH*SCL)/tex.height; sp.scale.set(sc*(opts.flip||1), sc);
+  sp.zIndex=y; world.addChild(sp); return sp; }
+function buildScene(){
+  const md=readpx(mask,MW,MH), kd=readpx(keep,MW,MH), base=DEN, treK=TREE;
+  const cx=CXf*MW, cy=CYf*MH, maxR=Math.hypot(Math.max(cx,MW-cx),Math.max(cy,MH-cy));
+  const K=Wn/layoutBGW;
+  foundations=placements.filter(p=>p.build).map(p=>{const w=p.img.width*p.scale*K,h=p.img.height*p.scale*K;
+    return {cx:p.x*K,cy:p.y*K+h*0.38,rx:w*0.30,ry:Math.max(8,h*0.12)};});
+  const inF=(px,py)=>{for(const f of foundations){const a=(px-f.cx)/f.rx,b=(py-f.cy)/f.ry;if(a*a+b*b<1)return true;}return false;};
+  function pick(ty,sx,sy){const arr=TEX[ty];return arr[Math.min(arr.length-1,(hash(sx*1.1+1,sy*0.7+2)*arr.length)|0)];}
+  function plant(ty,mx,my,baseH,stiff,sx,sy,wind){ const tex=pick(ty,sx,sy); if(!tex)return;
+    const th=baseH*(0.8+hash(sx*2.3+5,sy*1.9+3)*0.45); const flip=hash(sx*0.5+9,sy*3.1+4)<0.5?-1:1;
+    const sp=addSprite(tex,mx*SCL,my*SCL,th,{flip});
+    if(ty==='tree'||ty==='bush'){ const sh=new PIXI.Sprite(shadowTex); sh.anchor.set(0.5,0.5);
+      sh.x=mx*SCL; sh.y=my*SCL; sh.width=sp.width*0.9; sh.height=sp.width*0.34; sh.zIndex=my*SCL-0.5; world.addChild(sh); }
+    if(wind) windList.push({sprite:sp,x:mx*SCL,y:my*SCL,stiff:stiff*(0.85+hash(sx*0.9+12,sy*2.1+7)*0.4),phase:hash(sx*1.7+6,sy*2.5+8)*6.28});
+  }
+  for(let y=0;y<MH;y+=base){for(let x=0;x<MW;x+=base){ const i=(y*MW+x)*4; if(kd&&kd[i]>110)continue;
+    const r=md[i],g=md[i+1],b=md[i+2]; let zone=null;
+    if(r>110&&r>=g&&r>=b)zone='wheat'; else if(b>110&&b>=g*0.7)zone='reed'; else if(g>110)zone='flower'; if(!zone)continue;
+    const jx=x+(hash(x*0.3+1,y*0.5+2)-0.5)*base, jy=y+(hash(x*0.6+3,y*0.24+4)-0.5)*base;
+    if(foundations.length&&inF(jx*SCL,jy*SCL))continue;
+    const rp=hash(x*1.7+3.1,y*2.3+0.7), rich=Math.min(1,Math.hypot(jx-cx,jy-cy)/maxR), grove=vnoise(x*0.012+4,y*0.012+9);
+    if(zone==='wheat'){ if(rp>0.93)continue; plant('wheat',jx,jy,22,1.0,x,y,true); }
+    else if(zone==='reed'){ if(rp<0.30)plant('reed',jx,jy,36,0.95,x+0.2,y,true); else if(rp<0.62)plant('grass',jx,jy,20,0.9,x+0.4,y,true); }
+    else { if(rp<0.05+0.14*rich)plant('flower',jx,jy,15,0.85,x+0.11,y+0.13,true);
+      else if(hash(x*0.9+11,y*1.3+5)<0.06)plant('grass',jx,jy,17,0.9,x+0.23,y+0.29,true);
+      if(rich>0.30&&hash(x*2.7+9,y*1.1+4)<0.03*treK*(0.3+grove))plant('bush',jx,jy,26,1.8,x+0.37,y+0.41,true);
+      if(rich>0.42&&hash(x*3.3+7,y*2.9+2)<0.02*treK*grove*grove)plant('tree',jx,jy,56,3.2,x+0.71,y+0.83,true); } }}
+  // доми/декор
+  for(const p of placements){ const w=p.img.width*p.scale*K, h=p.img.height*p.scale*K;
+    // відкидна тінь силуетом
+    const sh=new PIXI.Sprite(p.tex); sh.anchor.set(0.5,1); sh.x=p.x*K; sh.y=p.y*K+h*0.5; sh.tint=0x000000; sh.alpha=0.22;
+    sh.scale.set(p.scale*K*p.flip, p.scale*K*0.5); sh.skew.x=-0.5; sh.zIndex=p.y*K+h*0.5-0.6; world.addChild(sh);
+    const sp=new PIXI.Sprite(p.tex); sp.anchor.set(0.5,0.5); sp.x=p.x*K; sp.y=p.y*K; sp.rotation=p.rot;
+    sp.scale.set(p.scale*K*p.flip, p.scale*K*p.flipY); sp.zIndex=p.y*K+h*0.5; world.addChild(sp); }
+  spawnAgents(12);
+  console.log('[scene] wind sprites=',windList.length,'children=',world.children.length);
+}
+
+// ================= АГЕНТИ =================
+const CHARS=[0,1,2,3,4,5].map(i=>'nb/c1_chars_a/0'+i).concat([0,1,2,3,4,5].map(i=>'nb/c2_chars_b/0'+i));
+function makeAvatar(cv){ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d');
+  x.save(); x.beginPath(); x.arc(32,32,31,0,6.283); x.clip();
+  const sw=cv.width*0.72, sh=sw, sx=(cv.width-sw)/2, sy=cv.height*0.05;   // голова = верх спрайта
+  x.drawImage(cv, sx,sy,sw,sh, 3,3,58,58); x.restore(); return c.toDataURL(); }
+const charTex=[], charAva=[];
+CHARS.forEach(s=>{const im=new Image();im.onload=()=>{const cv=gradeCanvas(im,130); charTex.push(PIXI.Texture.from(cv)); charAva.push(makeAvatar(cv));};im.src='assets/'+s+'.png';});
+let walkGrid=null,GW=0,GH=0; const CELL=14;
+function buildWalkGrid(){ const d=readpx(walkImg,MW,MH); if(!d)return; GW=(MW/CELL)|0; GH=(MH/CELL)|0; walkGrid=new Uint8Array(GW*GH);
+  for(let gy=0;gy<GH;gy++)for(let gx=0;gx<GW;gx++){const px=(gx*CELL+7)|0,py=(gy*CELL+7)|0,i=(py*MW+px)*4;
+    walkGrid[gy*GW+gx]=(d[i]>100||d[i+1]>100)?1:0;} }
+const walkable=(gx,gy)=>gx>=0&&gy>=0&&gx<GW&&gy<GH&&walkGrid[gy*GW+gx];
+function randWalkCell(){for(let k=0;k<500;k++){const gx=(Math.random()*GW)|0,gy=(Math.random()*GH)|0;if(walkable(gx,gy))return[gx,gy];}return null;}
+function bfs(s,g){if(!s||!g)return null;const prev=new Int32Array(GW*GH).fill(-1);const q=[s];prev[s[1]*GW+s[0]]=s[1]*GW+s[0];
+  const N=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];let hd=0;
+  while(hd<q.length){const[cx,cy]=q[hd++];if(cx===g[0]&&cy===g[1])break;
+    for(const[dx,dy]of N){const nx=cx+dx,ny=cy+dy;if(walkable(nx,ny)&&prev[ny*GW+nx]===-1){prev[ny*GW+nx]=cy*GW+cx;q.push([nx,ny]);}}}
+  const gi=g[1]*GW+g[0];if(prev[gi]===-1)return null;const path=[];let ci=gi;
+  while(true){const cx=ci%GW,cy=(ci/GW)|0;path.unshift([cx,cy]);if(cx===s[0]&&cy===s[1])break;ci=prev[ci];}return path;}
+function cellC(gx,gy){return {x:(gx*CELL+7)*SCL,y:(gy*CELL+7)*SCL};}
+// ролі-архетипи + POI-точки (позиції ролей-духів із впеченого layout, простір 2816)
+const ROLE_NAMES=['Панікер','Оптиміст','Фактчекер','Тролль','Кум','Діаспора','Цинік','Скептик','Патріот','Мама','Блогер','Halas'];
+const POIS=[{name:'криниця',x:1402,y:785},{name:'дошка',x:1199,y:764},{name:'дзвін',x:1614,y:777},{name:'ставок',x:1790,y:1227}];
+const CHATTER=['Чули новину?','Та не може бути…','Я ж казав!','Треба перевірити джерело.','Хто це взагалі вигадав?','Ой лишенько…','Спокійно, розберемось.','А пруфи є?','Це вже було торік.','Не панікуйте.','Ну і що тепер?','Ділом займіться, люди.'];
+function nearWalk(cx,cy){ let gx=((cx/SCL)/CELL)|0, gy=((cy/SCL)/CELL)|0; if(walkable(gx,gy))return[gx,gy];
+  for(let r=1;r<60;r++)for(let dx=-r;dx<=r;dx++)for(let dy=-r;dy<=r;dy++){ if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;
+    if(walkable(gx+dx,gy+dy))return[gx+dx,gy+dy]; } return null; }
+function poiSpot(poi,idx){ const ang=idx*1.9+0.5, rr=1+((idx*5)%4);   // кільце навколо точки — не купчаться
+  return nearWalk(poi.x+Math.cos(ang)*rr*CELL*SCL, poi.y+Math.sin(ang)*rr*CELL*SCL)||poi.cell; }
+let pois=[], agents=[], eventTimer=10+Math.random()*10, eventActive=0;
+function bubbleFor(a){ if(a.bub)return; const g=new PIXI.Graphics(); g.beginFill(0xfafafc,0.92);
+  g.drawEllipse(0,0,12*SCL,8*SCL); g.drawCircle(-8*SCL,7*SCL,3*SCL); g.drawCircle(-12*SCL,10*SCL,1.8*SCL); g.endFill();
+  g.beginFill(0x8a8a96); for(let k=-1;k<=1;k++)g.drawCircle(k*4*SCL,0,1.5*SCL); g.endFill();
+  a.bub=g; world.addChild(g); }
+function killBubble(a){ if(a.bub){world.removeChild(a.bub);a.bub=null;} }
+function spawnAgents(n){ if(!charTex.length){setTimeout(()=>spawnAgents(n),200);return;}
+  pois=POIS.map(p=>({...p,cell:nearWalk(p.x,p.y)})).filter(p=>p.cell);
+  agents.forEach(a=>{world.removeChild(a.sp);world.removeChild(a.sh);if(a.bub)world.removeChild(a.bub);}); agents=[];
+  for(let k=0;k<n;k++){const c=randWalkCell();if(!c)continue;const p=cellC(c[0],c[1]);
+    const tex=charTex[k%charTex.length]; const sp=new PIXI.Sprite(tex); sp.anchor.set(0.5,1);
+    const sc=(30*SCL)/tex.height; const sh=new PIXI.Sprite(shadowTex); sh.anchor.set(0.5,0.5); sh.width=tex.width*sc*0.8; sh.height=tex.width*sc*0.3;
+    world.addChild(sh); world.addChild(sp);
+    agents.push({idx:k,sp,sh,tex,sc,x:p.x,y:p.y,cell:c,path:null,pi:0,spd:14+Math.random()*8,face:Math.random()<0.5?-1:1,bob:0,
+      role:ROLE_NAMES[k%ROLE_NAMES.length],state:'idle',timer:1+Math.random()*4,goal:null,bub:null}); }
+  buildRoster();
+  console.log('[agents]',agents.length,'POIs:',pois.map(p=>p.name).join(','));
+}
+function goTo(a,cell){ if(!cell){a.state='idle';a.timer=2;return;} a.path=bfs(a.cell,cell); a.pi=1; a.state=a.path?'walk':'idle'; if(!a.path)a.timer=2; }
+function pickGoal(a){ if(eventActive>0 && pois.length){ const b=pois.find(p=>p.name==='дошка')||pois[0]; a.goal=b; goTo(a,poiSpot(b,a.idx)); return; }
+  if(pois.length && Math.random()<0.7){ const poi=pois[(Math.random()*pois.length)|0]; a.goal=poi; goTo(a,poiSpot(poi,a.idx)); }
+  else { a.goal=null; goTo(a,randWalkCell()); } }
+function updateAgents(dt){ if(!agents.length)return;
+  eventTimer-=dt;
+  if(eventActive>0){ eventActive-=dt; if(eventActive<=0) agents.forEach(a=>{if(a.state==='hang'){a.state='idle';a.timer=0.3+Math.random();}}); }
+  else if(eventTimer<=0){ eventActive=10+Math.random()*8; eventTimer=28+Math.random()*24; agents.forEach(pickGoal); }
+  for(const a of agents){ a.timer-=dt;
+    if(a.state==='talk'){ if(a.timer<=0){a.state='hang';a.timer=2+Math.random()*3;killBubble(a);} }
+    else if(a.state==='walk'){
+      if(!a.path||a.pi>=a.path.length){ a.state='hang'; a.timer=(a.goal?4+Math.random()*6:1+Math.random()*3); }
+      else{const t=a.path[a.pi],c=cellC(t[0],t[1]),dx=c.x-a.x,dy=c.y-a.y,d=Math.hypot(dx,dy),step=a.spd*SCL*dt;
+        if(d<=step){a.x=c.x;a.y=c.y;a.cell=t;a.pi++;}else{a.x+=dx/d*step;a.y+=dy/d*step;if(Math.abs(dx)>0.5)a.face=dx<0?-1:1;a.bob+=dt*9;}}
+    } else { if(a.timer<=0) pickGoal(a); }
+  }
+  // РОЗСУВАННЯ — щоб не заставляли одне одного
+  for(let i=0;i<agents.length;i++)for(let j=i+1;j<agents.length;j++){ const A=agents[i],B=agents[j];
+    if(A.state==='walk'||B.state==='walk')continue; const dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy),mn=30*SCL;
+    if(d>0.1&&d<mn){const p=(mn-d)/2/d; A.x-=dx*p;A.y-=dy*p;B.x+=dx*p;B.y+=dy*p;} }
+  // соц-контакт: повертаються одне до одного; РІДКО думка-бульбашка; репліка → в панель (не швидко)
+  for(let i=0;i<agents.length;i++){const A=agents[i];if(A.state!=='hang'&&A.state!=='idle')continue;
+    for(let j=i+1;j<agents.length;j++){const B=agents[j];if(B.state!=='hang'&&B.state!=='idle')continue;
+      if(Math.hypot(A.x-B.x,A.y-B.y)<80*SCL){ A.state=B.state='talk'; A.timer=B.timer=3+Math.random()*5;
+        A.face=B.x<A.x?-1:1; B.face=A.x<B.x?-1:1;
+        if(!lapaOn && Math.random()<0.8) pushDialogue(A.role, CHATTER[(Math.random()*CHATTER.length)|0], A.idx);   // авто-балачка в чат
+        if(Math.random()<0.22) bubbleFor(A);                                           // бульбашка — рідко
+        break; }}}
+  for(const a of agents){ const bounce=Math.abs(Math.sin(a.bob))*a.tex.height*a.sc*0.02;
+    a.sp.x=a.x; a.sp.y=a.y-bounce; a.sp.scale.set(a.sc*a.face,a.sc); a.sp.zIndex=a.y;
+    a.sh.x=a.x; a.sh.y=a.y; a.sh.zIndex=a.y-0.5;
+    if(a.bub){a.bub.x=a.x;a.bub.y=a.y-a.tex.height*a.sc-9*SCL;a.bub.zIndex=a.y+2;} }
+}
+
+// ================= ВІТЕР (skew) =================
+function gustAt(x,y,wx,wy,t){const gx=x*0.0022-wx*t*0.35,gy=y*0.0022-wy*t*0.35;
+  let n=vnoise(gx,gy)*0.62+vnoise(gx*2.1+5,gy*2.1+3)*0.38;let g=Math.max(0,n-0.5)/0.5;return g*g;}
+let blastStart=-99;
+function updateWind(t,blastAmt,blastPh){ const wa=0.9*Math.sin(t*0.06)+0.5*Math.sin(t*0.017+2),wdx=Math.cos(wa),wdy=Math.sin(wa);
+  for(const w of windList){ let g=gustAt(w.x,w.y,wdx,wdy,t)*(0.3+1.4*FREQ);
+    if(blastAmt>0){const along=w.x/Wn;g+=blastAmt*Math.exp(-Math.pow((along-blastPh)*2.6,2))*1.3;}
+    const rustle=0.03*Math.sin(t*2.6+w.phase);
+    w.sprite.skew.x = -((g*WIND/w.stiff)*wdx + rustle*(g>0.02?1:0.25)); }
+}
+
+// ================= ПАНЕЛЬ: ЧАТ-ХРОНІКА + РОСТЕР + НОВИНА =================
+const chatEl=document.getElementById('chat'); let lapaOn=false; const dq=[]; let dqT=1.5;
+function pushDialogue(role,text,idx){ if(dq.length<10) dq.push({role,text,idx}); }
+function pushSys(text){ dq.push({sys:true,text}); }
+function tickDialogue(dt){ dqT-=dt; if(dqT>0||!dq.length||!chatEl)return; const m=dq.shift();
+  const el=document.createElement('div'); el.className='msg'+(m.sys?' sys':'');
+  if(m.sys) el.innerHTML='<div class="bd">'+m.text+'</div>';
+  else el.innerHTML='<img src="'+(charAva[(m.idx||0)%(charAva.length||1)]||'')+'"><div class="bd"><span class="nm">'+m.role+'</span>'+m.text+'</div>';
+  chatEl.appendChild(el); while(chatEl.children.length>40)chatEl.removeChild(chatEl.firstChild);
+  requestAnimationFrame(()=>el.classList.add('show')); chatEl.scrollTop=chatEl.scrollHeight; dqT=m.sys?1.4:2.6; }
+function buildRoster(){ const el=document.getElementById('roster'); if(!el)return; el.innerHTML='';
+  agents.forEach(a=>{ const d=document.createElement('div'); d.className='rc';
+    d.innerHTML='<img src="'+(charAva[a.idx%(charAva.length||1)]||'')+'"><div><div class="nm">'+a.role+'</div><div class="ac">…</div></div>';
+    el.appendChild(d); a.acEl=d.querySelector('.ac'); }); }
+function agentAct(a){ if(a.state==='talk')return 'розмовляє'; if(a.state==='walk')return a.goal?('прямує до: '+a.goal.name):'йде вулицею';
+  return a.goal?('біля: '+a.goal.name):'спостерігає'; }
+let rosterT=0;
+function tickRoster(dt){ rosterT-=dt; if(rosterT>0)return; rosterT=0.5; for(const a of agents) if(a.acEl) a.acEl.textContent=agentAct(a); }
+// поле «новина на площу»
+window.addEventListener('load',()=>{ const go=document.getElementById('newsGo');
+  if(go) go.onclick=()=>{ const ta=document.getElementById('newsIn'); const v=(ta.value||'').trim(); if(!v)return;
+    pushSys('📰 На площу кинули новину: «'+v.slice(0,140)+(v.length>140?'…':'')+'»'); ta.value='';
+    eventActive=Math.max(eventActive,13); if(agents.length)agents.forEach(pickGoal); };
+  const hp=document.getElementById('hidePanel'), sp=document.getElementById('showPanel');
+  if(hp) hp.onclick=()=>document.body.classList.add('nopanel');
+  if(sp) sp.onclick=()=>document.body.classList.remove('nopanel');
+});
+
+// ================= ІНТРО: село з-під хмар =================
+const cloudTex=(()=>{const c=document.createElement('canvas');c.width=256;c.height=256;const x=c.getContext('2d');
+  const g=x.createRadialGradient(128,128,8,128,128,128);g.addColorStop(0,'rgba(252,252,255,1)');g.addColorStop(.55,'rgba(246,247,251,.92)');g.addColorStop(1,'rgba(246,247,251,0)');
+  x.fillStyle=g;x.beginPath();x.arc(128,128,128,0,6.283);x.fill();return PIXI.Texture.from(c);})();
+const introLayer=new PIXI.Container(); app.stage.addChild(introLayer); const puffs=[];
+for(let i=0;i<58;i++){ const s=new PIXI.Sprite(cloudTex); s.anchor.set(0.5);
+  const px=Math.random()*Wn, py=Math.random()*Hn; s.x=px;s.y=py; const sc0=(0.7+Math.random()*1.7)*(Wn/1400); s.scale.set(sc0);
+  const ang=Math.atan2(py-Hn/2,px-Wn/2)+(Math.random()-0.5)*0.8; const dist=Wn*(0.12+Math.random()*0.38);
+  puffs.push({s,bx:px,by:py,sc0,dx:Math.cos(ang)*dist,dy:Math.sin(ang)*dist}); introLayer.addChild(s); }
+let introT=0, introDone=false;
+function updateIntro(dt){ if(introDone)return; introT=Math.min(1,introT+dt/2.8); const e=1-Math.pow(1-introT,2.2);
+  for(const p of puffs){ p.s.x=p.bx+p.dx*e; p.s.y=p.by+p.dy*e; p.s.alpha=Math.max(0,1-e*1.15); p.s.scale.set(p.sc0*(1+e*0.6)); }
+  if(introT>=1){ app.stage.removeChild(introLayer); introDone=true; } }
+
+// ================= ЦИКЛ =================
+let t=0,playing=true,fpsT=0,fps=0;
+app.ticker.add(()=>{ const dt=Math.min(app.ticker.deltaMS/1000,0.05);
+  updateIntro(dt); tickDialogue(dt); tickRoster(dt);
+  if(!playing)return; t+=dt; waterFilter.uniforms.t=t;
+  const dtb=t-blastStart, blast=(dtb>=0&&dtb<1.7)?Math.sin(Math.PI*dtb/1.7):0, bph=Math.min(Math.max(dtb/1.7,0),1);
+  if(built){ updateWind(t,blast,bph); updateAgents(dt); }
+  fpsT+=dt; if(fpsT>0.5){fps=Math.round(app.ticker.FPS);document.getElementById('fps').textContent=fps;fpsT=0;}
+});
+const _play=document.getElementById('play'); if(_play)_play.onclick=e=>{playing=!playing;e.target.textContent=playing?'⏸ пауза':'▶ грати';e.target.classList.toggle('on',playing);};
+const _blow=document.getElementById('blow'); if(_blow)_blow.onclick=()=>{blastStart=t;};
+const _rel=document.getElementById('reloadL'); if(_rel)_rel.onclick=()=>location.reload();
+window.__scene={app};
+</script></body></html>
