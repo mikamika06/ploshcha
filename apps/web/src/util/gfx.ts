@@ -11,10 +11,12 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
 
 // Легкий грейд для цілісного вигляду — трохи живіший, ніж у референсі.
 const GRADE = "saturate(0.96) sepia(0.04) brightness(1.02)";
+// Сильніший грейд для персонажів — приглушує, щоб вписати у painterly-фон.
+export const GRADE_MUTED = "saturate(0.80) sepia(0.13) brightness(0.94)";
 const texCache = new Map<string, Texture>();
 
-export async function loadGraded(url: string, maxH?: number): Promise<Texture> {
-  const key = `${url}|${maxH ?? 0}`;
+export async function loadGraded(url: string, maxH?: number, grade: string = GRADE): Promise<Texture> {
+  const key = `${url}|${maxH ?? 0}|${grade}`;
   const hit = texCache.get(key);
   if (hit) return hit;
   const img = await loadImage(url);
@@ -25,7 +27,7 @@ export async function loadGraded(url: string, maxH?: number): Promise<Texture> {
   c.width = Math.max(1, Math.round(nw * sc));
   c.height = Math.max(1, Math.round(nh * sc));
   const ctx = c.getContext("2d")!;
-  ctx.filter = GRADE;
+  ctx.filter = grade;
   ctx.drawImage(img, 0, 0, c.width, c.height);
   const tex = Texture.from(c);
   texCache.set(key, tex);

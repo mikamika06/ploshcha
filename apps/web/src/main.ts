@@ -13,7 +13,7 @@ import { Narrator } from "./roles/Narrator";
 import { ChatLog } from "./hud/ChatLog";
 import { FixtureDriver } from "./net/FixtureDriver";
 import { EditMode } from "./edit/EditMode";
-import { loadGraded, makeShadowTexture } from "./util/gfx";
+import { GRADE_MUTED, loadGraded, makeShadowTexture } from "./util/gfx";
 import { REPLAY_MS } from "./config";
 
 const TIME_UA: Record<string, string> = {
@@ -57,6 +57,23 @@ async function loadCharTextures(): Promise<Texture[]> {
   return loaded.filter((t): t is Texture => t !== null);
 }
 
+const ROLE_IDS = [
+  "koval", "mirosh", "pip", "sheptu", "starosta", "shynkar",
+  "chumak", "diak", "did", "mati", "parubok", "divchyna",
+];
+
+async function loadRoleFrames(): Promise<Map<string, Texture[]>> {
+  const map = new Map<string, Texture[]>();
+  await Promise.all(
+    ROLE_IDS.map(async (id) => {
+      const fr = await Promise.all([0, 1, 2].map((n) => loadGraded(`/assets/roles/${id}/${n}.png`, undefined, GRADE_MUTED).catch(() => null)));
+      const valid = fr.filter((t): t is Texture => t !== null);
+      if (valid.length === 3) map.set(id, valid);
+    }),
+  );
+  return map;
+}
+
 async function boot(): Promise<void> {
   const scene = SceneSpec.parse(sceneJson);
   const SCL = scene.size.w / scene.masks.space.w;
@@ -71,7 +88,7 @@ async function boot(): Promise<void> {
   // walk-grid її НЕ використовуємо (інакше вирізає всю ходьбу). Ходьба лише за walk2.
   await grid.load(scene.masks.walk);
 
-  const [vegTex, chars] = await Promise.all([loadVegTextures(), loadCharTextures()]);
+  const [vegTex, chars, roleFrames] = await Promise.all([loadVegTextures(), loadCharTextures(), loadRoleFrames()]);
   await renderer.buildVegetation(vegTex, shadowTex);
   renderer.initWeather();
   renderer.playIntro();
@@ -86,7 +103,7 @@ async function boot(): Promise<void> {
   const pois = new Map<string, POI>();
   for (const p of scene.pois) pois.set(p.id, p);
 
-  const director = new AgentDirector(renderer.world, grid, pois, chars, shadowTex, SCL);
+  const director = new AgentDirector(renderer.world, grid, pois, chars, roleFrames, shadowTex, SCL);
   const narrator = new Narrator();
   const chat = new ChatLog();
   const store = new SimStore();
