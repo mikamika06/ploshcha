@@ -1,6 +1,6 @@
 import { Application, Container, Filter, Sprite, Texture } from "pixi.js";
 import type { SceneSpec } from "@ploshcha/contract-ts";
-import { assetUrl, loadGraded, makeShadowTexture, readPixels } from "../util/gfx";
+import { assetUrl, loadGraded, readPixels } from "../util/gfx";
 import { makeWaterFilter } from "./Water";
 import { seedVegetation, type VegItem, type VegTextures } from "./Vegetation";
 import { Wind } from "./Wind";
@@ -70,28 +70,17 @@ export class SceneRenderer {
     const data = (await res.json()) as {
       objects: { file: string; x: number; y: number; w: number; h: number; baseY: number }[];
     };
-    const shadowTex = makeShadowTexture();
     await Promise.all(
       data.objects.map(async (o) => {
         const tex = await loadGraded(assetUrl(`assets/objects/${o.file}`)).catch(() => null);
         if (!tex) return;
-        // висока споруда (хата/церква/зруб) заслоняє й має тінь; пласка (грядки/корита) — на землі
+        // висока споруда (хата/церква/зруб) заслоняє; пласка (грядки/корита) — на землі.
+        // Власна запечена тінь уже всередині вирізаного спрайта.
         const tall = o.h >= o.w * 0.6;
-        if (tall) {
-          const sh = new Sprite(shadowTex);
-          sh.anchor.set(0.5, 0.5);
-          sh.x = o.x + o.w / 2;
-          sh.y = o.baseY - o.h * 0.03;
-          sh.width = o.w * 0.98;
-          sh.height = o.w * 0.24;
-          sh.alpha = 0.32;
-          sh.zIndex = o.baseY - 1;
-          this.world.addChild(sh);
-        }
         const sp = new Sprite(tex);
         sp.x = o.x;
         sp.y = o.y;
-        sp.zIndex = tall ? o.baseY : -5e8; // пласкі — на землі, не заслоняють людей
+        sp.zIndex = tall ? o.baseY : -5e8;
         this.world.addChild(sp);
       }),
     );
