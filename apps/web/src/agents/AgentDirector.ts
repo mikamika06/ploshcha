@@ -23,6 +23,7 @@ interface Rec {
   cell: Cell;
   bubble?: Container;
   bubbleT: number;
+  wanderTimer: number;
 }
 
 /** Звʼязує селян контракту зі спрайтами: спавн, рух по BFS, бульбашки реплік. */
@@ -63,7 +64,7 @@ export class AgentDirector {
         id: v.id, name: v.name, sprite, shadow, tex, frames, sc,
         x: p.x, y: p.y, face: Math.random() < 0.5 ? -1 : 1,
         path: null, pi: 0, speed: 10 + Math.random() * 4, bob: 0, state: "idle",
-        cell, bubbleT: 0,
+        cell, bubbleT: 0, wanderTimer: 1 + Math.random() * 3,
       });
     }
   }
@@ -104,6 +105,20 @@ export class AgentDirector {
 
   update(dt: number): void {
     for (const r of this.recs.values()) {
+      // амбієнтне блукання: коли стоїть — час від часу йде до близької точки
+      if (r.state === "idle") {
+        r.wanderTimer -= dt;
+        if (r.wanderTimer <= 0) {
+          r.wanderTimer = 2 + Math.random() * 4;
+          const t = this.grid.randCellNear(r.cell, 14);
+          const path = t ? this.grid.bfs(r.cell, t) : null;
+          if (path && path.length > 1) {
+            r.path = path;
+            r.pi = 1;
+            r.state = "walk";
+          }
+        }
+      }
       if (r.state === "walk" && r.path) {
         if (r.pi >= r.path.length) {
           r.state = "idle";
