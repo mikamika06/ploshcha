@@ -70,6 +70,24 @@ export class SceneRenderer {
     this.world.addChild(g);
   }
 
+  /** Будівлі/споруди «розпечено» з фону в окремі спрайти з глибиною (zIndex=низ) — щоб селяни заходили ЗА них. */
+  async loadObjects(): Promise<void> {
+    const res = await fetch("/assets/objects/objects.json").catch(() => null);
+    if (!res || !res.ok) return;
+    const data = (await res.json()) as { objects: { file: string; x: number; y: number; baseY: number }[] };
+    await Promise.all(
+      data.objects.map(async (o) => {
+        const tex = await loadGraded(assetUrl(`assets/objects/${o.file}`)).catch(() => null);
+        if (!tex) return;
+        const sp = new Sprite(tex);
+        sp.x = o.x;
+        sp.y = o.y;
+        sp.zIndex = o.baseY;
+        this.world.addChild(sp);
+      }),
+    );
+  }
+
   async buildVegetation(tex: VegTextures, shadowTex: Texture): Promise<void> {
     const m = this.scene.masks;
     if (!m.zone) return;

@@ -82,6 +82,7 @@ async function boot(): Promise<void> {
   const renderer = new SceneRenderer(scene);
   renderer.mount(document.getElementById("frame")!);
   await renderer.loadGround();
+  await renderer.loadObjects();
 
   const grid = new WalkGrid(scene.masks.space.w, scene.masks.space.h, SCL);
   // NB: keepout маска = «не саджати» (стежки+хати+вода), а не «тут хата» — тому для

@@ -2,7 +2,7 @@
   "id": "verbolozy",
   "name": "Верболози",
   "size": { "w": 2816, "h": 1536 },
-  "background": "assets/backgrounds/ground2_baked.png",
+  "background": "assets/backgrounds/ground2_hi.png",
   "masks": {
     "walk": "assets/backgrounds/walk2.png",
     "zone": "assets/backgrounds/zone2.png",
