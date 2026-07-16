@@ -2,7 +2,7 @@ import { Application, Container, Filter, Sprite, Texture } from "pixi.js";
 import type { SceneSpec } from "@ploshcha/contract-ts";
 import { assetUrl, loadGraded, readPixels } from "../util/gfx";
 import { makeWaterFilter } from "./Water";
-import { seedVegetation, type VegTextures } from "./Vegetation";
+import { seedVegetation, type VegItem, type VegTextures } from "./Vegetation";
 import { Wind } from "./Wind";
 import { Intro } from "./Intro";
 import { Weather } from "./Weather";
@@ -22,6 +22,14 @@ export class SceneRenderer {
   private waterFilter?: Filter;
   private wind?: Wind;
   private intro?: Intro;
+  private vegItems: VegItem[] = [];
+
+  get vegetation(): VegItem[] {
+    return this.vegItems;
+  }
+  get canvas(): HTMLCanvasElement {
+    return this.app.view as unknown as HTMLCanvasElement;
+  }
 
   constructor(public scene: SceneSpec) {
     this.app = new Application({
@@ -70,10 +78,10 @@ export class SceneRenderer {
     const SCL = this.scene.size.w / MW;
     const zone = await readPixels(assetUrl(m.zone), MW, MH);
     const keep = m.keepout ? await readPixels(assetUrl(m.keepout), MW, MH) : null;
-    const windList = seedVegetation(this.world, zone, keep, tex, shadowTex, {
+    this.vegItems = seedVegetation(this.world, zone, keep, tex, shadowTex, {
       MW, MH, SCL, DEN: 9, TREE: 1.3, CXf: 782 / 1408, CYf: 377 / 768,
     });
-    this.wind = new Wind(windList, this.scene.size.w);
+    this.wind = new Wind(this.vegItems, this.scene.size.w);
   }
 
   initWeather(): void {

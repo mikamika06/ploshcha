@@ -13,6 +13,7 @@ export class Camera {
   private lastX = 0;
   private lastY = 0;
   private moved = false;
+  locked = false; // true у режимі правки — пан вимкнено
 
   constructor(
     private view: HTMLCanvasElement,
@@ -76,7 +77,14 @@ export class Camera {
     this.view.style.transform = `translate(${this.x.toFixed(1)}px, ${this.y.toFixed(1)}px) scale(${this.scale.toFixed(4)})`;
   }
 
+  /** Екранна точка (clientX/Y) → координати світу. */
+  screenToWorld(clientX: number, clientY: number): { x: number; y: number } {
+    const r = this.frame.getBoundingClientRect();
+    return { x: (clientX - r.left - this.x) / this.scale, y: (clientY - r.top - this.y) / this.scale };
+  }
+
   private onDown = (e: PointerEvent): void => {
+    if (this.locked) return;
     this.dragging = true;
     this.moved = false;
     this.lastX = e.clientX;

@@ -12,6 +12,7 @@ import { SimStore } from "./store/SimStore";
 import { Narrator } from "./roles/Narrator";
 import { ChatLog } from "./hud/ChatLog";
 import { FixtureDriver } from "./net/FixtureDriver";
+import { EditMode } from "./edit/EditMode";
 import { loadGraded, makeShadowTexture } from "./util/gfx";
 import { REPLAY_MS } from "./config";
 
@@ -74,6 +75,13 @@ async function boot(): Promise<void> {
   await renderer.buildVegetation(vegTex, shadowTex);
   renderer.initWeather();
   renderer.playIntro();
+
+  // режим правки (прибрати рослини / закрити прохід) — застосовує збережене одразу
+  const editMode = new EditMode(renderer.world, grid, renderer.vegetation, renderer.camera!, renderer.canvas);
+  document.getElementById("edit-toggle")?.addEventListener("click", (e) => {
+    const on = editMode.toggle();
+    (e.currentTarget as HTMLElement).classList.toggle("on", on);
+  });
 
   const pois = new Map<string, POI>();
   for (const p of scene.pois) pois.set(p.id, p);

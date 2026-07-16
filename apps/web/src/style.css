@@ -249,3 +249,74 @@ body {
     transform: none;
   }
 }
+
+/* ================= РЕЖИМ ПРАВКИ ================= */
+.hud-edit {
+  font: 600 11px/1 var(--sans);
+  letter-spacing: 0.04em;
+  color: var(--txt-dim);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  padding: 6px 11px;
+  cursor: pointer;
+}
+.hud-edit:hover {
+  background: rgba(0, 0, 0, 0.09);
+}
+.hud-edit.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.edit-toolbar {
+  position: absolute;
+  top: clamp(14px, 2vw, 30px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--panel-top), var(--panel));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--edge);
+  box-shadow: 0 12px 34px #0007;
+  color: var(--txt);
+}
+.edit-toolbar[hidden] {
+  display: none;
+}
+.edit-toolbar .et-title {
+  font: 700 11px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--txt-dim);
+}
+.edit-toolbar .et-tool,
+.edit-toolbar .et-clear {
+  font: 600 12px/1 var(--sans);
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--txt);
+  cursor: pointer;
+}
+.edit-toolbar .et-tool.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.edit-toolbar .et-tool:hover,
+.edit-toolbar .et-clear:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+.edit-toolbar .et-hint {
+  font: 12px/1 var(--sans);
+  color: var(--txt-dim);
+}

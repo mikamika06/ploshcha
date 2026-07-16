@@ -1,12 +1,14 @@
 import { Container, Sprite, Texture } from "pixi.js";
 import { hash, vnoise } from "./noise";
 
-export interface WindSprite {
+export interface VegItem {
   sprite: Sprite;
+  shadow: Sprite | null;
   x: number;
   y: number;
   stiff: number;
   phase: number;
+  removed: boolean;
 }
 
 export type VegType = "wheat" | "flower" | "reed" | "grass" | "tree" | "bush";
@@ -33,9 +35,9 @@ export function seedVegetation(
   tex: VegTextures,
   shadowTex: Texture,
   o: VegParams,
-): WindSprite[] {
+): VegItem[] {
   const { MW, MH, SCL, DEN, TREE, CXf, CYf } = o;
-  const windList: WindSprite[] = [];
+  const items: VegItem[] = [];
   const cx = CXf * MW;
   const cy = CYf * MH;
   const maxR = Math.hypot(Math.max(cx, MW - cx), Math.max(cy, MH - cy));
@@ -64,8 +66,9 @@ export function seedVegetation(
     const th = baseH * (0.8 + hash(sx * 2.3 + 5, sy * 1.9 + 3) * 0.45);
     const flip = hash(sx * 0.5 + 9, sy * 3.1 + 4) < 0.5 ? -1 : 1;
     const sp = addSprite(t, mx * SCL, my * SCL, th, flip);
+    let sh: Sprite | null = null;
     if (ty === "tree" || ty === "bush") {
-      const sh = new Sprite(shadowTex);
+      sh = new Sprite(shadowTex);
       sh.anchor.set(0.5, 0.5);
       sh.x = mx * SCL;
       sh.y = my * SCL;
@@ -74,12 +77,14 @@ export function seedVegetation(
       sh.zIndex = my * SCL - 0.5;
       world.addChild(sh);
     }
-    windList.push({
+    items.push({
       sprite: sp,
+      shadow: sh,
       x: mx * SCL,
       y: my * SCL,
       stiff: stiff * (0.85 + hash(sx * 0.9 + 12, sy * 2.1 + 7) * 0.4),
       phase: hash(sx * 1.7 + 6, sy * 2.5 + 8) * 6.28,
+      removed: false,
     });
   };
 
@@ -116,5 +121,5 @@ export function seedVegetation(
       }
     }
   }
-  return windList;
+  return items;
 }

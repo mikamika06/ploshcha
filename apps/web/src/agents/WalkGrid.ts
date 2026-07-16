@@ -101,4 +101,34 @@ export class WalkGrid {
   cellCenter(gx: number, gy: number): { x: number; y: number } {
     return { x: (gx * this.CELL + 7) * this.SCL, y: (gy * this.CELL + 7) * this.SCL };
   }
+
+  get cellWorld(): number {
+    return this.CELL * this.SCL;
+  }
+
+  blockIndex(idx: number): void {
+    if (idx >= 0 && idx < this.grid.length) this.grid[idx] = 0;
+  }
+
+  /** Блокує прохід у радіусі навколо нативної точки. Повертає індекси змінених клітинок. */
+  blockWorld(nativeX: number, nativeY: number, radiusWorld: number): number[] {
+    const cx = ((nativeX / this.SCL) / this.CELL) | 0;
+    const cy = ((nativeY / this.SCL) / this.CELL) | 0;
+    const rc = Math.max(1, Math.round(radiusWorld / this.SCL / this.CELL));
+    const out: number[] = [];
+    for (let gy = cy - rc; gy <= cy + rc; gy++) {
+      for (let gx = cx - rc; gx <= cx + rc; gx++) {
+        if (gx < 0 || gy < 0 || gx >= this.GW || gy >= this.GH) continue;
+        const dx = gx - cx;
+        const dy = gy - cy;
+        if (dx * dx + dy * dy > rc * rc) continue;
+        const i = gy * this.GW + gx;
+        if (this.grid[i] === 1) {
+          this.grid[i] = 0;
+          out.push(i);
+        }
+      }
+    }
+    return out;
+  }
 }

@@ -1,4 +1,4 @@
-import type { WindSprite } from "./Vegetation";
+import type { VegItem } from "./Vegetation";
 import { vnoise } from "./noise";
 
 const WIND = 0.5;
@@ -16,7 +16,7 @@ function gustAt(x: number, y: number, wx: number, wy: number, t: number): number
 export class Wind {
   private blastStart = -99;
 
-  constructor(private list: WindSprite[], private Wn: number) {}
+  constructor(private list: VegItem[], private Wn: number) {}
 
   blast(t: number): void {
     this.blastStart = t;
@@ -30,6 +30,7 @@ export class Wind {
     const blastAmt = dtb >= 0 && dtb < 1.7 ? Math.sin((Math.PI * dtb) / 1.7) : 0;
     const blastPh = Math.min(Math.max(dtb / 1.7, 0), 1);
     for (const w of this.list) {
+      if (w.removed) continue;
       let g = gustAt(w.x, w.y, wdx, wdy, t) * (0.3 + 1.4 * FREQ);
       if (blastAmt > 0) {
         const along = w.x / this.Wn;
