@@ -8,6 +8,15 @@ import { Intro } from "./Intro";
 import { Weather } from "./Weather";
 import { Camera } from "./Camera";
 
+export interface ObjectSpec {
+  file: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  baseY: number;
+}
+
 /**
  * Pixi-сцена нативного розміру (world scale=1 → фільтр води не зʼїжджає).
  * Пан/зум — CSS-трансформ полотна через Camera. Глибина = zIndex(y).
@@ -64,14 +73,9 @@ export class SceneRenderer {
   }
 
   /** Будівлі/споруди «розпечено» з фону в окремі спрайти з глибиною (zIndex=низ) — щоб селяни заходили ЗА них. */
-  async loadObjects(): Promise<void> {
-    const res = await fetch("/assets/objects/objects.json").catch(() => null);
-    if (!res || !res.ok) return;
-    const data = (await res.json()) as {
-      objects: { file: string; x: number; y: number; w: number; h: number; baseY: number }[];
-    };
+  async loadObjects(objects: ObjectSpec[]): Promise<void> {
     await Promise.all(
-      data.objects.map(async (o) => {
+      objects.map(async (o) => {
         const tex = await loadGraded(assetUrl(`assets/objects/${o.file}`)).catch(() => null);
         if (!tex) return;
         // висока споруда (хата/церква/зруб) заслоняє; пласка (грядки/корита) — на землі.

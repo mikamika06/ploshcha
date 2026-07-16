@@ -121,6 +121,25 @@ export class WalkGrid {
     for (let i = 0; i < N; i++) if (this.dist[i] < 0) this.dist[i] = 1;
   }
 
+  /**
+   * Виключає з прохідності футпринти високих споруд (bbox з objects.json), щоб селяни
+   * не заходили ЗА/ПІД хату (де zIndex хати їх ховає й стирчать самі ноги). Викликати ПІСЛЯ load.
+   */
+  blockObjects(objs: { x: number; y: number; w: number; h: number; baseY: number }[], margin = 6): void {
+    for (const o of objs) {
+      const tall = o.h >= o.w * 0.6;
+      if (!tall) continue;
+      const gx0 = Math.max(0, Math.floor((o.x - margin) / this.SCL / this.CELL));
+      const gx1 = Math.min(this.GW - 1, Math.floor((o.x + o.w + margin) / this.SCL / this.CELL));
+      const gy0 = Math.max(0, Math.floor(o.y / this.SCL / this.CELL));
+      const gy1 = Math.min(this.GH - 1, Math.floor((o.baseY + margin) / this.SCL / this.CELL));
+      for (let gy = gy0; gy <= gy1; gy++) {
+        for (let gx = gx0; gx <= gx1; gx++) this.grid[gy * this.GW + gx] = 0;
+      }
+    }
+    this.computeDist();
+  }
+
   walkable(gx: number, gy: number): boolean {
     return gx >= 0 && gy >= 0 && gx < this.GW && gy < this.GH && this.grid[gy * this.GW + gx] === 1;
   }

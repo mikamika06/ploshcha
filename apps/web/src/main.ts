@@ -4,7 +4,7 @@ import { SceneSpec } from "@ploshcha/contract-ts";
 import type { POI } from "@ploshcha/contract-ts";
 import sceneJson from "@fixtures/scenes/verbolozy.scene.json";
 import quietDayRaw from "@fixtures/runs/quiet-day.jsonl?raw";
-import { SceneRenderer } from "./scene/SceneRenderer";
+import { SceneRenderer, type ObjectSpec } from "./scene/SceneRenderer";
 import type { VegTextures, VegType } from "./scene/Vegetation";
 import { WalkGrid } from "./agents/WalkGrid";
 import { AgentDirector } from "./agents/AgentDirector";
@@ -78,15 +78,22 @@ async function boot(): Promise<void> {
   const SCL = scene.size.w / scene.masks.space.w;
   const shadowTex = makeShadowTexture();
 
+  const objects = await fetch("/assets/objects/objects.json")
+    .then((r) => (r.ok ? r.json() : { objects: [] }))
+    .then((d: { objects: ObjectSpec[] }) => d.objects)
+    .catch(() => [] as ObjectSpec[]);
+
   const renderer = new SceneRenderer(scene);
   renderer.mount(document.getElementById("frame")!);
   await renderer.loadGround();
-  await renderer.loadObjects();
+  await renderer.loadObjects(objects);
 
   const grid = new WalkGrid(scene.masks.space.w, scene.masks.space.h, SCL);
   // NB: keepout маска = «не саджати» (стежки+хати+вода), а не «тут хата» — тому для
   // walk-grid її НЕ використовуємо (інакше вирізає всю ходьбу). Ходьба лише за walk2.
   await grid.load(scene.masks.walk);
+  // футпринти хат (реальні bbox зі спрайтів) — щоб селяни не заходили ЗА/ПІД них
+  grid.blockObjects(objects);
 
   const [vegTex, chars, roleFrames] = await Promise.all([loadVegTextures(), loadCharTextures(), loadRoleFrames()]);
   await renderer.buildVegetation(vegTex, shadowTex);
