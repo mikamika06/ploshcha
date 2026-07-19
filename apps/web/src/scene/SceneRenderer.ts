@@ -91,6 +91,8 @@ export class SceneRenderer {
         const sp = new Sprite(tex);
         sp.x = o.x;
         sp.y = o.y;
+        sp.width = o.w; // текстури об'єктів апскейлені (2×) → малюємо у світовому розмірі o.w×o.h
+        sp.height = o.h; // (більше текселів на ту саму площу → різко при зумі)
         sp.zIndex = tall ? o.baseY : -5e8;
         this.world.addChild(sp);
       }),
