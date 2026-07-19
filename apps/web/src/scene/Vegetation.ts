@@ -1,5 +1,6 @@
 import { Container, Sprite, Texture } from "pixi.js";
 import { hash, vnoise } from "./noise";
+import { ovalShadow } from "../util/gfx";
 
 export interface VegItem {
   sprite: Sprite;
@@ -34,7 +35,6 @@ export function seedVegetation(
   zone: Uint8ClampedArray,
   keep: Uint8ClampedArray | null,
   tex: VegTextures,
-  shadowTex: Texture,
   o: VegParams,
 ): VegItem[] {
   const { MW, MH, SCL, DEN, TREE, CXf, CYf } = o;
@@ -69,12 +69,13 @@ export function seedVegetation(
     const sp = addSprite(t, mx * SCL, my * SCL, th, flip);
     let sh: Sprite | null = null;
     if (ty === "tree" || ty === "bush") {
-      sh = new Sprite(shadowTex);
+      sh = new Sprite(ovalShadow()); // м'яка контактна калюжа ПІД основою (не «літає»)
       sh.anchor.set(0.5, 0.5);
-      sh.x = mx * SCL;
-      sh.y = my * SCL;
-      sh.width = sp.width * 0.9;
-      sh.height = sp.width * 0.34;
+      sh.x = mx * SCL + sp.width * 0.04; // ледь до світла
+      sh.y = my * SCL - sp.width * 0.04; // центр трохи вище низу → калюжа обіймає основу
+      sh.width = sp.width * 0.85;
+      sh.height = sp.width * (ty === "tree" ? 0.26 : 0.3);
+      sh.alpha = ty === "tree" ? 0.34 : 0.3;
       sh.zIndex = my * SCL - 0.5;
       world.addChild(sh);
     }

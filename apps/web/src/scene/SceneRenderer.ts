@@ -1,4 +1,4 @@
-import { Application, Container, Filter, Sprite, Texture } from "pixi.js";
+import { Application, Container, Filter, Sprite } from "pixi.js";
 import type { SceneSpec } from "@ploshcha/contract-ts";
 import { assetUrl, loadGraded, readPixels } from "../util/gfx";
 import { makeWaterFilter } from "./Water";
@@ -39,6 +39,8 @@ export class SceneRenderer {
     // спрайтового арту (краї — це альфа PNG, а не векторна геометрія).
     const nav = navigator as Navigator & { deviceMemory?: number };
     const weak = (nav.hardwareConcurrency ?? 8) <= 4 || (nav.deviceMemory ?? 8) <= 4;
+    // Повна роздільність дисплея (до 2×) → полотно не апскейлиться на retina, усе різке.
+    // Слабкий пристрій лишається на 1× заради fps.
     this.app = new Application({
       width: scene.size.w,
       height: scene.size.h,
@@ -46,7 +48,7 @@ export class SceneRenderer {
       backgroundColor: 0x6f7a45,
       powerPreference: "default",
       autoDensity: true,
-      resolution: weak ? 1 : Math.min(1.5, window.devicePixelRatio || 1),
+      resolution: weak ? 1 : Math.min(2, window.devicePixelRatio || 1),
     });
     this.world = new Container();
     this.world.sortableChildren = true;
@@ -116,7 +118,7 @@ export class SceneRenderer {
     );
   }
 
-  async buildVegetation(tex: VegTextures, shadowTex: Texture): Promise<void> {
+  async buildVegetation(tex: VegTextures): Promise<void> {
     const m = this.scene.masks;
     if (!m.zone) return;
     const MW = m.space.w;
@@ -124,7 +126,7 @@ export class SceneRenderer {
     const SCL = this.scene.size.w / MW;
     const zone = await readPixels(assetUrl(m.zone), MW, MH);
     const keep = m.keepout ? await readPixels(assetUrl(m.keepout), MW, MH) : null;
-    this.vegItems = seedVegetation(this.world, zone, keep, tex, shadowTex, {
+    this.vegItems = seedVegetation(this.world, zone, keep, tex, {
       MW, MH, SCL, DEN: 9, TREE: 1.3, CXf: 782 / 1408, CYf: 377 / 768,
     });
     this.wind = new Wind(this.vegItems, this.scene.size.w, this.scene.size.h);
@@ -136,6 +138,11 @@ export class SceneRenderer {
 
   playIntro(): void {
     this.intro = new Intro(this.app.stage, this.app.screen.width, this.app.screen.height);
+  }
+
+  /** Село повністю відрендерене (з людьми) → розвести хмарну завісу. */
+  dissipateIntro(): void {
+    this.intro?.dissipate();
   }
 
   /** Амбієнт кожен кадр: течія води, вітер, інтро, погода. */

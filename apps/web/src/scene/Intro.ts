@@ -25,17 +25,21 @@ interface Puff {
   dy: number;
 }
 
-/** Інтро: село відкривається з-під хмар, що розлітаються. */
+/**
+ * Хмарна завіса. Тримається (ховає село), поки все вантажиться й рендериться; коли готове —
+ * `dissipate()` розводить хмари, і село відкривається з-під них уже повністю (з людьми).
+ */
 export class Intro {
   private layer = new Container();
   private puffs: Puff[] = [];
   private t = 0;
+  private parting = false;
   done = false;
 
   constructor(stage: Container, Wn: number, Hn: number) {
     stage.addChild(this.layer);
     const tex = makeCloudTexture();
-    for (let i = 0; i < 32; i++) {
+    for (let i = 0; i < 40; i++) {
       const s = new Sprite(tex);
       s.anchor.set(0.5);
       const px = Math.random() * Wn;
@@ -51,8 +55,13 @@ export class Intro {
     }
   }
 
+  /** Село готове → почати розводити хмари. */
+  dissipate(): void {
+    this.parting = true;
+  }
+
   update(dt: number): void {
-    if (this.done) return;
+    if (this.done || !this.parting) return; // ХОЛД: хмари стоять і ховають сцену, поки не готово
     this.t = Math.min(1, this.t + dt / 2.8);
     const e = 1 - Math.pow(1 - this.t, 2.2);
     for (const p of this.puffs) {

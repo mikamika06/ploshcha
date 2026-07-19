@@ -45,19 +45,26 @@ export async function readPixels(url: string, w: number, h: number): Promise<Uin
   return ctx.getImageData(0, 0, w, h).data;
 }
 
-export function makeShadowTexture(): Texture {
+let softOval: Texture | null = null;
+
+/** Спільна текстура м'якої пласкої тіні-калюжі (радіальний градієнт з розмитим краєм).
+ *  Кладеться ПІД основу об'єкта (контактна тінь) — тому об'єкт стоїть на землі, а не «літає». */
+export function ovalShadow(): Texture {
+  if (softOval) return softOval;
   const c = document.createElement("canvas");
   c.width = 128;
-  c.height = 64;
+  c.height = 128;
   const x = c.getContext("2d")!;
-  const g = x.createRadialGradient(64, 32, 2, 64, 32, 60);
-  g.addColorStop(0, "rgba(20,16,8,0.5)");
-  g.addColorStop(1, "rgba(20,16,8,0)");
+  const g = x.createRadialGradient(64, 64, 3, 64, 64, 62);
+  g.addColorStop(0, "rgba(18,13,6,0.5)");
+  g.addColorStop(0.55, "rgba(18,13,6,0.28)");
+  g.addColorStop(1, "rgba(18,13,6,0)");
   x.fillStyle = g;
   x.beginPath();
-  x.ellipse(64, 32, 60, 30, 0, 0, Math.PI * 2);
+  x.arc(64, 64, 62, 0, Math.PI * 2);
   x.fill();
-  return Texture.from(c);
+  softOval = Texture.from(c);
+  return softOval;
 }
 
 // Шляхи зі SceneSpec ("assets/...") → абсолютні від кореня статики ("/assets/...").

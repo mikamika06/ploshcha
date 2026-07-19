@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 import type { PlaceRef, POI, VillagerPublic } from "@ploshcha/contract-ts";
 import type { WalkGrid } from "./WalkGrid";
+import { ovalShadow } from "../util/gfx";
 
 type Cell = [number, number];
 
@@ -37,7 +38,6 @@ export class AgentDirector {
     private pois: Map<string, POI>,
     private charTex: Texture[],
     private roleFrames: Map<string, Texture[]>,
-    private shadowTex: Texture,
     private SCL: number,
   ) {}
 
@@ -52,12 +52,12 @@ export class AgentDirector {
       const sprite = new Sprite(tex);
       sprite.anchor.set(0.5, 1);
       const sc = (30 * this.SCL) / (tex.height || 1);
-      const shadow = new Sprite(this.shadowTex);
+      const shadow = new Sprite(ovalShadow()); // м'яка контактна калюжа під ногами
       shadow.anchor.set(0.5, 0.5);
-      const dh = tex.height * sc; // висота фігури на екрані
-      shadow.width = dh * 0.4;
-      shadow.height = dh * 0.13;
-      shadow.alpha = 0.85;
+      const dh = tex.height * sc;
+      shadow.width = dh * 0.42;
+      shadow.height = dh * 0.15;
+      shadow.alpha = 0.32;
       this.world.addChild(shadow);
       this.world.addChild(sprite);
       this.recs.set(v.id, {
@@ -172,8 +172,8 @@ export class AgentDirector {
       r.sprite.scale.set(r.sc * r.face, r.sc);
       r.sprite.zIndex = r.y | 0; // ціле → мікрорух не «бруднить» сортування щокадру
       r.shadow.x = r.x;
-      r.shadow.y = r.y;
-      r.shadow.alpha = walking ? 0.85 - Math.abs(s) * 0.18 : 0.85;
+      r.shadow.y = r.y; // калюжа під ногами (anchor 0.5,0.5)
+      r.shadow.alpha = walking ? 0.32 - Math.abs(s) * 0.05 : 0.32;
       r.shadow.zIndex = (r.y | 0) - 1;
       if (r.bubble) {
         r.bubbleT -= dt;

@@ -45,7 +45,8 @@ const SOCIAL_ROOM: Record<string, { bg: string; name: string; floor: Pt[]; mask?
 };
 
 import { FixtureDriver } from "./net/FixtureDriver";
-import { GRADE_MUTED, loadGraded, makeShadowTexture } from "./util/gfx";
+import { parseEnvelope } from "./net/validate";
+import { GRADE_MUTED, loadGraded } from "./util/gfx";
 import { REPLAY_MS } from "./config";
 
 function tuftUrls(dir: string, count: number): string[] {
@@ -99,7 +100,6 @@ async function loadRoleFrames(): Promise<Map<string, Texture[]>> {
 async function boot(): Promise<void> {
   const scene = SceneSpec.parse(sceneJson);
   const SCL = scene.size.w / scene.masks.space.w;
-  const shadowTex = makeShadowTexture();
 
   const objects = await fetch("/assets/objects/objects.json")
     .then((r) => (r.ok ? r.json() : { objects: [] }))
@@ -108,6 +108,8 @@ async function boot(): Promise<void> {
 
   const renderer = new SceneRenderer(scene);
   renderer.mount(document.getElementById("frame")!);
+  // Хмарна завіса ОДРАЗУ — ховає сцену, поки все вантажиться й рендериться (з людьми).
+  renderer.playIntro();
   await renderer.loadGround();
   await renderer.loadObjects(objects);
   await renderer.loadProps();
@@ -120,14 +122,13 @@ async function boot(): Promise<void> {
   grid.blockObjects(objects);
 
   const [vegTex, chars, roleFrames] = await Promise.all([loadVegTextures(), loadCharTextures(), loadRoleFrames()]);
-  await renderer.buildVegetation(vegTex, shadowTex);
+  await renderer.buildVegetation(vegTex);
   renderer.initWeather();
-  renderer.playIntro();
 
   const pois = new Map<string, POI>();
   for (const p of scene.pois) pois.set(p.id, p);
 
-  const director = new AgentDirector(renderer.world, grid, pois, chars, roleFrames, shadowTex, SCL);
+  const director = new AgentDirector(renderer.world, grid, pois, chars, roleFrames, SCL);
   const store = new SimStore();
 
   // ── діегетична оболонка (без HUD-бару): порти → занурення → Дошка / розмова ──
@@ -313,14 +314,31 @@ async function boot(): Promise<void> {
     }
   });
 
-  const lines = quietDayRaw.split("\n");
-  const driver = new FixtureDriver(lines, REPLAY_MS);
+  // Люди мають стояти на місцях ще ПІД завісою: стартові події (каст) застосовуємо одразу,
+  // а таймлайн-реплей — з першого tick.begin. spawn ідемпотентний → без дублів.
+  const allLines = quietDayRaw.split("\n").filter((l) => l.trim());
+  const firstTick = allLines.findIndex((l) => l.includes('"type":"tick.begin"'));
+  const head = firstTick > 0 ? allLines.slice(0, firstTick) : allLines;
+  const tail = firstTick > 0 ? allLines.slice(firstTick) : [];
+  for (const l of head) {
+    const ev = parseEnvelope(l);
+    if (ev) store.apply(ev); // run.started + casting.* → селяни спавняться зараз, під хмарами
+  }
+  const driver = new FixtureDriver(tail.length ? tail : allLines, REPLAY_MS);
   driver.subscribe(
     (ev) => store.apply(ev),
     () => console.log("[fixture] done"),
   );
 
   (window as unknown as { __ploshcha: unknown }).__ploshcha = { renderer, store, director };
+
+  // Усе відрендерено й люди наспавнились → даємо сцені кілька кадрів проступити під завісою
+  // (не залежимо від rAF у фоновій вкладці — таймер-fallback), і аж тоді розводимо хмари.
+  await Promise.race([
+    new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res()))),
+    new Promise<void>((res) => setTimeout(res, 250)),
+  ]);
+  renderer.dissipateIntro();
 }
 
 boot().catch((e: unknown) => {
