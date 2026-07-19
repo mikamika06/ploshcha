@@ -39,12 +39,32 @@
       "type": "array",
       "items": { "$ref": "#/$defs/POI" },
       "minItems": 1
+    },
+    "props": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/SceneProp" },
+      "description": "Декоративні спрайти поверх землі (напр. вітряк), розставлені редактором розкладки."
     }
   },
   "required": ["id", "name", "size", "background", "masks", "pois"],
   "additionalProperties": false,
 
   "$defs": {
+    "SceneProp": {
+      "type": "object",
+      "description": "Спрайт-декор на карті (assets/nb/<sprite>.png); координати в нативному просторі фону.",
+      "properties": {
+        "sprite": { "type": "string", "description": "шлях у паку nb без розширення, напр. 10_mill/00" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "scale": { "type": "number" },
+        "rot": { "type": "number", "description": "оберт у градусах" },
+        "anchor": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "description": "[ax, ay] частка точки кріплення (низ-центр = [0.5,1])" },
+        "z": { "type": "number", "description": "ключ глибини (нативний y); без нього — рахується з низу спрайта" }
+      },
+      "required": ["sprite", "x", "y"],
+      "additionalProperties": false
+    },
     "POI": {
       "type": "object",
       "description": "Точка інтересу на карті (місце дії/зустрічей).",

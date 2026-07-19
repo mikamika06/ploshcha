@@ -20,6 +20,20 @@ export const POI = z
   .strict();
 export type POI = z.infer<typeof POI>;
 
+/** Декоративний спрайт на карті (assets/nb/<sprite>.png), розставлений редактором розкладки. */
+export const SceneProp = z
+  .object({
+    sprite: z.string(),
+    x: z.number(),
+    y: z.number(),
+    scale: z.number().default(1),
+    rot: z.number().default(0), // оберт у градусах
+    anchor: z.tuple([z.number(), z.number()]).default([0.5, 1]),
+    z: z.number().optional(), // ключ глибини (нативний y); без нього — рахується з низу спрайта
+  })
+  .strict();
+export type SceneProp = z.infer<typeof SceneProp>;
+
 export const SceneSpec = z
   .object({
     id: z.string(),
@@ -36,6 +50,7 @@ export const SceneSpec = z
       })
       .strict(),
     pois: z.array(POI).min(1),
+    props: z.array(SceneProp).optional(),
   })
   .strict();
 export type SceneSpec = z.infer<typeof SceneSpec>;

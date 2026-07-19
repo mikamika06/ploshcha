@@ -9,21 +9,44 @@ import type { VegTextures, VegType } from "./scene/Vegetation";
 import { WalkGrid } from "./agents/WalkGrid";
 import { AgentDirector } from "./agents/AgentDirector";
 import { SimStore } from "./store/SimStore";
-import { Narrator } from "./roles/Narrator";
-import { ChatLog } from "./hud/ChatLog";
+import { Ports, radiusFor } from "./interact/Ports";
+import { Board } from "./interact/Board";
+import { GroupTalk } from "./interact/GroupTalk";
+import { discussionFor, type TalkPart } from "./interact/discussion";
+import { LivingRoom, type RoomCast, type Pt } from "./interact/LivingRoom";
+import { Inspector } from "./interact/Inspector";
+
+/** «Чорний ящик»: декоративні відкриті iso-сцени духів + нефункціональний токен-тул (флейвор). */
+const BLACKBOX: Record<string, { verb: string; lines: string[] }> = {
+  pond: { verb: "Придивитись до ставка", lines: ["Ряска ледь колишеться.", "Плюснула риба — і тиша.", "Очерет шепоче на вітрі.", "Хмара пропливла у воді."] },
+  bell: { verb: "Торкнутись дзвона", lines: ["Дзвін теплий від сонця.", "Мідь гуде ледь чутно.", "Мотузка шорстка в руці.", "Луна ще спить у металі."] },
+};
+
+/** Соціальні кімнати → жива кімната (iso-box + наші спрайти ходять по МАСЦІ-зоні з Nano Banana).
+ *  mask = згенерована walk-зона (зелене=прохідне, вирізає стільці/меблі); floor = полігон-фолбек. */
+// Усі локації тепер уніфіковані: одна канва 1792×1008 на одному фоні #21222F (без лого),
+// тому — один масштаб фігур для всіх (нормальні однакові розміри людей).
+const FIG = 0.8;
+// Фолбек-підлога (діамант по центру) діє лише мить до завантаження маски; далі головна — маска.
+const FB: Pt[] = [
+  [0.5, 0.8],
+  [0.78, 0.56],
+  [0.5, 0.32],
+  [0.22, 0.56],
+];
+const SOCIAL_ROOM: Record<string, { bg: string; name: string; floor: Pt[]; mask?: string }> = {
+  tavern: { bg: "/assets/rooms/tavern.webp", name: "Шинок", mask: "/assets/rooms/tavern_mask.png", floor: FB },
+  mill: { bg: "/assets/rooms/mill.webp", name: "Млин", mask: "/assets/rooms/mill_mask.png", floor: FB },
+  church: { bg: "/assets/rooms/church.webp", name: "Церква", mask: "/assets/rooms/church_mask.png", floor: FB },
+  forge: { bg: "/assets/rooms/forge.webp", name: "Кузня", mask: "/assets/rooms/forge_mask.png", floor: FB },
+  pond: { bg: "/assets/rooms/pond.webp", name: "Ставок", mask: "/assets/rooms/pond_mask.png", floor: FB },
+  bell: { bg: "/assets/rooms/bell.webp", name: "Дзвіниця", mask: "/assets/rooms/bell_mask.png", floor: FB },
+  square: { bg: "/assets/rooms/square.webp", name: "Площа", mask: "/assets/rooms/square_mask.png", floor: FB },
+};
+
 import { FixtureDriver } from "./net/FixtureDriver";
 import { GRADE_MUTED, loadGraded, makeShadowTexture } from "./util/gfx";
 import { REPLAY_MS } from "./config";
-
-const TIME_UA: Record<string, string> = {
-  dawn: "світанок",
-  morning: "ранок",
-  noon: "полудень",
-  evening: "вечір",
-  dusk: "сутінки",
-  night: "ніч",
-};
-const clockLabel = (t: string): string => TIME_UA[t] ?? t;
 
 function tuftUrls(dir: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `/assets/nb/${dir}/0${i}.png`);
@@ -87,6 +110,7 @@ async function boot(): Promise<void> {
   renderer.mount(document.getElementById("frame")!);
   await renderer.loadGround();
   await renderer.loadObjects(objects);
+  await renderer.loadProps();
 
   const grid = new WalkGrid(scene.masks.space.w, scene.masks.space.h, SCL);
   // NB: keepout маска = «не саджати» (стежки+хати+вода), а не «тут хата» — тому для
@@ -104,65 +128,165 @@ async function boot(): Promise<void> {
   for (const p of scene.pois) pois.set(p.id, p);
 
   const director = new AgentDirector(renderer.world, grid, pois, chars, roleFrames, shadowTex, SCL);
-  const narrator = new Narrator();
-  const chat = new ChatLog();
   const store = new SimStore();
 
-  store.on((ev, state) => {
+  // ── діегетична оболонка (без HUD-бару): порти → занурення → Дошка / розмова ──
+  const stageEl = document.getElementById("stage")!;
+  const whisper = document.createElement("div");
+  whisper.className = "whisper";
+  stageEl.appendChild(whisper);
+  const vign = document.createElement("div");
+  vign.className = "vign";
+  stageEl.appendChild(vign);
+  const loc = document.createElement("div");
+  loc.className = "loccard";
+  loc.innerHTML = `<div class="loc-name"></div><div class="loc-mean"></div><button class="loc-back" type="button">← до села</button>`;
+  stageEl.appendChild(loc);
+
+  const squarePoi = scene.pois.find((p) => p.kind === "square");
+  let resumeSkips = 0; // після рестарту тікера (вкладка/вихід з кімнати) — відкинути перші «биті» кадри
+
+  const exitToVillage = (): void => {
+    board.close();
+    groupTalk.close();
+    room.close();
+    inspector.close();
+    loc.classList.remove("on");
+    vign.classList.remove("on");
+    renderer.camera?.back();
+    ports.setEnabled(true);
+    // кімната стопить тікер (опукла оболонка ховає діораму) → на виході прокидаємо сцену
+    if (!renderer.app.ticker.started) {
+      resumeSkips = 3;
+      renderer.app.ticker.start();
+    }
+  };
+  const enterDive = (p: POI): void => {
+    inspector.close();
+    ports.setEnabled(false);
+    whisper.classList.remove("on");
+    vign.classList.add("on");
+    renderer.camera?.diveTo(p.x, p.y);
+  };
+
+  const groupTalk = new GroupTalk(() => exitToVillage());
+  const board = new Board(
+    (t) => {
+      board.close();
+      // учасники — реальні селяни зі стору; якщо ще не «наспавнились» — запасний гурт
+      const villagers = [...store.state.villagers.values()];
+      const pool: TalkPart[] =
+        villagers.length >= 2
+          ? villagers.map((v) => ({ id: v.id, name: v.name, role: v.role }))
+          : [
+              { id: "parubok", name: "Іван", role: "parubok" },
+              { id: "divchyna", name: "Оксана", role: "divchyna" },
+              { id: "did", name: "дід Свирид", role: "did" },
+              { id: "sheptu", name: "баба Горпина", role: "sheptu" },
+            ];
+      const parts = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(5, pool.length));
+      // усі сходяться на Площу + камера пірнає туди (видно, як зібрались коло криниці)
+      if (squarePoi) {
+        for (const p of parts) director.moveTo(p.id, { poi: squarePoi.id });
+        renderer.camera?.diveTo(squarePoi.x, squarePoi.y);
+      }
+      groupTalk.open(t.text, parts, discussionFor(t.text, parts));
+    },
+    () => exitToVillage(),
+  );
+  const inspector = new Inspector(() => inspector.close());
+  const room = new LivingRoom(
+    () => exitToVillage(),
+    (vid) => {
+      const v = store.state.villagers.get(vid);
+      if (v) inspector.open(v); // аналітика на людину і всередині локації
+    },
+  );
+
+  const ports = new Ports(renderer.world, scene.pois, {
+    onHover: (p, x, y) => {
+      if (!p) {
+        whisper.classList.remove("on");
+        return;
+      }
+      whisper.textContent = p.name;
+      whisper.style.left = `${x}px`;
+      whisper.style.top = `${y}px`;
+      whisper.classList.add("on");
+    },
+    onSelect: (p) => {
+      enterDive(p);
+      if (p.kind === "board") {
+        board.open();
+      } else if (SOCIAL_ROOM[p.kind]) {
+        const r = SOCIAL_ROOM[p.kind];
+        // ЖИВА зайнятість: у локації ті селяни, чий поточний POI = цей (з agent.moved), а не фікс-каст
+        const here = [...store.state.villagers.values()].filter((v) => v.location === p.id);
+        const cast: RoomCast[] = here.map((v) => ({ id: v.role, name: v.name, vid: v.id }));
+        room.open(r.bg, r.name, cast, r.floor, r.mask, { figScale: FIG, token: BLACKBOX[p.kind] });
+        renderer.app.ticker.stop(); // опукла кімната ховає діораму → не рендеримо/не колишемо її поки там
+      } else {
+        (loc.querySelector(".loc-name") as HTMLElement).textContent = p.name;
+        (loc.querySelector(".loc-mean") as HTMLElement).textContent = p.meaning ?? "";
+        loc.classList.add("on");
+      }
+    },
+  });
+  loc.querySelector(".loc-back")!.addEventListener("click", () => exitToVillage());
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") exitToVillage();
+  });
+
+  // клік по селянину на діорамі → інспектор когніції (ручний хіт-тест поза Pixi)
+  const canvasEl = renderer.app.view as unknown as HTMLCanvasElement;
+  canvasEl.addEventListener("click", (e) => {
+    const cam = renderer.camera;
+    if (!cam || cam.consumeDrag()) return; // це був пан, не клік
+    const w = cam.clientToWorld(e.clientX, e.clientY);
+    // порти (POI) мають пріоритет — їхні тапи обробляє Pixi окремо (guard = точний радіус порту)
+    for (const p of scene.pois) if (Math.hypot(w.x - p.x, w.y - p.y) < radiusFor(p.kind)) return;
+    const id = director.nearestAt(w.x, w.y, 60);
+    if (id) {
+      const v = store.state.villagers.get(id);
+      if (v) inspector.open(v);
+    } else {
+      inspector.close();
+    }
+  });
+
+  store.on((ev) => {
     switch (ev.type) {
-      case "run.started":
-        narrator.say(`Ранок у селі ${ev.payload.scene.name}. Село прокидається…`);
-        chat.setClock(ev.payload.scene.name);
-        break;
       case "casting.done":
         director.spawn(ev.payload.cast);
         break;
       case "tick.begin":
-        chat.setClock(clockLabel(ev.payload.timeOfDay));
         if (ev.payload.mood) renderer.weather?.setMood(ev.payload.mood.valence);
         break;
       case "agent.moved":
         director.moveTo(ev.payload.agentId, ev.payload.to);
         break;
-      case "utterance.spoken": {
-        const name = state.villagers.get(ev.payload.agentId)?.name ?? ev.payload.agentId;
+      case "utterance.spoken":
         director.speak(ev.payload.agentId, ev.payload.text);
-        chat.line(name, ev.payload.text);
         break;
-      }
       case "event.happened":
-        chat.sys(`${ev.payload.event.label}: ${ev.payload.event.description}`);
+        board.addTopic({ text: ev.payload.event.label, heat: "warm" });
         break;
-      case "reflection.formed": {
-        const name = state.villagers.get(ev.payload.agentId)?.name ?? ev.payload.agentId;
-        chat.line(`${name} (думка)`, ev.payload.thought);
-        break;
-      }
       case "report.compiled":
-        narrator.say(ev.payload.chronicle.narration);
-        chat.chronicle(ev.payload.chronicle.title);
-        chat.setClock(`день ${ev.payload.chronicle.day}`);
         renderer.weather?.setMood(ev.payload.chronicle.mood.valence);
-        break;
-      case "run.done":
-        chat.sys("Село засинає. Кінець дня.");
-        break;
-      case "run.degraded":
-        chat.sys(`… деградація: ${ev.payload.stage}`);
-        break;
-      case "run.error":
-        chat.sys(`⚠ Помилка: ${ev.payload.message}`);
         break;
       default:
         break;
     }
   });
 
-  const hudEl = document.getElementById("hud");
-  document.getElementById("hud-toggle")?.addEventListener("click", () => hudEl?.classList.toggle("collapsed"));
-
   renderer.app.ticker.add(() => {
-    const dt = Math.min(renderer.app.ticker.deltaMS / 1000, 0.05);
+    const rawMs = renderer.app.ticker.deltaMS;
+    if (resumeSkips > 0 && rawMs > 34) {
+      resumeSkips--; // кадр із ненормально великим delta одразу після рестарту тікера → пропустити (без стрибка вітру)
+      return;
+    }
+    resumeSkips = 0;
+    const dt = Math.min(rawMs / 1000, 0.05);
     renderer.update(dt);
     director.update(dt);
   });
@@ -174,6 +298,18 @@ async function boot(): Promise<void> {
     if (fpsT > 500 && fpsEl) {
       fpsEl.textContent = String(Math.round(renderer.app.ticker.FPS));
       fpsT = 0;
+    }
+  });
+
+  // Вкладка схована → стопимо тікер (щоб не було повільних/нерівних кадрів і смикання вітру
+  // на поверненні); показана → чистий рестарт.
+  document.addEventListener("visibilitychange", () => {
+    const t = renderer.app.ticker;
+    if (document.hidden) {
+      t.stop();
+    } else {
+      resumeSkips = 3; // перші кадри після рестарту мають стале/велике deltaMS → відкидаємо
+      t.start();
     }
   });
 

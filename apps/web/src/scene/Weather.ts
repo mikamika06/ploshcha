@@ -33,5 +33,6 @@ export class Weather {
   update(dt: number): void {
     this.cur += (this.target - this.cur) * Math.min(1, dt * 1.5);
     this.overlay.alpha = this.cur;
+    this.overlay.renderable = this.cur > 0.003; // ясна погода → не блендимо повноекранний прозорий квад
   }
 }

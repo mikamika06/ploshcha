@@ -35,7 +35,7 @@ export class Intro {
   constructor(stage: Container, Wn: number, Hn: number) {
     stage.addChild(this.layer);
     const tex = makeCloudTexture();
-    for (let i = 0; i < 58; i++) {
+    for (let i = 0; i < 32; i++) {
       const s = new Sprite(tex);
       s.anchor.set(0.5);
       const px = Math.random() * Wn;

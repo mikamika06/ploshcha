@@ -1,0 +1,191 @@
+<meta charset="utf-8">
+<title>ПЛОЩА — редактор села (Верболози)</title>
+<style>
+ :root{--bg:#14121a;--panel:#1e1a26;--line:#322a40;--ink:#efe7db;--ink2:#b3a690;--acc:#f0b33c}
+ *{box-sizing:border-box}
+ body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,sans-serif;display:flex;height:100vh;overflow:hidden}
+ #side{width:330px;flex:0 0 330px;background:var(--panel);border-right:1px solid var(--line);padding:13px;overflow:auto}
+ #stage{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:14px;background:#0c0a10}
+ h1{font-size:14px;margin:0 0 8px;letter-spacing:.03em}
+ h2{font-size:11px;color:var(--ink2);margin:14px 0 5px;text-transform:uppercase;letter-spacing:.07em}
+ canvas{background:#000;box-shadow:0 20px 60px -30px #000;cursor:crosshair;max-width:100%}
+ .row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px;align-items:center}
+ button,select{font:inherit;font-size:12px;color:var(--ink);background:#26202f;border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer}
+ button.on{background:var(--acc);color:#1a1206;border-color:var(--acc);font-weight:600}
+ button:hover{border-color:var(--acc)}
+ label{font-size:11.5px;color:var(--ink2);display:flex;align-items:center;gap:6px;margin:5px 0}
+ input[type=range]{flex:1}
+ .pois{display:flex;flex-wrap:wrap;gap:5px}
+ .poib{display:flex;align-items:center;gap:5px;font-size:11px;padding:4px 7px}
+ .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+ .palcat{font-size:10.5px;color:var(--ink2);margin:9px 0 4px;text-transform:uppercase;letter-spacing:.06em}
+ .pal{display:flex;flex-wrap:wrap;gap:4px}
+ .pi{width:58px;height:58px;border:1px solid var(--line);border-radius:6px;background:#191420;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
+ .pi:hover{border-color:var(--acc)}
+ .pi.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+ .pi img{max-width:52px;max-height:52px;image-rendering:auto}
+ .list{font-size:11px;max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:5px;background:#191420}
+ .li{display:flex;justify-content:space-between;gap:6px;padding:3px 2px;border-bottom:1px solid #241d30;cursor:pointer}
+ .li:hover{background:#241d30}.li.sel{outline:1px solid var(--acc)}.li b{color:var(--acc)}
+ textarea{width:100%;height:120px;background:#12100b;color:#bfe6c0;border:1px solid var(--line);border-radius:7px;font:10.5px ui-monospace,Menlo,monospace;padding:6px}
+ .hint{font-size:11px;color:var(--ink2);line-height:1.5;margin:5px 0}
+ #brushName{color:var(--acc);font-weight:600}
+</style>
+<div id="side">
+ <h1>Редактор села · Верболози</h1>
+ <div class="hint">Обери спрайт у палітрі → клікни на мапі, щоб поставити. <b>Рухати</b> — тягни. Обраний обʼєкт: повзунки <b>розмір</b> і <b>оберт</b>, або клавіші <b>[ ]</b> оберт, <b>, .</b> розмір, <b>R</b> скинути оберт, <b>Del</b> прибрати. Автозбереження у браузері.</div>
+
+ <div class="row" id="modes">
+  <button data-m="add" class="on">＋ Ставити</button>
+  <button data-m="move">✥ Рухати</button>
+  <button data-m="del">🗑 Прибрати</button>
+ </div>
+ <div class="hint">Пензель: <span id="brushName">—</span></div>
+
+ <h2>Обраний обʼєкт</h2>
+ <label>Розмір <input id="scale" type="range" min="0.1" max="3" step="0.01" value="1"><span id="scaleV" style="width:34px;text-align:right">1.00</span></label>
+ <label>Оберт <input id="rot" type="range" min="-180" max="180" step="1" value="0"><span id="rotV" style="width:34px;text-align:right">0°</span></label>
+
+ <h2>Мітки-POI</h2>
+ <div class="pois" id="poiPal"></div>
+
+ <h2>Обʼєкти села (палітра)</h2>
+ <div id="palette"></div>
+
+ <h2>Показ</h2>
+ <div class="row"><button id="tgLbl" class="on">Підписи</button><button id="tgProps" class="on">Спрайти</button></div>
+
+ <h2>На мапі (<span id="cnt">0</span>)</h2>
+ <div class="list" id="list"></div>
+
+ <h2>Експорт</h2>
+ <div class="row"><button id="exp" class="on">Оновити JSON</button><button id="dl">⬇ layout.json</button><button id="reset">↺ Скинути</button></div>
+ <textarea id="out" spellcheck="false"></textarea>
+</div>
+<div id="stage"><canvas id="c"></canvas></div>
+<script>
+const SCENE = "verbolozy";
+const BG = "/assets/backgrounds/ground2_baked.webp"; // прод-мапа з ВПЕЧЕНИМИ будинками (правильне розташування)
+const SIZE = [2816, 1536];
+const NB = "/assets/nb/";
+const PAL_CATS = ["Будівлі", "Хати · ракурси", "Млин (розбірний)", "Фішки · декор", "Дерева й кущі", "Квіти", "Терейн", "Земля · дрібниці"];
+
+const POI = {
+  square:["#ffffff","Площа"], board:["#e0902f","Дошка-вісник"], bell:["#f0b33c","Дзвіниця"], pond:["#57c7d4","Ставок"],
+  church:["#c7a0ff","Церква"], mill:["#9ad06a","Млин"], forge:["#e2563a","Кузня"], tavern:["#e0b060","Шинок"],
+};
+const PRELOAD_POIS = [
+  {cat:"poi",kind:"board",x:1199,y:764},{cat:"poi",kind:"bell",x:1614,y:777},{cat:"poi",kind:"pond",x:1790,y:1227},
+  {cat:"poi",kind:"square",x:1450,y:900},{cat:"poi",kind:"church",x:1050,y:620},{cat:"poi",kind:"mill",x:1900,y:1150},
+  {cat:"poi",kind:"forge",x:950,y:980},{cat:"poi",kind:"tavern",x:1300,y:980},
+];
+// Будинки вже ВПЕЧЕНІ у ground2_baked.webp (правильна прод-розкладка) — окремих пропів не тримаємо.
+// Ставиш лише мітки (перетягуючи на потрібні будівлі) та млин (з палітри 10_mill).
+const PRELOAD = [...PRELOAD_POIS];
+// пласкі декалі кріпляться по центру; будівлі/дерева/хати — основою (низ-центр)
+function anchorFor(sp){ return (sp==="10_mill/01"||sp.startsWith("t1_terrain/")||sp.startsWith("5_ground/")||sp.startsWith("v3_flowers/")) ? [0.5,0.5] : [0.5,1.0]; }
+
+const LSKEY = "ploshcha_layout_" + SCENE + "_v3"; // bump → baked-мапа, без вигаданих пропів
+const c = document.getElementById("c"), g = c.getContext("2d");
+const W = SIZE[0], H = SIZE[1]; c.width = W; c.height = H; c.style.width = Math.min(W,1180)+"px";
+let items = load();
+let mode = "add", brush = null, selected = null, showLbl = true, showProps = true;
+const cache = {};
+function spr(sp){ if(!cache[sp]){ const im=new Image(); im.onload=draw; im.src=NB+sp+".png"; cache[sp]=im; } return cache[sp]; }
+const bg = new Image(); bg.onload = draw; bg.src = BG;
+
+function load(){ try{ const s=JSON.parse(localStorage.getItem(LSKEY)); if(s&&s.items) return s.items; }catch(e){} return PRELOAD.map(p=>({...p})); }
+function persist(){ localStorage.setItem(LSKEY, JSON.stringify({items})); }
+
+// ── палітри ──
+const poiPal = document.getElementById("poiPal");
+for(const k in POI){ const b=document.createElement("button"); b.className="poib"; b.innerHTML=`<span class="sw" style="background:${POI[k][0]}"></span>${POI[k][1]}`;
+  b.onclick=()=>{ brush={t:"poi",kind:k}; setMode("add"); markBrush(); document.getElementById("brushName").textContent="POI · "+POI[k][1]; }; poiPal.appendChild(b); }
+
+fetch(NB+"manifest.json").then(r=>r.json()).then(m=>{
+  const pal=document.getElementById("palette");
+  for(const cat of m.categories){ if(!PAL_CATS.includes(cat.name)) continue;
+    const h=document.createElement("div"); h.className="palcat"; h.textContent=cat.name; pal.appendChild(h);
+    const grid=document.createElement("div"); grid.className="pal";
+    for(const it of cat.items){ const d=document.createElement("div"); d.className="pi"; d.dataset.sp=it;
+      const im=document.createElement("img"); im.src=NB+it+".png"; im.loading="lazy"; d.appendChild(im);
+      d.title=it; d.onclick=()=>{ brush={t:"prop",sprite:it}; setMode("add"); markBrush(); spr(it); document.getElementById("brushName").textContent=it; };
+      grid.appendChild(d); }
+    pal.appendChild(grid);
+  }
+});
+function markBrush(){ document.querySelectorAll(".pi").forEach(el=>el.classList.toggle("on", brush&&brush.t==="prop"&&el.dataset.sp===brush.sprite)); }
+
+// ── режими / контролі ──
+function setMode(m){ mode=m; document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("on",b.dataset.m===m)); }
+document.querySelectorAll("#modes button").forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+const scaleEl=document.getElementById("scale"),scaleV=document.getElementById("scaleV");
+const rotEl=document.getElementById("rot"),rotV=document.getElementById("rotV");
+scaleEl.oninput=()=>{ scaleV.textContent=(+scaleEl.value).toFixed(2); if(selected&&selected.cat==="prop"){selected.scale=+scaleEl.value;draw();persist();refresh();} };
+rotEl.oninput=()=>{ rotV.textContent=Math.round(+rotEl.value)+"°"; if(selected&&selected.cat==="prop"){selected.rot=+rotEl.value;draw();persist();refresh();} };
+const tgl=(id,get,set)=>{ const el=document.getElementById(id); el.onclick=()=>{set(!get());el.classList.toggle("on",get());draw();}; };
+tgl("tgLbl",()=>showLbl,v=>showLbl=v); tgl("tgProps",()=>showProps,v=>showProps=v);
+document.getElementById("exp").onclick=updOut;
+document.getElementById("dl").onclick=()=>{ updOut(); const b=new Blob([document.getElementById("out").value],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="layout.json"; a.click(); };
+document.getElementById("reset").onclick=()=>{ if(confirm("Прибрати всі поставлені обʼєкти й лишити стартові POI?")){ items=PRELOAD.map(p=>({...p})); selected=null; draw();persist();refresh();updOut(); } };
+
+// ── координати / хіт-тест (з урахуванням оберту) ──
+function toImg(e){ const r=c.getBoundingClientRect(); return {x:Math.round((e.clientX-r.left)*W/r.width), y:Math.round((e.clientY-r.top)*H/r.height)}; }
+function dims(it){ const im=spr(it.sprite); const s=it.scale??1; const [ax,ay]=anchorFor(it.sprite); return {w:im.width*s,h:im.height*s,ax,ay}; }
+function inProp(it,x,y){ const {w,h,ax,ay}=dims(it); const rad=-(it.rot||0)*Math.PI/180; const dx=x-it.x,dy=y-it.y;
+  const lx=dx*Math.cos(rad)-dy*Math.sin(rad), ly=dx*Math.sin(rad)+dy*Math.cos(rad);
+  return lx>=-w*ax&&lx<=w*(1-ax)&&ly>=-h*ay&&ly<=h*(1-ay); }
+function hit(x,y){ for(let i=items.length-1;i>=0;i--){ const it=items[i]; if(it.cat==="prop"&&inProp(it,x,y)) return it; }
+  let best=null,bd=34; for(const it of items) if(it.cat==="poi"){ const d=Math.hypot(it.x-x,it.y-y); if(d<bd){bd=d;best=it;} } return best; }
+
+let dragging=null,dox=0,doy=0;
+c.addEventListener("mousedown",e=>{ const p=toImg(e);
+  if(mode==="add"){ if(!brush){ return; }
+    if(brush.t==="poi"){ const it={cat:"poi",kind:brush.kind,x:p.x,y:p.y}; items.push(it); select(it); }
+    else { const it={cat:"prop",sprite:brush.sprite,x:p.x,y:p.y,scale:1,rot:0}; items.push(it); select(it); }
+    draw();persist();refresh();
+  } else if(mode==="move"){ const it=hit(p.x,p.y); select(it); if(it){dragging=it;dox=it.x-p.x;doy=it.y-p.y;} }
+  else if(mode==="del"){ const it=hit(p.x,p.y); if(it){remove(it);} }
+});
+c.addEventListener("mousemove",e=>{ if(dragging){ const p=toImg(e); dragging.x=p.x+dox; dragging.y=p.y+doy; draw(); } });
+window.addEventListener("mouseup",()=>{ if(dragging){dragging=null;persist();refresh();} });
+c.addEventListener("contextmenu",e=>{ e.preventDefault(); const p=toImg(e); const it=hit(p.x,p.y); if(it) remove(it); });
+function remove(it){ items=items.filter(z=>z!==it); if(selected===it) selected=null; draw();persist();refresh(); }
+
+window.addEventListener("keydown",e=>{ if(!selected||selected.cat!=="prop"){ if((e.key==="Delete"||e.key==="Backspace")&&selected){remove(selected);} return; }
+  if(e.key==="["){ selected.rot=(selected.rot||0)-5; } else if(e.key==="]"){ selected.rot=(selected.rot||0)+5; }
+  else if(e.key===","){ selected.scale=Math.max(0.1,(selected.scale||1)-0.05); } else if(e.key==="."){ selected.scale=Math.min(3,(selected.scale||1)+0.05); }
+  else if(e.key==="r"||e.key==="R"){ selected.rot=0; } else if(e.key==="Delete"||e.key==="Backspace"){ remove(selected); return; }
+  else return;
+  e.preventDefault(); syncSel(); draw();persist();refresh();
+});
+
+function select(it){ selected=it; syncSel(); refresh(); }
+function syncSel(){ if(selected&&selected.cat==="prop"){ scaleEl.value=selected.scale??1; scaleV.textContent=(+scaleEl.value).toFixed(2); rotEl.value=selected.rot||0; rotV.textContent=Math.round(rotEl.value)+"°"; } }
+
+// ── рендер ──
+function draw(){
+  g.clearRect(0,0,W,H); if(bg.complete) g.drawImage(bg,0,0,W,H); else{ g.fillStyle="#222"; g.fillRect(0,0,W,H); }
+  if(showProps){ const props=items.filter(it=>it.cat==="prop");
+    const ordered=props.filter(it=>it!==selected).concat(props.includes(selected)?[selected]:[]);
+    for(const it of ordered){ const im=spr(it.sprite); if(!im.complete||!im.width) continue; const {w,h,ax,ay}=dims(it);
+      g.save(); g.translate(it.x,it.y); g.rotate((it.rot||0)*Math.PI/180); g.drawImage(im,-w*ax,-h*ay,w,h);
+      if(it===selected){ g.strokeStyle="#f0b33c"; g.lineWidth=3; g.strokeRect(-w*ax,-h*ay,w,h); } g.restore();
+      g.fillStyle="#f0b33c"; g.beginPath(); g.arc(it.x,it.y,4,0,7); g.fill();
+    } }
+  for(const it of items) if(it.cat==="poi"){ const col=(POI[it.kind]||["#fff"])[0];
+    g.fillStyle=col; g.strokeStyle=it===selected?"#f0b33c":"#000"; g.lineWidth=it===selected?4:2;
+    g.beginPath(); g.arc(it.x,it.y,9,0,7); g.fill(); g.stroke();
+    if(showLbl){ const t=(POI[it.kind]||["",it.kind])[1]; g.font="bold 20px sans-serif"; g.fillStyle="#000"; g.fillText(t,it.x+14,it.y+7); g.fillStyle="#fff"; g.fillText(t,it.x+12,it.y+5); } }
+}
+function refresh(){ document.getElementById("cnt").textContent=items.length; const L=document.getElementById("list");
+  L.innerHTML=items.map((it,i)=>{ const isP=it.cat==="prop"; const col=isP?"#f0b33c":(POI[it.kind]||["#fff"])[0];
+    const name=isP?it.sprite:(POI[it.kind]||["",it.kind])[1]; const ex=isP?` ×${(it.scale??1).toFixed(2)} ${Math.round(it.rot||0)}°`:"";
+    return `<div class="li ${it===selected?"sel":""}" data-i="${i}"><span><span class="sw" style="background:${col}"></span>${name}${ex}</span><b>${it.x},${it.y}</b></div>`; }).join("");
+  L.querySelectorAll(".li").forEach(el=>el.onclick=()=>{ select(items[+el.dataset.i]); draw(); }); }
+function updOut(){ const pois=items.filter(it=>it.cat==="poi").map((it,i)=>({id:it.kind+"_"+i,name:(POI[it.kind]||["",it.kind])[1],kind:it.kind,x:it.x,y:it.y}));
+  const props=items.filter(it=>it.cat==="prop").map(it=>({sprite:it.sprite,x:it.x,y:it.y,scale:+(it.scale??1).toFixed(3),rot:Math.round(it.rot||0),anchor:anchorFor(it.sprite)}));
+  document.getElementById("out").value=JSON.stringify({scene:SCENE,size:SIZE,pois,props},null,1); }
+
+refresh(); updOut(); draw();
+</script>

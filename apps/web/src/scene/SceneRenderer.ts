@@ -34,14 +34,19 @@ export class SceneRenderer {
   private vegItems: VegItem[] = [];
 
   constructor(public scene: SceneSpec) {
+    // слабкий пристрій → рендеримо в 1× (у 4 рази менший бекбуфер/філрейт); потужний → до 1.5×
+    // (візуально без втрат — полотно все одно CSS-масштабується камерою). antialias зайвий для
+    // спрайтового арту (краї — це альфа PNG, а не векторна геометрія).
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const weak = (nav.hardwareConcurrency ?? 8) <= 4 || (nav.deviceMemory ?? 8) <= 4;
     this.app = new Application({
       width: scene.size.w,
       height: scene.size.h,
-      antialias: true,
+      antialias: false,
       backgroundColor: 0x6f7a45,
-      powerPreference: "high-performance",
+      powerPreference: "default",
       autoDensity: true,
-      resolution: Math.min(2, window.devicePixelRatio || 1),
+      resolution: weak ? 1 : Math.min(1.5, window.devicePixelRatio || 1),
     });
     this.world = new Container();
     this.world.sortableChildren = true;
@@ -90,6 +95,27 @@ export class SceneRenderer {
     );
   }
 
+  /** Декор-пропси з розкладки (вітряк тощо) — спрайти поверх землі з глибиною (zIndex=y), тож селяни їх обходять. */
+  async loadProps(): Promise<void> {
+    const props = this.scene.props;
+    if (!props?.length) return;
+    await Promise.all(
+      props.map(async (p) => {
+        const tex = await loadGraded(assetUrl(`assets/nb/${p.sprite}.png`)).catch(() => null);
+        if (!tex) return;
+        const [ax, ay] = p.anchor;
+        const sp = new Sprite(tex);
+        sp.anchor.set(ax, ay);
+        sp.x = p.x;
+        sp.y = p.y;
+        sp.scale.set(p.scale);
+        sp.rotation = (p.rot * Math.PI) / 180;
+        sp.zIndex = p.z ?? p.y + tex.height * p.scale * (1 - ay); // глибина за низом спрайта, якщо z не задано
+        this.world.addChild(sp);
+      }),
+    );
+  }
+
   async buildVegetation(tex: VegTextures, shadowTex: Texture): Promise<void> {
     const m = this.scene.masks;
     if (!m.zone) return;
@@ -101,7 +127,7 @@ export class SceneRenderer {
     this.vegItems = seedVegetation(this.world, zone, keep, tex, shadowTex, {
       MW, MH, SCL, DEN: 9, TREE: 1.3, CXf: 782 / 1408, CYf: 377 / 768,
     });
-    this.wind = new Wind(this.vegItems, this.scene.size.w);
+    this.wind = new Wind(this.vegItems, this.scene.size.w, this.scene.size.h);
   }
 
   initWeather(): void {
@@ -116,7 +142,7 @@ export class SceneRenderer {
   update(dt: number): void {
     this.t += dt;
     if (this.waterFilter) this.waterFilter.uniforms.t = this.t;
-    this.wind?.update(this.t);
+    this.wind?.update(this.t, this.camera?.visibleWorldRect(220)); // кулінг рослин поза кадром
     this.intro?.update(dt);
     this.weather?.update(dt);
   }

@@ -9,6 +9,7 @@ export interface VegItem {
   stiff: number;
   phase: number;
   removed: boolean;
+  lastSkew: number; // останній записаний skew.x → епсилон-гейт (не бруднити transform дарма)
 }
 
 export type VegType = "wheat" | "flower" | "reed" | "grass" | "tree" | "bush";
@@ -85,6 +86,7 @@ export function seedVegetation(
       stiff: stiff * (0.85 + hash(sx * 0.9 + 12, sy * 2.1 + 7) * 0.4),
       phase: hash(sx * 1.7 + 6, sy * 2.5 + 8) * 6.28,
       removed: false,
+      lastSkew: 0,
     });
   };
 

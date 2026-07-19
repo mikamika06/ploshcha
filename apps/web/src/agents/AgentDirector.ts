@@ -69,6 +69,20 @@ export class AgentDirector {
     }
   }
 
+  /** Найближчий селянин до світ-точки в межах maxDist (native) — для кліку-інспекту. */
+  nearestAt(wx: number, wy: number, maxDist: number): string | null {
+    let best: string | null = null;
+    let bd = maxDist;
+    for (const r of this.recs.values()) {
+      const d = Math.hypot(r.x - wx, r.y - wy);
+      if (d < bd) {
+        bd = d;
+        best = r.id;
+      }
+    }
+    return best;
+  }
+
   moveTo(id: string, to: PlaceRef): void {
     const r = this.recs.get(id);
     if (!r) return;
@@ -156,11 +170,11 @@ export class AgentDirector {
       r.sprite.y = r.y - bounce;
       r.sprite.rotation = 0;
       r.sprite.scale.set(r.sc * r.face, r.sc);
-      r.sprite.zIndex = r.y;
+      r.sprite.zIndex = r.y | 0; // ціле → мікрорух не «бруднить» сортування щокадру
       r.shadow.x = r.x;
       r.shadow.y = r.y;
       r.shadow.alpha = walking ? 0.85 - Math.abs(s) * 0.18 : 0.85;
-      r.shadow.zIndex = r.y - 0.5;
+      r.shadow.zIndex = (r.y | 0) - 1;
       if (r.bubble) {
         r.bubbleT -= dt;
         r.bubble.x = r.x;
@@ -184,17 +198,17 @@ export class AgentDirector {
     const label = text.length > 70 ? text.slice(0, 68) + "…" : text;
     const t = new Text(label, {
       fontFamily: "-apple-system, Segoe UI, Roboto, sans-serif",
-      fontSize: 21,
+      fontSize: 17,
       fontWeight: "500",
       fill: 0xf0e8d6,
       wordWrap: true,
-      wordWrapWidth: 380,
+      wordWrapWidth: 300,
       align: "left",
-      lineHeight: 27,
+      lineHeight: 22,
     });
-    const padX = 14;
-    const padY = 9;
-    const tail = 11;
+    const padX = 11;
+    const padY = 7;
+    const tail = 9;
     const w = t.width + padX * 2;
     const h = t.height + padY * 2;
     const bg = new Graphics();

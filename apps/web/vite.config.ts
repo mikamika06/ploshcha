@@ -15,4 +15,11 @@ export default defineConfig({
   server: {
     fs: { allow: [repoRoot] },
   },
+  build: {
+    target: "es2022", // код і так на ES2022 (tsconfig) → без зайвого down-level
+    rollupOptions: {
+      // стабільний pixi-чанк окремо від коду застосунку → не інвалідується при кожній зміні
+      output: { manualChunks: { pixi: ["pixi.js"] } },
+    },
+  },
 });

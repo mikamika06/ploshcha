@@ -33,5 +33,7 @@ void main(){ vec2 uv=vTextureCoord; vec4 base=texture2D(uSampler,uv); vec4 fl=te
 
 export function makeWaterFilter(flowUrl: string, aspect: number): Filter {
   const flowTex = Texture.from(assetUrl(flowUrl));
-  return new Filter(undefined, waterFrag, { flowTex, t: 0, aspect, wa: 1.0 });
+  const f = new Filter(undefined, waterFrag, { flowTex, t: 0, aspect, wa: 1.0 });
+  f.resolution = 0.5; // ріпл м'який і анімований → пів-роздільність невидима, а філ-рейт у 4× менший
+  return f;
 }

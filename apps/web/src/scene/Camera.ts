@@ -62,9 +62,60 @@ export class Camera {
   }
 
   private recompute(): void {
-    // cover раму, крізь 1:1 (крипко) як стеля зуму
+    // cover раму; стеля зуму підвищена, щоб «пірнати» в локацію ближче за 1:1
     this.minScale = Math.max(this.vw / this.worldW, this.vh / this.worldH);
-    this.maxScale = Math.max(this.minScale, 1.0);
+    this.maxScale = Math.max(this.minScale, 1.7);
+  }
+
+  /** Плавний tween камери (x,y,scale) з ease-out; використовується зануренням/виходом. */
+  private raf = 0;
+  private tween(toX: number, toY: number, toS: number, ms: number, onDone?: () => void): void {
+    cancelAnimationFrame(this.raf);
+    const fx = this.x, fy = this.y, fs = this.scale, t0 = performance.now();
+    const ease = (t: number): number => 1 - Math.pow(1 - t, 3);
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - t0) / ms);
+      const e = ease(t);
+      this.scale = fs + (toS - fs) * e;
+      this.x = fx + (toX - fx) * e;
+      this.y = fy + (toY - fy) * e;
+      this.apply();
+      if (t < 1) this.raf = requestAnimationFrame(step);
+      else if (onDone) onDone();
+    };
+    this.raf = requestAnimationFrame(step);
+  }
+
+  /** Занурення до точки світу (native-координати POI): наближення + центрування. */
+  diveTo(wx: number, wy: number): void {
+    this.recompute();
+    const s = Math.min(this.maxScale, Math.max(this.minScale * 2.6, this.minScale));
+    this.tween(this.vw / 2 - wx * s, this.vh / 2 - wy * s, s, 620);
+  }
+
+  /** Вихід назад у повну діораму. */
+  back(): void {
+    this.recompute();
+    const s = Math.min(this.maxScale, this.minScale * 1.25);
+    const fx = this.focus ? this.focus.x : this.worldW / 2;
+    const fy = this.focus ? this.focus.y : this.worldH / 2;
+    this.tween(this.vw / 2 - fx * s, this.vh / 2 - fy * s, s, 520);
+  }
+
+  /** Видима зараз область СВІТУ (native), розширена на margin — для кулінгу рослин вітром. */
+  visibleWorldRect(margin = 0): { x0: number; y0: number; x1: number; y1: number } {
+    return {
+      x0: -this.x / this.scale - margin,
+      y0: -this.y / this.scale - margin,
+      x1: (this.vw - this.x) / this.scale + margin,
+      y1: (this.vh - this.y) / this.scale + margin,
+    };
+  }
+
+  /** Client-координати → світ (native). Для ручного хіт-тесту (клік по селянину). */
+  clientToWorld(cx: number, cy: number): { x: number; y: number } {
+    const r = this.frame.getBoundingClientRect();
+    return { x: (cx - r.left - this.x) / this.scale, y: (cy - r.top - this.y) / this.scale };
   }
 
   private apply(): void {
