@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Версію pnpm бере з "packageManager" у package.json.
+      # Дублювати її тут через `version:` — помилка (ERR_PNPM_BAD_PM_VERSION).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -21,3 +21,15 @@ jobs:
       # Кожен рядок фікстур мусить валідуватися проти zod-контракту (13/13 типів).
       # Коли зʼявиться Pydantic-дзеркало (Фаза 4) — сюди додається гейт паритету TS↔Py.
       - run: pnpm --filter @ploshcha/contract-ts validate
+
+  sim:
+    name: sim unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # Детерміноване ядро мусить бути зеленим без мережі й без LLM.
+      - run: uv run --frozen --extra dev pytest
+        working-directory: services/sim
