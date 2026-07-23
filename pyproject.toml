@@ -8,6 +8,9 @@ dependencies = []
 # Робочі залежності (fastapi, pydantic, openai, pytest…) додаються у Фазі 4,
 # коли пишемо services/sim. Зараз — лише валідний плейсхолдер для uv/hatch.
 
+[tool.uv]
+package = false  # корінь — лише workspace-контейнер, не пакет для збірки
+
 [tool.uv.workspace]
 members = ["services/*"]
 

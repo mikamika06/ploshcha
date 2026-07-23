@@ -29,8 +29,14 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# === документація (робочі документи, не в трек) ===
+docs/
+
 # === ОС / редактор ===
 .DS_Store
 *.swp
 .idea/
 .vscode/
+
+# === траси прогонів ===
+eval/traces/
