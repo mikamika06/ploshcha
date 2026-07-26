@@ -1,4 +1,4 @@
-"""Памʼять агента + чистий скор retrieval. Деталі — docs/sprints/S0-core.md."""
+"""Памʼять агента + чистий скор retrieval."""
 
 from typing import Literal
 
@@ -15,9 +15,17 @@ class MemoryItem(BaseModel):
     importance: int = Field(ge=1, le=10)
     provenance: str = Field(default="sim", description="sim | agent:<id> | board | external")
     embedding: list[float] | None = None
+    evidence: list[str] = Field(default_factory=list, description="id памʼятей-підстав")
 
 
-DECAY = 0.99  # калібрується під шкалу тіку — див. docs/sprints/S0-core.md §7
+def decay_from_half_life(half_life_ticks: float) -> float:
+    """Скільки лишається за тік, щоб за half_life_ticks лишилась половина."""
+    return 0.5 ** (1.0 / half_life_ticks)
+
+
+# 6 тіків = доба (PHASES у state.py), тож 18 тіків = три дні.
+HALF_LIFE_TICKS = 18.0
+DECAY = decay_from_half_life(HALF_LIFE_TICKS)
 W_RECENCY = 1.0
 W_IMPORTANCE = 1.0
 W_RELEVANCE = 1.0

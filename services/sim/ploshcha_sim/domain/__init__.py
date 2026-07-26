@@ -15,7 +15,27 @@ from .action import (
     strict_action_json_schema,
     wire_action_json_schema,
 )
-from .memory import MemoryItem, MemoryKind, normalized_importance, recency, score, top_k
+from .memory import (
+    DECAY,
+    HALF_LIFE_TICKS,
+    MemoryItem,
+    MemoryKind,
+    decay_from_half_life,
+    normalized_importance,
+    recency,
+    score,
+    top_k,
+)
+from .retrieval import (
+    RelevanceMode,
+    Retrieved,
+    char_grams,
+    relevance_chargram,
+    relevance_cosine,
+    relevance_jaccard,
+    retrieve,
+    tokens,
+)
 from .reducer import ActionOutcome, TickResult, tick, validate_action
 from .state import (
     PHASES,
@@ -58,6 +78,17 @@ __all__ = [
     "normalized_importance",
     "score",
     "top_k",
+    "DECAY",
+    "HALF_LIFE_TICKS",
+    "decay_from_half_life",
+    "retrieve",
+    "Retrieved",
+    "RelevanceMode",
+    "relevance_jaccard",
+    "relevance_chargram",
+    "relevance_cosine",
+    "tokens",
+    "char_grams",
     "tick",
     "validate_action",
     "TickResult",
