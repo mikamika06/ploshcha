@@ -28,10 +28,7 @@ TOOLS = [
             "description": "Перевірити, чи рік відповідає історичній події.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "year": {"type": "integer"},
-                    "event": {"type": "string"},
-                },
+                "properties": {"year": {"type": "integer"}, "event": {"type": "string"}},
                 "required": ["year", "event"],
                 "additionalProperties": False,
             },
@@ -58,6 +55,8 @@ CASES = [
     ("Знайди факт про Тараса Шевченка.", "lookup_fact"),
 ]
 
+SYS_TOOLS = "Ти агент з інструментами. НЕ відповідай напряму — ОБОВʼЯЗКОВО виклич інструмент."
+
 WIRE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -75,28 +74,34 @@ SYSTEM_B = (
     "check_date(year,event); lookup_fact(entity)."
 )
 
+NATIVE_MODES = [
+    ("auto", "auto", None),
+    ("auto+sys", "auto", SYS_TOOLS),
+    ("required", "required", None),
+    ("required+sys", "required", SYS_TOOLS),
+]
 
-def try_native(client, model, prompt):
+
+def native(client, model, prompt, tool_choice, sys):
+    msgs = ([{"role": "system", "content": sys}] if sys else []) + [{"role": "user", "content": prompt}]
     try:
         r = client.chat.completions.create(
-            model=model, messages=[{"role": "user", "content": prompt}],
-            tools=TOOLS, tool_choice="auto", temperature=0.0, max_tokens=200,
+            model=model, messages=msgs, tools=TOOLS, tool_choice=tool_choice, temperature=0.0, max_tokens=200,
         )
-        msg = r.choices[0].message
-        if msg.tool_calls:
-            tc = msg.tool_calls[0]
+        m = r.choices[0].message
+        if m.tool_calls:
+            tc = m.tool_calls[0]
             try:
                 args = json.loads(tc.function.arguments)
             except Exception:
                 args = None
-            return "NATIVE-OK", {"tool": tc.function.name, "args": args}, ""
-        return "NO-TOOLCALL", None, (msg.content or "")[:60]
+            return tc.function.name, args
+        return None, None
     except Exception as e:
-        return f"ERR:{type(e).__name__}", None, str(e)[:70]
+        return f"ERR:{type(e).__name__}", None
 
 
-def try_prompt(client, model, prompt):
-    t = ""
+def prompt_mode(client, model, prompt):
     try:
         r = client.chat.completions.create(
             model=model,
@@ -105,38 +110,32 @@ def try_prompt(client, model, prompt):
             response_format={"type": "json_schema",
                              "json_schema": {"name": "toolcall", "schema": WIRE_SCHEMA, "strict": True}},
         )
-        t = (r.choices[0].message.content or "").strip()
-        obj = json.loads(t)
-        return "JSON-OK", {"tool": obj.get("tool"), "args": {k: v for k, v in obj.items() if k != "tool"}}, t[:60]
-    except json.JSONDecodeError:
-        return "NOT-JSON", None, t[:60]
+        obj = json.loads((r.choices[0].message.content or "").strip())
+        return obj.get("tool")
     except Exception as e:
-        return f"ERR:{type(e).__name__}", None, str(e)[:70]
+        return f"ERR:{type(e).__name__}"
 
 
 def run(label, model, base_url, api_key):
     client = OpenAI(base_url=base_url, api_key=api_key, timeout=180)
     print(f"\n{'='*80}\n{label}   {model}\n{'='*80}")
 
-    print("--- режим A: нативний tools ---")
-    native_ok = sel_ok = 0
-    for prompt, want_tool in CASES:
-        verdict, call, raw = try_native(client, model, prompt)
-        picked = call["tool"] if call else "—"
-        native_ok += verdict == "NATIVE-OK"
-        sel_ok += bool(call and call["tool"] == want_tool)
-        print(f"  {verdict:<12} тул={picked:<12} (треба {want_tool})  {raw}")
-    print(f"  нативних викликів: {native_ok}/{len(CASES)}, правильний тул: {sel_ok}/{len(CASES)}")
+    print("--- режим A: нативний tools (по режимах tool_choice) ---")
+    for mode_label, tc, sys in NATIVE_MODES:
+        calls = correct = 0
+        for prompt, want in CASES:
+            name, _ = native(client, model, prompt, tc, sys)
+            calls += bool(name and not str(name).startswith("ERR"))
+            correct += name == want
+        print(f"  {mode_label:<14} викликів {calls}/{len(CASES)}, правильний тул {correct}/{len(CASES)}")
 
-    print("--- режим B: prompt-based ---")
-    json_ok = selb_ok = 0
-    for prompt, want_tool in CASES:
-        verdict, call, raw = try_prompt(client, model, prompt)
-        picked = call["tool"] if call else "—"
-        json_ok += verdict == "JSON-OK"
-        selb_ok += bool(call and call["tool"] == want_tool)
-        print(f"  {verdict:<12} тул={picked:<12} (треба {want_tool})  {raw}")
-    print(f"  валідних JSON: {json_ok}/{len(CASES)}, правильний тул: {selb_ok}/{len(CASES)}")
+    print("--- режим B: prompt-based (наша схема) ---")
+    json_ok = correct = 0
+    for prompt, want in CASES:
+        picked = prompt_mode(client, model, prompt)
+        json_ok += bool(picked and not str(picked).startswith("ERR"))
+        correct += picked == want
+    print(f"  валідних {json_ok}/{len(CASES)}, правильний тул {correct}/{len(CASES)}")
 
 
 def main():
