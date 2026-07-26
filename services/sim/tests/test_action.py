@@ -104,7 +104,7 @@ def test_union_still_parses_flat_payload_with_extra_keys():
     assert a.type == "wait" and a.reason == "нема кого"
 
 
-# ── ступінь 2: посилений union (S1 §14) ──────────────────────────────────────
+# ── ступінь 2: посилений union ───────────────────────────────────────────────
 
 
 def test_plain_union_leaves_discriminator_optional():

@@ -1,4 +1,4 @@
-"""Action-space села. Деталі й обґрунтування — docs/sprints/S0-core.md."""
+"""Action-space села."""
 
 from typing import Annotated, Literal, Union
 
@@ -90,7 +90,7 @@ def _harden(node: object) -> object:
     """Кожному object дописати required=усі поля + additionalProperties:false.
 
     Без цього бекенд не компілює граматику: pydantic не кладе поля з `default`
-    (а це наш дискримінатор `type`) у `required`. Див. docs/sprints/S1-llm-act.md §14.
+    (а це наш дискримінатор `type`) у `required`.
     """
     if isinstance(node, dict):
         out = {k: _harden(v) for k, v in node.items()}
