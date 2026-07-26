@@ -26,6 +26,7 @@ from .memory import (
     score,
     top_k,
 )
+from .task import Budget, TaskResult, TaskState
 from .retrieval import (
     RelevanceMode,
     Retrieved,
@@ -93,4 +94,7 @@ __all__ = [
     "validate_action",
     "TickResult",
     "ActionOutcome",
+    "TaskState",
+    "Budget",
+    "TaskResult",
 ]

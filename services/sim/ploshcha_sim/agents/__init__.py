@@ -4,6 +4,8 @@ from .act import ActResult, act, build_act_prompt
 from .importance import ImportanceResult, heuristic_importance, rate_importance
 from .perceive import perceive, to_memories
 from .recall import build_recall_query, recall
+from .orchestrator import LinearPlanner, Orchestrator
+from .verify import Verdict, verify
 from .reflect import Insight, ReflectResult, reflect, should_reflect
 
 __all__ = [
@@ -21,4 +23,8 @@ __all__ = [
     "should_reflect",
     "ReflectResult",
     "Insight",
+    "Orchestrator",
+    "LinearPlanner",
+    "verify",
+    "Verdict",
 ]
