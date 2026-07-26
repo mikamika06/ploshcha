@@ -44,6 +44,7 @@ class Orchestrator:
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
         state = TaskState(task=task, budget=budget or Budget())
+        seen: set[str] = set()
         while not state.done and state.budget.can_continue():
             kind = self.planner.next_kind(state)
             llm = self.router.route(kind)
@@ -60,6 +61,11 @@ class Orchestrator:
                 state.answer = str(call.args.get("text", ""))
                 state.done = True
                 break
+            sig = json.dumps({"tool": call.tool, **call.args}, sort_keys=True, ensure_ascii=False)
+            if sig in seen:
+                state.degraded = True
+                break
+            seen.add(sig)
             result = self.tools.call(call)
             state.scratch.append({
                 "call": {"tool": call.tool, **call.args},

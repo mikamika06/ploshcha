@@ -48,7 +48,7 @@ def test_verifier_off_accepts_without_judge():
 
 
 def test_budget_stop_without_final_is_degraded():
-    o = orch([tc("lookup_fact", entity="a")] * 10, verifier=False)
+    o = orch([tc("lookup_fact", entity=f"a{i}") for i in range(10)], verifier=False)
     r = o.run("питання", budget=Budget(max_steps=3))
     assert r.answer is None and r.degraded is True and r.steps == 3
 
@@ -94,3 +94,9 @@ def test_result_reports_step_count():
     o = orch([tc("lookup_fact", entity="X"), tc("final_answer", text="R")], verifier=False)
     r = o.run("q")
     assert r.steps == 2
+
+
+def test_repeated_call_breaks_early():
+    o = orch([tc("lookup_fact", entity="X")] * 6, verifier=False)
+    r = o.run("q", budget=Budget(max_steps=10))
+    assert r.degraded is True and r.steps == 2 and len(r.scratch) == 1
