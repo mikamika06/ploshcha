@@ -1,3 +1,3 @@
-"""ploshcha_sim — агентний движок ПЛОЩІ. Архітектура — docs/ARCHITECTURE.md."""
+"""ploshcha_sim — агентний движок ПЛОЩІ."""
 
 __version__ = "0.0.1"

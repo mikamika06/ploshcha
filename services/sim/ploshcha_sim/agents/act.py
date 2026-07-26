@@ -1,4 +1,4 @@
-"""Крок `act`: модель обирає одну дію. Деталі — docs/sprints/S1-llm-act.md."""
+"""Крок `act`: модель обирає одну дію."""
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -16,7 +16,7 @@ SYSTEM = (
 )
 
 # Форми дій у промпті обовʼязкові, коли constrained decoding недоступний
-# (хостований Lapathoniia мовчки ігнорує guided_json — див. S1 §12).
+# (хостований Lapathoniia мовчки ігнорує guided_json).
 ACTION_FORMS = """Формат відповіді — рівно один JSON, одна з форм:
 {"type":"move_to","poi":"<id локації>"}
 {"type":"speak","to":["<id людини>"],"text":"<що кажеш>"}
@@ -27,7 +27,7 @@ ACTION_FORMS = """Формат відповіді — рівно один JSON, 
 
 SCHEMA_INVALID = "schema_invalid"
 # обрізання по max_tokens — це провал БЮДЖЕТУ, не формату; окремий код, щоб не
-# псувати метрику schema-validity (див. S1 §13)
+# псувати метрику schema-validity
 TRUNCATED = "truncated"
 
 

@@ -1,4 +1,4 @@
-"""Порт LLM. Деталі — docs/sprints/S1-llm-act.md."""
+"""Порт LLM."""
 
 from abc import ABC, abstractmethod
 

@@ -1,4 +1,4 @@
-"""Смоук-проба живого API Lapathoniia. Деталі — docs/sprints/S1-llm-act.md."""
+"""Смоук-проба живого API Lapathoniia."""
 
 import json
 import os

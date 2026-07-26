@@ -1,4 +1,4 @@
-"""Стан світу ПЛОЩІ. Деталі — docs/sprints/S0-core.md."""
+"""Стан світу ПЛОЩІ."""
 
 from typing import Literal
 
