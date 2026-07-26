@@ -23,7 +23,7 @@ class OpenAICompatLlm(LlmPort):
         self.guided_backend = guided_backend
         self._client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
 
-    def _call(self, prompt, system, temperature, max_tokens, extra_body=None, response_format=None) -> LlmResult:
+    def _call(self, prompt, system, temperature, max_tokens, extra_body=None, response_format=None, seed=None) -> LlmResult:
         messages = ([{"role": "system", "content": system}] if system else []) + [
             {"role": "user", "content": prompt}
         ]
@@ -34,6 +34,7 @@ class OpenAICompatLlm(LlmPort):
             temperature=temperature,
             max_tokens=max_tokens,
             extra_body=extra_body or {},
+            **({"seed": seed} if seed is not None else {}),
             **({"response_format": response_format} if response_format else {}),
         )
         latency = int((time.perf_counter() - t0) * 1000)
@@ -50,10 +51,10 @@ class OpenAICompatLlm(LlmPort):
             finish_reason=resp.choices[0].finish_reason,
         )
 
-    def generate(self, prompt, *, system=None, temperature=0.0, max_tokens=512) -> LlmResult:
-        return self._call(prompt, system, temperature, max_tokens, None)
+    def generate(self, prompt, *, system=None, temperature=0.0, max_tokens=512, seed=None) -> LlmResult:
+        return self._call(prompt, system, temperature, max_tokens, None, seed=seed)
 
-    def generate_structured(self, prompt, schema, *, system=None, temperature=0.0, max_tokens=512) -> LlmResult:
+    def generate_structured(self, prompt, schema, *, system=None, temperature=0.0, max_tokens=512, seed=None) -> LlmResult:
         extra: dict = {}
         rf: dict | None = None
         if self.structured_mode == "json_schema":
@@ -67,4 +68,4 @@ class OpenAICompatLlm(LlmPort):
             extra["guided_json"] = schema
             if self.guided_backend:
                 extra["guided_decoding_backend"] = self.guided_backend
-        return self._call(prompt, system, temperature, max_tokens, extra, rf)
+        return self._call(prompt, system, temperature, max_tokens, extra, rf, seed=seed)

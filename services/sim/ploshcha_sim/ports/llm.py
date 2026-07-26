@@ -36,6 +36,7 @@ class LlmPort(ABC):
         system: str | None = None,
         temperature: float = 0.0,
         max_tokens: int = 512,
+        seed: int | None = None,
     ) -> LlmResult: ...
 
     @abstractmethod
@@ -47,6 +48,7 @@ class LlmPort(ABC):
         system: str | None = None,
         temperature: float = 0.0,
         max_tokens: int = 512,
+        seed: int | None = None,
     ) -> LlmResult:
         """Вивід обмежений JSON-схемою (constrained decoding). Парсинг — на боці агента,
         щоб невалідний вивід лишався вимірюваним, а не ховався в порті."""

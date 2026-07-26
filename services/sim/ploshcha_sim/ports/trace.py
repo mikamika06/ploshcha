@@ -22,6 +22,7 @@ class StepRecord(BaseModel):
     usage: LlmUsage = Field(default_factory=LlmUsage)
     latency_ms: int = 0
     finish_reason: str | None = None
+    seed: int | None = None
     ablation: dict = Field(default_factory=dict)
     seq: int = 0
 

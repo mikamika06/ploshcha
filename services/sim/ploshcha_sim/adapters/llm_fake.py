@@ -10,9 +10,9 @@ class FakeLlm(LlmPort):
         self._responses = list(responses)
         self.calls: list[dict] = []
 
-    def _next(self, prompt: str, system: str | None, structured: bool, schema: dict | None) -> LlmResult:
+    def _next(self, prompt, system, structured, schema, seed) -> LlmResult:
         self.calls.append(
-            {"prompt": prompt, "system": system, "structured": structured, "schema": schema}
+            {"prompt": prompt, "system": system, "structured": structured, "schema": schema, "seed": seed}
         )
         text = self._responses.pop(0) if self._responses else ""
         return LlmResult(
@@ -24,8 +24,8 @@ class FakeLlm(LlmPort):
             finish_reason=self.finish_reason,
         )
 
-    def generate(self, prompt, *, system=None, temperature=0.0, max_tokens=512) -> LlmResult:
-        return self._next(prompt, system, False, None)
+    def generate(self, prompt, *, system=None, temperature=0.0, max_tokens=512, seed=None) -> LlmResult:
+        return self._next(prompt, system, False, None, seed)
 
-    def generate_structured(self, prompt, schema, *, system=None, temperature=0.0, max_tokens=512) -> LlmResult:
-        return self._next(prompt, system, True, schema)
+    def generate_structured(self, prompt, schema, *, system=None, temperature=0.0, max_tokens=512, seed=None) -> LlmResult:
+        return self._next(prompt, system, True, schema, seed)
