@@ -53,6 +53,7 @@ class Orchestrator:
             cfg = self.effort.effort(kind)
             schema = self.tools.strict_schema() if cfg.tier == "strict" else self.tools.wire_schema()
             res = llm.generate_structured(_render(state), schema, system=self.system,
+                                          temperature=cfg.temperature,
                                           max_tokens=cfg.max_tokens, seed=seed)
             state.budget.spend(res.usage.total)
             call, reason = self.tools.parse(_safe_json(res.text))

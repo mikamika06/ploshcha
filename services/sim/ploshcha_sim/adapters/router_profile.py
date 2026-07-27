@@ -42,3 +42,13 @@ class PresetEffort(EffortPolicy):
 
     def effort(self, kind: StepKind) -> EffortConfig:
         return self._high if kind in self._high_kinds else self._low
+
+
+def sampling_effort(temperature: float = 0.7, base: EffortPolicy | None = None,
+                    high_kinds: tuple[StepKind, ...] = HIGH_KINDS) -> PresetEffort:
+    src = base or PresetEffort(high_kinds=high_kinds)
+    return PresetEffort(
+        low=src.effort(LOW_KINDS[0]).model_copy(update={"temperature": temperature}),
+        high=src.effort(HIGH_KINDS[0]).model_copy(update={"temperature": temperature}),
+        high_kinds=high_kinds,
+    )

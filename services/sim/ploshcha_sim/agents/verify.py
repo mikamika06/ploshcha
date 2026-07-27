@@ -33,7 +33,8 @@ def verify(task, answer, router: ModelRouter, effort: EffortPolicy, *,
     cfg = effort.effort("judge")
     ev = _json.dumps(evidence, ensure_ascii=False) if evidence else "—"
     prompt = f"Задача: {task}\nВідповідь: {answer}\nДокази (результати інструментів): {ev}\n\nОдин JSON."
-    res = llm.generate_structured(prompt, VERDICT_SCHEMA, system=SYSTEM, max_tokens=cfg.max_tokens, seed=seed)
+    res = llm.generate_structured(prompt, VERDICT_SCHEMA, system=SYSTEM,
+                                  temperature=cfg.temperature, max_tokens=cfg.max_tokens, seed=seed)
     try:
         d = json.loads(res.text)
         verdict = Verdict(accepted=bool(d["accepted"]), reason=str(d.get("reason", "")))

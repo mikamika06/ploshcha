@@ -22,6 +22,7 @@ class EffortConfig(BaseModel):
     think_tokens: int = 0
     force_thinking: bool = False
     max_tokens: int = 256
+    temperature: float = 0.0
     tier: Tier = "strict"
     samples: int = 1
     verify: bool = False
