@@ -32,7 +32,8 @@ class LinearPlanner(Planner):
 class Orchestrator:
     def __init__(self, router: ModelRouter, effort: EffortPolicy, tools: ToolPort,
                  planner: Planner | None = None, verifier: bool = True,
-                 memory=None, trace: TracePort | None = None, run_id: str = ""):
+                 memory=None, trace: TracePort | None = None, run_id: str = "",
+                 system: str | None = None):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -41,6 +42,7 @@ class Orchestrator:
         self.memory = memory
         self.trace = trace
         self.run_id = run_id
+        self.system = system
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
         state = TaskState(task=task, budget=budget or Budget())
@@ -50,7 +52,8 @@ class Orchestrator:
             llm = self.router.route(kind)
             cfg = self.effort.effort(kind)
             schema = self.tools.strict_schema() if cfg.tier == "strict" else self.tools.wire_schema()
-            res = llm.generate_structured(_render(state), schema, max_tokens=cfg.max_tokens, seed=seed)
+            res = llm.generate_structured(_render(state), schema, system=self.system,
+                                          max_tokens=cfg.max_tokens, seed=seed)
             state.budget.spend(res.usage.total)
             call, reason = self.tools.parse(_safe_json(res.text))
             self._emit(state, kind, llm.model, res, call, reason, seed)
@@ -79,7 +82,7 @@ class Orchestrator:
         reason = None
         if state.done and self.verifier:
             verdict = run_verify(task, state.answer, self.router, self.effort,
-                                 seed=seed, trace=self.trace, run_id=self.run_id)
+                                 evidence=state.scratch, seed=seed, trace=self.trace, run_id=self.run_id)
             accepted = verdict.accepted
             reason = verdict.reason
             if not accepted:

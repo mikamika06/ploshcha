@@ -44,9 +44,17 @@ def show(label, task, result, trace):
           f"steps={result.steps}")
 
 
+SYSTEM = (
+    "Ти агент з інструментами: check_date(year,event), lookup_fact(entity), calc(expr), final_answer(text). "
+    "Аргументи пиши УКРАЇНСЬКОЮ дослівно як у задачі — НЕ перекладай назви подій і людей. "
+    "Перевіряй факти інструментом, навіть якщо знаєш відповідь; final_answer лише після перевірки. "
+    "Якщо інструмент не знайшов — не повторюй той самий виклик, спробуй інакше або заверши."
+)
+
+
 def run_config(label, router, task):
     trace = InMemoryTrace()
-    orch = Orchestrator(router, PresetEffort(), FakeToolbox(), verifier=True, trace=trace)
+    orch = Orchestrator(router, PresetEffort(), FakeToolbox(), verifier=True, trace=trace, system=SYSTEM)
     result = orch.run(task, seed=1, budget=Budget(max_steps=5))
     show(label, task, result, trace)
 

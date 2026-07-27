@@ -13,8 +13,9 @@ VERDICT_SCHEMA = {
 }
 
 SYSTEM = (
-    "Ти суворий перевіряльник. Спробуй СПРОСТУВАТИ відповідь на задачу. "
-    "Якщо спростувати не вдається — accepted=true, інакше false. За сумніву — false. "
+    "Ти перевіряльник. Оціни, чи відповідь правильна Й підтверджена доказами (результатами "
+    "інструментів). Якщо докази підтверджують відповідь — accepted=true. Відкидай (false) лише за "
+    "фактичну помилку чи суперечність доказам, не за брак довіри до самих інструментів. "
     "Відповідай РІВНО одним JSON: {\"accepted\":<bool>,\"reason\":\"<чому>\"}"
 )
 
@@ -25,10 +26,13 @@ class Verdict(BaseModel):
 
 
 def verify(task, answer, router: ModelRouter, effort: EffortPolicy, *,
-           seed: int = 0, trace: TracePort | None = None, run_id: str = "") -> Verdict:
+           evidence: list | None = None, seed: int = 0,
+           trace: TracePort | None = None, run_id: str = "") -> Verdict:
+    import json as _json
     llm = router.route("judge")
     cfg = effort.effort("judge")
-    prompt = f"Задача: {task}\nВідповідь: {answer}\n\nСпробуй спростувати. Один JSON."
+    ev = _json.dumps(evidence, ensure_ascii=False) if evidence else "—"
+    prompt = f"Задача: {task}\nВідповідь: {answer}\nДокази (результати інструментів): {ev}\n\nОдин JSON."
     res = llm.generate_structured(prompt, VERDICT_SCHEMA, system=SYSTEM, max_tokens=cfg.max_tokens, seed=seed)
     try:
         d = json.loads(res.text)

@@ -3,6 +3,8 @@
 from .embed_hash import HashEmbedder
 from .llm_fake import FakeLlm
 from .memory_world import WorldStateMemory
+from .embed_llama import LlamaEmbedder
+from .retriever_lexical import BM25Retriever
 from .retriever_basic import HybridRetriever, ModeRetriever, default_hybrid, reciprocal_rank_fusion
 from .router_profile import PresetEffort, ProfileRouter, profile_router, single_model_router
 from .tools_fake import DEFAULT_TOOLS, FakeToolbox, Tool
@@ -13,4 +15,5 @@ __all__ = [
     "FakeToolbox", "Tool", "DEFAULT_TOOLS",
     "ProfileRouter", "profile_router", "single_model_router", "PresetEffort",
     "WorldStateMemory", "ModeRetriever", "HybridRetriever", "default_hybrid", "reciprocal_rank_fusion",
+    "BM25Retriever", "LlamaEmbedder",
 ]

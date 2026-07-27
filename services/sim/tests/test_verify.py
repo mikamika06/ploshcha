@@ -33,3 +33,10 @@ def test_verify_traces():
     trace = InMemoryTrace()
     verify("q", "a", router_with([json.dumps({"accepted": True, "reason": "ok"})]), PresetEffort(), trace=trace)
     assert trace.records[0].stage == "judge" and trace.records[0].agent == "verifier"
+
+
+def test_verify_includes_evidence_in_prompt():
+    llm = FakeLlm([json.dumps({"accepted": True, "reason": "ok"})], model="judge")
+    verify("q", "a", single_model_router(llm), PresetEffort(),
+           evidence=[{"call": {"tool": "check_date"}, "result": {"matches": True}}])
+    assert "matches" in llm.calls[0]["prompt"]

@@ -9,6 +9,7 @@ dependencies = [
 
 [project.optional-dependencies]
 openai = ["openai>=1.40"]
+retrieval = ["pymorphy3>=2.0", "pymorphy3-dicts-uk", "rank-bm25>=0.2"]
 dev = ["pytest>=8", "jsonschema>=4"]
 
 [tool.pytest.ini_options]

@@ -46,13 +46,23 @@ class Tool:
         return ToolSpec(name=self.name, description=self.description, params=self.params.model_json_schema())
 
 
+def _match(query: str, table: dict):
+    q = query.strip().casefold()
+    for key, value in table.items():
+        kk = key.casefold()
+        if kk == q or kk in q or q in kk:
+            return value
+    return None
+
+
 def _check_date(a: CheckDateArgs) -> dict:
-    actual = EVENT_YEARS.get(a.event)
+    actual = _match(a.event, EVENT_YEARS)
     return {"matches": actual == a.year, "actual_year": actual, "known": actual is not None}
 
 
 def _lookup_fact(a: LookupFactArgs) -> dict:
-    return {"fact": FACTS.get(a.entity), "known": a.entity in FACTS}
+    fact = _match(a.entity, FACTS)
+    return {"fact": fact, "known": fact is not None}
 
 
 def _calc(a: CalcArgs) -> dict:
