@@ -30,4 +30,5 @@ class TaskResult(BaseModel):
     verdict_reason: str | None = None
     degraded: bool = False
     steps: int = 0
+    tokens: int = 0
     scratch: list[dict] = Field(default_factory=list)

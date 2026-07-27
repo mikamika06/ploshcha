@@ -92,7 +92,8 @@ class Orchestrator:
 
         return TaskResult(
             answer=state.answer, accepted=accepted, verdict_reason=reason,
-            degraded=state.degraded, steps=state.budget.steps_used, scratch=state.scratch,
+            degraded=state.degraded, steps=state.budget.steps_used,
+            tokens=state.budget.tokens_used, scratch=state.scratch,
         )
 
     def _emit(self, state, kind, model, res, call, reason, seed):
