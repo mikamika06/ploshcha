@@ -14,7 +14,8 @@ dev = ["pytest>=8", "jsonschema>=4"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q -p no:asyncio"
+addopts = "-q -p no:asyncio -m 'not live'"
+markers = ["live: hits a real model endpoint; excluded by default, run with -m live"]
 
 [build-system]
 requires = ["hatchling"]
