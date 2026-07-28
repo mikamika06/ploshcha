@@ -20,6 +20,7 @@ def load_env(path):
 load_env(ROOT / ".env")
 
 from evalkit.harness import load_items, orchestrator_runner, run_eval, single_call_runner
+from evalkit.prompts import resolve
 from evalkit.report import aggregate, format_report
 from ploshcha_sim.adapters import FakeToolbox, PresetEffort, profile_router, single_model_router
 from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm
@@ -38,24 +39,21 @@ def parse_args(argv):
             limit = int(a.split("=", 1)[1])
     return seeds, limit
 
-SYSTEM = (
-    "Ти агент з інструментами: check_date(year,event), lookup_fact(entity), calc(expr), final_answer(text). "
-    "Аргументи пиши УКРАЇНСЬКОЮ дослівно як у задачі — НЕ перекладай назви подій і людей. "
-    "Перевіряй факти інструментом, навіть якщо знаєш відповідь. "
-    "НЕ повторюй виклик, який уже зроблено — його результат вище. "
-    "Виконай ВСІ частини задачі, і лише тоді заверши через final_answer. "
-    "Якщо інструмент не знайшов — не повторюй той самий виклик, спробуй інакше або заверши."
-)
+PROMPT_ID = "agent/v2"
 
 
 def make_llm(model, url, key):
     return OpenAICompatLlm(model=model, base_url=url, api_key=key, structured_mode="json_schema")
 
 
-def orch_cond(router_factory, verifier, *, recovery=False, max_steps=5):
+def orch_cond(router_factory, verifier, *, recovery=False, max_steps=5, prompt=None):
+    variant = prompt or resolve(PROMPT_ID)
+
     def make_orch():
         return Orchestrator(router_factory(), PresetEffort(), FakeToolbox(),
-                            verifier=verifier, system=SYSTEM, recovery=recovery)
+                            verifier=verifier, system=variant.render_system(),
+                            tail=variant.tail or None, prompt_id=variant.id,
+                            prompt_sha=variant.sha256, recovery=recovery)
     return orchestrator_runner(make_orch, budget=Budget(max_steps=max_steps))
 
 
@@ -72,8 +70,8 @@ def main():
     if limit:
         items = items[:limit]
     runners = {
-        "single-mamay": single_call_runner(mamay, system=SYSTEM),
-        "single-lapa": single_call_runner(lapa, system=SYSTEM),
+        "single-mamay": single_call_runner(mamay, system=resolve(PROMPT_ID).render_system()),
+        "single-lapa": single_call_runner(lapa, system=resolve(PROMPT_ID).render_system()),
         "mamay@5": orch_cond(lambda: single_model_router(mamay), True),
         "mamay@8": orch_cond(lambda: single_model_router(mamay), True, max_steps=8),
         "mamay+rec@8": orch_cond(lambda: single_model_router(mamay), True, recovery=True, max_steps=8),

@@ -19,6 +19,7 @@ def load_env(path):
 
 load_env(ROOT / ".env")
 
+from evalkit.prompts import resolve
 from ploshcha_sim.adapters import FakeToolbox, InMemoryTrace, PresetEffort, profile_router, single_model_router
 from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm
 from ploshcha_sim.agents import Orchestrator
@@ -44,14 +45,8 @@ def show(label, task, result, trace):
           f"steps={result.steps}")
 
 
-SYSTEM = (
-    "Ти агент з інструментами: check_date(year,event), lookup_fact(entity), calc(expr), final_answer(text). "
-    "Аргументи пиши УКРАЇНСЬКОЮ дослівно як у задачі — НЕ перекладай назви подій і людей. "
-    "Перевіряй факти інструментом, навіть якщо знаєш відповідь. "
-    "НЕ повторюй виклик, який уже зроблено — його результат вище. "
-    "Виконай ВСІ частини задачі, і лише тоді заверши через final_answer. "
-    "Якщо інструмент не знайшов — не повторюй той самий виклик, спробуй інакше або заверши."
-)
+PROMPT_ID = "agent/v2"
+SYSTEM = resolve(PROMPT_ID).render_system()
 
 
 def run_config(label, router, task):

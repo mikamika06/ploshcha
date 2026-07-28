@@ -16,4 +16,4 @@ esac
 if [ "$1" = "bge" ]; then
   exec llama-server -m "$GGUF" --host 127.0.0.1 --port "$PORT" --embedding --pooling cls -ngl 999 --log-prefix
 fi
-exec llama-server -m "$GGUF" --host 127.0.0.1 --port "$PORT" -c 8192 -ngl 999 --log-prefix
+exec llama-server -m "$GGUF" --host 127.0.0.1 --port "$PORT" -c 8192 -ngl 999 --jinja --log-prefix
