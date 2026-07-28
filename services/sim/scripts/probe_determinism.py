@@ -79,17 +79,33 @@ def realistic(llm, schema):
     report("H послідовно, різні seed", [call(s) for s in range(1, N + 1)])
 
 
+def parse_args(argv):
+    url, models, key = None, None, None
+    for a in argv:
+        if a.startswith("--base-url="):
+            url = a.split("=", 1)[1]
+        elif a.startswith("--models="):
+            models = a.split("=", 1)[1].split(",")
+        elif a.startswith("--api-key="):
+            key = a.split("=", 1)[1]
+    return url, models, key
+
+
 def main():
-    key, url = os.environ.get("LAPA_API_KEY"), os.environ.get("LAPA_BASE_URL")
-    if not key:
-        print("нема LAPA_API_KEY")
-        return 1
+    url, models, key = parse_args(sys.argv[1:])
+    if url is None:
+        url, key = os.environ.get("LAPA_BASE_URL"), os.environ.get("LAPA_API_KEY")
+        models = [os.environ["MAMAY_MODEL"], os.environ["LAPA_MODEL"]]
+        if not key:
+            print("нема LAPA_API_KEY")
+            return 1
+    key = key or "EMPTY"
+    models = models or ["local"]
     schema = FakeToolbox().wire_schema()
-    for name in ("MAMAY_MODEL", "LAPA_MODEL"):
-        model = os.environ[name]
+    for model in models:
         llm = OpenAICompatLlm(model=model, base_url=url, api_key=key, structured_mode="json_schema")
         print("=" * 78)
-        print(f"МОДЕЛЬ {name}={model}")
+        print(f"МОДЕЛЬ {model}  @  {url}")
         short_matrix(llm)
         realistic(llm, schema)
     print("\nСхема виводу: 1/N унікальних = бітово стабільно; >1 = недетермінізм бекенда.")
