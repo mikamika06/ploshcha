@@ -32,7 +32,8 @@ def _safe_json(text):
 VERBATIM_WINDOW = 2
 
 
-def _render(state: TaskState, recall=None, verbatim: int | None = None) -> str:
+def _render(state: TaskState, recall=None, verbatim: int | None = None,
+            tail: str | None = None) -> str:
     lines = [f"Задача: {state.task}"]
     if recall is not None and recall.hits:
         lines.append("Пригадане:")
@@ -45,6 +46,8 @@ def _render(state: TaskState, recall=None, verbatim: int | None = None) -> str:
     for hint in state.hints:
         lines.append(f"Підказка: {hint}")
     lines.append("Наступний крок — один JSON (виклик інструмента або final_answer):")
+    if tail:
+        lines.append(tail)
     return "\n".join(lines)
 
 
@@ -86,7 +89,8 @@ class Orchestrator:
                  planner: Planner | None = None, verifier: bool = True,
                  memory=None, trace: TracePort | None = None, run_id: str = "",
                  system: str | None = None, recovery: bool = False,
-                 notebook: Callable[[], Notebook] | None = None):
+                 notebook: Callable[[], Notebook] | None = None,
+                 tail: str | None = None, prompt_id: str = "", prompt_sha: str = ""):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -98,6 +102,9 @@ class Orchestrator:
         self.system = system
         self.recovery = recovery
         self.notebook = notebook
+        self.tail = tail
+        self.prompt_id = prompt_id
+        self.prompt_sha = prompt_sha
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
         state = TaskState(task=task, budget=budget or Budget())
@@ -121,13 +128,14 @@ class Orchestrator:
             if notebook is not None:
                 recall = notebook.recall(_recall_query(state), state.budget.steps_used)
                 self._emit_memory(state, "mem_read", recall.as_trace(), seed)
-            prompt = _render(state, recall, VERBATIM_WINDOW if notebook is not None else None)
+            prompt = _render(state, recall, VERBATIM_WINDOW if notebook is not None else None,
+                             self.tail)
             res = llm.generate_structured(prompt, schema, system=self.system,
                                           temperature=cfg.temperature,
                                           max_tokens=cfg.max_tokens, seed=seed)
             state.budget.spend(res.usage.total)
             call, reason = self.tools.parse(_safe_json(res.text))
-            self._emit(state, kind, llm.model, res, call, reason, seed, prompt)
+            self._emit(state, kind, llm.model, res, call, reason, seed, prompt, cfg.tier)
             state.hints = []
 
             if call is None:
@@ -274,7 +282,7 @@ class Orchestrator:
             schema_valid=True, world_valid=True, seed=seed,
         ))
 
-    def _emit(self, state, kind, model, res, call, reason, seed, prompt=None):
+    def _emit(self, state, kind, model, res, call, reason, seed, prompt=None, cfg_tier=""):
         if self.trace is None:
             return
         self.trace.emit(StepRecord(
@@ -283,5 +291,7 @@ class Orchestrator:
             parsed={"tool": call.tool, **call.args} if call else None,
             schema_valid=call is not None, world_valid=call is not None,
             reject_reason=reason, usage=res.usage, latency_ms=res.latency_ms,
-            finish_reason=res.finish_reason, seed=seed, ablation={"kind": kind},
+            finish_reason=res.finish_reason, seed=seed,
+            ablation={"kind": kind, "tier": cfg_tier, "prompt": self.prompt_id,
+                      "prompt_sha": self.prompt_sha},
         ))

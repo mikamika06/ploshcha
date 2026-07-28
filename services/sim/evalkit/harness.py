@@ -22,6 +22,7 @@ class EvalResult(BaseModel):
     item_id: str
     category: str
     condition: str
+    prompt_id: str = ""
     seed: int
     success: bool
     checks: dict[str, bool]
@@ -59,7 +60,8 @@ def single_call_runner(llm, *, system: str | None = None, max_tokens: int = 512)
     return run
 
 
-def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int]) -> list[EvalResult]:
+def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int],
+             prompt_ids: dict[str, str] | None = None) -> list[EvalResult]:
     out: list[EvalResult] = []
     for item in items:
         for condition, runner in runners.items():
@@ -67,7 +69,8 @@ def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int]
                 result = runner(item.task, seed)
                 checks = run_checks(item.checks, result)
                 out.append(EvalResult(
-                    item_id=item.id, category=item.category, condition=condition, seed=seed,
+                    item_id=item.id, category=item.category, condition=condition,
+                    prompt_id=(prompt_ids or {}).get(condition, ""), seed=seed,
                     success=all(checks.values()), checks=checks,
                     steps=result.steps, tokens=result.tokens, aux_tokens=result.aux_tokens,
                     accepted=result.accepted, degraded=result.degraded, partial=result.partial,

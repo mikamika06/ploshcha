@@ -24,6 +24,19 @@ def check(spec: dict, result) -> bool:
         return result.accepted
     if kind == "answered":
         return result.answer is not None and not result.degraded
+    if kind == "no_incident":
+        code = spec.get("code")
+        incidents = list(getattr(result, "incidents", []))
+        return code not in incidents if code else not incidents
+    if kind == "steps_between":
+        lo, hi = spec.get("lo", 0), spec.get("hi", 10**6)
+        return lo <= result.steps <= hi
+    if kind == "tool_calls_at_most":
+        return len(_tools(result)) <= spec["n"]
+    if kind == "not_degraded":
+        return not result.degraded
+    if kind == "not_partial":
+        return not getattr(result, "partial", False)
     raise ValueError(f"unknown check kind: {kind}")
 
 
