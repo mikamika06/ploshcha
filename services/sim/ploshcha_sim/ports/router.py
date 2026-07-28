@@ -17,6 +17,20 @@ STEP_KINDS: tuple[StepKind, ...] = (
 
 Tier = Literal["none", "wire", "strict"]
 
+ESCALATE_KIND: dict[StepKind, StepKind] = {
+    "parse": "decide",
+    "classify": "decide",
+    "select": "decide",
+    "ground": "decide",
+    "gate": "decide",
+    "decide": "synthesize",
+}
+
+
+def escalated(kind: StepKind) -> StepKind | None:
+    target = ESCALATE_KIND.get(kind)
+    return target if target != kind else None
+
 
 class EffortConfig(BaseModel):
     think_tokens: int = 0
