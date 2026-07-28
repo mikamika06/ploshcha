@@ -27,8 +27,11 @@ class EvalResult(BaseModel):
     checks: dict[str, bool]
     steps: int = 0
     tokens: int = 0
+    aux_tokens: int = 0
     accepted: bool = False
     degraded: bool = False
+    partial: bool = False
+    incidents: list[str] = Field(default_factory=list)
     answer: str | None = None
 
 
@@ -66,7 +69,8 @@ def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int]
                 out.append(EvalResult(
                     item_id=item.id, category=item.category, condition=condition, seed=seed,
                     success=all(checks.values()), checks=checks,
-                    steps=result.steps, tokens=result.tokens,
-                    accepted=result.accepted, degraded=result.degraded, answer=result.answer,
+                    steps=result.steps, tokens=result.tokens, aux_tokens=result.aux_tokens,
+                    accepted=result.accepted, degraded=result.degraded, partial=result.partial,
+                    incidents=list(result.incidents), answer=result.answer,
                 ))
     return out

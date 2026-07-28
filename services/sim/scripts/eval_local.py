@@ -41,7 +41,9 @@ def parse_args(argv):
 SYSTEM = (
     "Ти агент з інструментами: check_date(year,event), lookup_fact(entity), calc(expr), final_answer(text). "
     "Аргументи пиши УКРАЇНСЬКОЮ дослівно як у задачі — НЕ перекладай назви подій і людей. "
-    "Перевіряй факти інструментом, навіть якщо знаєш відповідь; final_answer лише після перевірки. "
+    "Перевіряй факти інструментом, навіть якщо знаєш відповідь. "
+    "НЕ повторюй виклик, який уже зроблено — його результат вище. "
+    "Виконай ВСІ частини задачі, і лише тоді заверши через final_answer. "
     "Якщо інструмент не знайшов — не повторюй той самий виклик, спробуй інакше або заверши."
 )
 
@@ -50,11 +52,11 @@ def make_llm(model, url, key):
     return OpenAICompatLlm(model=model, base_url=url, api_key=key, structured_mode="json_schema")
 
 
-def orch_cond(router_factory, verifier):
+def orch_cond(router_factory, verifier, *, recovery=False, max_steps=5):
     def make_orch():
         return Orchestrator(router_factory(), PresetEffort(), FakeToolbox(),
-                            verifier=verifier, system=SYSTEM)
-    return orchestrator_runner(make_orch, budget=Budget(max_steps=5))
+                            verifier=verifier, system=SYSTEM, recovery=recovery)
+    return orchestrator_runner(make_orch, budget=Budget(max_steps=max_steps))
 
 
 def main():
@@ -72,9 +74,13 @@ def main():
     runners = {
         "single-mamay": single_call_runner(mamay, system=SYSTEM),
         "single-lapa": single_call_runner(lapa, system=SYSTEM),
-        "full-mamay": orch_cond(lambda: single_model_router(mamay), True),
-        "full-mamay-nov": orch_cond(lambda: single_model_router(mamay), False),
-        "full-hetero": orch_cond(lambda: profile_router(lapa, mamay), True),
+        "mamay@5": orch_cond(lambda: single_model_router(mamay), True),
+        "mamay@8": orch_cond(lambda: single_model_router(mamay), True, max_steps=8),
+        "mamay+rec@8": orch_cond(lambda: single_model_router(mamay), True, recovery=True, max_steps=8),
+        "hetero@5": orch_cond(lambda: profile_router(lapa, mamay), True),
+        "hetero@8": orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8),
+        "hetero+rec@8": orch_cond(lambda: profile_router(lapa, mamay), True, recovery=True, max_steps=8),
+        "hetero-nov@8": orch_cond(lambda: profile_router(lapa, mamay), False, max_steps=8),
     }
     print(f"{len(items)} задач × {len(runners)} умов × {len(seeds)} seed = "
           f"{len(items) * len(runners) * len(seeds)} прогонів\n")
