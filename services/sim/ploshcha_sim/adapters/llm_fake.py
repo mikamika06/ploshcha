@@ -4,9 +4,11 @@ from ..ports.llm import LlmPort, LlmResult, LlmUsage
 
 
 class FakeLlm(LlmPort):
-    def __init__(self, responses: list[str], model: str = "fake", finish_reason: str = "stop"):
+    def __init__(self, responses: list[str], model: str = "fake", finish_reason: str = "stop",
+                 strict: bool = False):
         self.model = model
         self.finish_reason = finish_reason
+        self.strict = strict
         self._responses = list(responses)
         self.calls: list[dict] = []
 
@@ -15,6 +17,8 @@ class FakeLlm(LlmPort):
             {"prompt": prompt, "system": system, "structured": structured, "schema": schema,
              "seed": seed, "temperature": temperature}
         )
+        if not self._responses and self.strict:
+            raise AssertionError(f"FakeLlm: скрипт вичерпано на виклику #{len(self.calls)}")
         text = self._responses.pop(0) if self._responses else ""
         return LlmResult(
             text=text,

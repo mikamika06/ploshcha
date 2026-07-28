@@ -23,6 +23,7 @@ SYSTEM = (
 class Verdict(BaseModel):
     accepted: bool
     reason: str = ""
+    tokens: int = 0
 
 
 def verify(task, answer, router: ModelRouter, effort: EffortPolicy, *,
@@ -37,10 +38,11 @@ def verify(task, answer, router: ModelRouter, effort: EffortPolicy, *,
                                   temperature=cfg.temperature, max_tokens=cfg.max_tokens, seed=seed)
     try:
         d = json.loads(res.text)
-        verdict = Verdict(accepted=bool(d["accepted"]), reason=str(d.get("reason", "")))
+        verdict = Verdict(accepted=bool(d["accepted"]), reason=str(d.get("reason", "")),
+                          tokens=res.usage.total)
         ok = True
     except (json.JSONDecodeError, KeyError, TypeError):
-        verdict = Verdict(accepted=False, reason="verify_parse_fail")
+        verdict = Verdict(accepted=False, reason="verify_parse_fail", tokens=res.usage.total)
         ok = False
     if trace is not None:
         trace.emit(StepRecord(

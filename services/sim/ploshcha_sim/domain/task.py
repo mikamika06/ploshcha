@@ -6,6 +6,7 @@ class Budget(BaseModel):
     max_tokens: int = 100_000
     steps_used: int = 0
     tokens_used: int = 0
+    aux_tokens: int = 0
 
     def can_continue(self) -> bool:
         return self.steps_used < self.max_steps and self.tokens_used < self.max_tokens
@@ -14,6 +15,32 @@ class Budget(BaseModel):
         self.steps_used += 1
         self.tokens_used += tokens
 
+    def spend_aux(self, tokens: int) -> None:
+        self.aux_tokens += tokens
+
+
+class TaskStep(BaseModel):
+    id: str
+    goal: str
+    kind: str = "select"
+    tool_hint: str | None = None
+    done: bool = False
+
+
+class TaskPlan(BaseModel):
+    steps: list[TaskStep] = Field(default_factory=list)
+
+    def current(self) -> TaskStep | None:
+        return next((s for s in self.steps if not s.done), None)
+
+    def advance(self) -> None:
+        step = self.current()
+        if step is not None:
+            step.done = True
+
+    def progress(self) -> tuple[int, int]:
+        return sum(1 for s in self.steps if s.done), len(self.steps)
+
 
 class TaskState(BaseModel):
     task: str
@@ -21,7 +48,15 @@ class TaskState(BaseModel):
     answer: str | None = None
     done: bool = False
     degraded: bool = False
+    partial: bool = False
     budget: Budget = Field(default_factory=Budget)
+    hints: list[str] = Field(default_factory=list)
+    overrides: dict = Field(default_factory=dict)
+    route_as: str | None = None
+    attempts: dict[str, int] = Field(default_factory=dict)
+    incidents: list[str] = Field(default_factory=list)
+    recoveries: int = 0
+    plan: TaskPlan | None = None
 
 
 class TaskResult(BaseModel):
@@ -29,6 +64,9 @@ class TaskResult(BaseModel):
     accepted: bool = False
     verdict_reason: str | None = None
     degraded: bool = False
+    partial: bool = False
     steps: int = 0
     tokens: int = 0
+    aux_tokens: int = 0
+    incidents: list[str] = Field(default_factory=list)
     scratch: list[dict] = Field(default_factory=list)
