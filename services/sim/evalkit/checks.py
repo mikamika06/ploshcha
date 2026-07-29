@@ -1,5 +1,25 @@
+import json
+
+DUMP_MIN_LEN = 24
+JSON_SIGNS = ('{"', '":')
+
+
 def _answer(result) -> str:
     return result.answer or ""
+
+
+def _dumped(result, min_len: int = DUMP_MIN_LEN) -> bool:
+    """Відповідь, яка дослівно містить payload інструмента, — це дамп, а не відповідь.
+
+    Драбина відновлення на рунзі `partial` вивалює сирі результати в текст відповіді, і тоді
+    будь-який змістовий чек проходить тривіально: потрібне значення лежить усередині дампа.
+    """
+    answer = _answer(result)
+    for entry in result.scratch:
+        payload = json.dumps(entry.get("result", {}), ensure_ascii=False)
+        if len(payload) >= min_len and payload in answer:
+            return True
+    return False
 
 
 def _tools(result) -> list[str]:
@@ -47,6 +67,10 @@ def check(spec: dict, result) -> bool:
         return not result.degraded
     if kind == "not_partial":
         return not getattr(result, "partial", False)
+    if kind == "answer_not_dumped":
+        return not _dumped(result, spec.get("min_len", DUMP_MIN_LEN))
+    if kind == "answer_no_json":
+        return not any(sign in _answer(result) for sign in JSON_SIGNS)
     raise ValueError(f"unknown check kind: {kind}")
 
 

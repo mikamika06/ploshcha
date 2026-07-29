@@ -20,6 +20,7 @@ class EvalItem(BaseModel):
     gold: list[str] = Field(default_factory=list)
     foil: list[str] = Field(default_factory=list)
     gold_tools: list[str] = Field(default_factory=list)
+    toolsets: list[str] = Field(default_factory=list)
     chain_len: int = 0
 
 

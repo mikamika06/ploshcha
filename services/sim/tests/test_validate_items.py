@@ -66,6 +66,83 @@ def test_hygiene_checks_do_not_block_the_gold():
     assert validate_item(item).gold_failed == [], "abstain — гігієна, не результат"
 
 
+def test_gate_catches_a_predicate_unsatisfiable_under_another_toolset():
+    """Дефект №13 (= повторення №8): чек вимагає `запис`, а в агрегатному наборі його немає."""
+    hardcoded = EvalItem(id="x", category="c", task="t",
+                         checks=[{"kind": "used_tool_any", "tools": ["запис"]}],
+                         gold=["372"], foil=["391"])
+    report = validate_item(hardcoded, ("registry", "registry_agg"))
+    assert report.unsatisfiable, "нездійсненний чек мусить бути виявлений"
+    assert "registry_agg" in report.unsatisfiable[0]
+    assert validate_item(hardcoded, ("registry",)).unsatisfiable == []
+
+    agnostic = hardcoded.model_copy(update={
+        "checks": [{"kind": "used_tool_any", "tools": ["запис", "записи_села"]}]})
+    assert validate_item(agnostic, ("registry", "registry_agg")).unsatisfiable == []
+
+
+DUMP = ('Часткова відповідь на основі здобутого:\n'
+        'список_записів: {"відомо": true, "село": "Сухий Яр", "записи": ["сх-1904-01"]}\n'
+        'запис: {"відомо": true, "майстер": "Остап Заячук", "сума": 91}')
+
+
+def test_gate_catches_a_raw_dump_passing_content_checks():
+    """Дефект №14: рунга `partial` вивалює payload інструмента, і чек ловить значення в дампі."""
+    loose = EvalItem(id="x", category="c", task="t",
+                     checks=[{"kind": "answer_contains_any", "values": ["Остап", "Заячук"]},
+                             {"kind": "answer_contains_any", "values": ["91"]}],
+                     gold=["Остап Заячук, 91 карбованець."], foil=[DUMP])
+    assert validate_item(loose).foil_passed, "дамп не має проходити змістові чеки"
+
+    tight = loose.model_copy(update={"checks": loose.checks + [{"kind": "answer_no_json"}]})
+    assert validate_item(tight).ok
+    assert validate_item(tight).gold_failed == []
+
+
+def test_dump_predicate_reads_the_actual_payload():
+    from evalkit.checks import check
+    payload = {"відомо": True, "майстер": "Остап Заячук", "сума": 91}
+    dumped = synth_result("ось що здобуто: " + __import__("json").dumps(payload, ensure_ascii=False))
+    dumped.scratch = [{"call": {"tool": "запис"}, "result": payload}]
+    assert not check({"kind": "answer_not_dumped"}, dumped)
+    clean = synth_result("Остап Заячук, 91 карбованець.")
+    clean.scratch = [{"call": {"tool": "запис"}, "result": payload}]
+    assert check({"kind": "answer_not_dumped"}, clean)
+
+
+def test_every_foil_must_fail_not_merely_one():
+    """Дефект №15: один добрий антиеталон маскував інший, що проходив усі чеки."""
+    item = EvalItem(id="x", category="c", task="t",
+                    checks=[{"kind": "answer_contains_any", "values": ["178"]}],
+                    gold=["178"], foil=["зовсім інше", "усе-таки 178"])
+    report = validate_item(item)
+    assert report.foil_passed == ["усе-таки 178"], "другий антиеталон мусить бути виявлений"
+
+
+def test_gate_catches_phantom_gold_tools():
+    """`gold_tools` монтує фейкову трасу — вигаданий інструмент робить її брехнею."""
+    item = EvalItem(id="x", category="c", task="t", checks=[{"kind": "answered"}],
+                    gold=["будь-що"], gold_tools=["такого_немає"])
+    assert validate_item(item, ("registry",)).unsatisfiable
+
+
+def test_hygiene_is_allowed_to_be_unsatisfiable():
+    """`tool_calls_at_least` саме й міряє, чи був обхід — під агрегатом він законно провалюється."""
+    item = EvalItem(id="x", category="c", task="t",
+                    checks=[{"kind": "answer_contains_any", "values": ["372"]},
+                            {"kind": "tool_calls_at_least", "n": 9}],
+                    gold=["372"], foil=["391"])
+    assert validate_item(item, ("registry", "registry_agg")).ok
+
+
+def test_every_item_set_declares_its_toolsets():
+    from evalkit.validate import ITEM_SET_TOOLSETS, TOOLSETS
+    missing = [n for n in item_sets() if n not in ITEM_SET_TOOLSETS]
+    assert not missing, f"набір без оголошених наборів інструментів: {missing}"
+    unknown = {ts for names in ITEM_SET_TOOLSETS.values() for ts in names} - set(TOOLSETS)
+    assert not unknown, f"невідомий набір інструментів: {unknown}"
+
+
 def test_blank_answer_is_not_an_answer():
     """Дефект №9: `answer is not None` пропускав порожній рядок як відповідь."""
     from evalkit.checks import check
