@@ -23,6 +23,8 @@ class AppSpec(BaseModel):
     answer_prompt_id: str = "answer/plain"
     answer_channel: AnswerChannel = "schema"
     planner: PlannerKind = "none"
+    plan_gather: int = 1
+    plan_guard: bool = False
     memory: MemoryKind = "none"
     verifier: bool = True
     recovery: bool = False

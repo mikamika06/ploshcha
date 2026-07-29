@@ -45,6 +45,12 @@ CHAIN: dict[str, AppSpec] = {
                                      prompt_id="agent/v2-agg"),
     "chain-agg-text@16": REG.with_(max_steps=16, toolset="registry_agg",
                                    prompt_id="agent/v2-agg", answer_channel="text"),
+    "chain-text-plan9@16": REG.with_(max_steps=16, answer_channel="text", planner="skeleton",
+                                     plan_gather=9),
+    "chain-text-guard9@16": REG.with_(max_steps=16, answer_channel="text", planner="skeleton",
+                                      plan_gather=9, plan_guard=True),
+    "chain-text-guard9rec@16": REG.with_(max_steps=16, answer_channel="text", planner="skeleton",
+                                         plan_gather=9, plan_guard=True, recovery=True),
 }
 CONDITIONS.update(CHAIN)
 
@@ -62,7 +68,10 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("chain-text@16", "chain-text-plan@16"),
          ("chain-text@16", "chain-text-rec@16"),
          ("chain-text@16", "chain-agg-text@16"),
-         ("chain-agg-schema@16", "chain-agg-text@16"))
+         ("chain-agg-schema@16", "chain-agg-text@16"),
+         ("chain-text-plan@16", "chain-text-plan9@16"),
+         ("chain-text-plan9@16", "chain-text-guard9@16"),
+         ("chain-text-guard9@16", "chain-text-guard9rec@16"))
 
 
 def _model(routing: str, *, lapa, mamay):

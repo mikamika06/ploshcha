@@ -37,6 +37,11 @@ VERBATIM_WINDOW = 2
 
 STEP_INSTRUCTION = "Наступний крок — один JSON (виклик інструмента або final_answer):"
 
+PREMATURE_FINAL = "premature_final"
+PLAN_GUARD_CAP = 2
+PLAN_GUARD_HINT = ("У плані ще лишились кроки збору даних. Не завершуй — виклич інструмент "
+                   "для наступного елемента, який ще не здобутий.")
+
 
 def _render(state: TaskState, recall=None, verbatim: int | None = None,
             tail: str | None = None, instruction: str | None = None) -> str:
@@ -97,7 +102,8 @@ class Orchestrator:
                  system: str | None = None, recovery: bool = False,
                  notebook: Callable[[], Notebook] | None = None,
                  tail: str | None = None, prompt_id: str = "", prompt_sha: str = "",
-                 answer_channel: str = "schema", answer_instruction: str | None = None):
+                 answer_channel: str = "schema", answer_instruction: str | None = None,
+                 plan_guard: bool = False):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -114,6 +120,7 @@ class Orchestrator:
         self.prompt_sha = prompt_sha
         self.answer_channel = answer_channel
         self.answer_instruction = answer_instruction
+        self.plan_guard = plan_guard
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
         state = TaskState(task=task, budget=budget or Budget())
@@ -122,6 +129,7 @@ class Orchestrator:
         seen: list[str] = []
         history: list[tuple[str, dict]] = []
         history_ok: list[bool] = []
+        guard_blocks = 0
         while not state.done and state.budget.can_continue():
             kind = self.planner.next_kind(state)
             if state.route_as:
@@ -164,6 +172,16 @@ class Orchestrator:
                     continue
                 state.degraded = True
                 break
+
+            if call.tool == FINAL_TOOL and self._plan_unfinished(state):
+                if guard_blocks < PLAN_GUARD_CAP:
+                    guard_blocks += 1
+                    state.incidents.append(PREMATURE_FINAL)
+                    if PLAN_GUARD_HINT not in state.hints:
+                        state.hints.append(PLAN_GUARD_HINT)
+                    continue
+                state.partial = True
+                state.notes.append(f"{PREMATURE_FINAL}:allowed_after_cap")
 
             if call.tool == FINAL_TOOL:
                 if self.answer_channel == "text":
@@ -241,6 +259,13 @@ class Orchestrator:
         state.budget.spend(res.usage.total)
         self._emit(state, "synthesize", llm.model, res, None, None, seed, prompt, "none")
         return res.text.strip()
+
+    def _plan_unfinished(self, state: TaskState) -> bool:
+        """Заборона відповідати, поки в плані лишились кроки збору (борг 28)."""
+        if not self.plan_guard or state.plan is None:
+            return False
+        step = state.plan.current()
+        return step is not None and step.tool_hint != FINAL_TOOL
 
     def _is_answer_step(self, state: TaskState) -> bool:
         if self.answer_channel != "text" or state.plan is None:

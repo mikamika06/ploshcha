@@ -25,7 +25,7 @@ def build_router(spec: AppSpec, *, lapa, mamay):
 
 
 def build_planner(spec: AppSpec):
-    return SkeletonPlanner() if spec.planner == "skeleton" else None
+    return SkeletonPlanner(gather=spec.plan_gather) if spec.planner == "skeleton" else None
 
 
 def build_notebook(spec: AppSpec):
@@ -58,4 +58,5 @@ def build_orchestrator(spec: AppSpec, *, lapa, mamay, system: str | None = None,
         notebook=build_notebook(spec),
         answer_channel=spec.answer_channel,
         answer_instruction=answer_instruction,
+        plan_guard=spec.plan_guard,
     )
