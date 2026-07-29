@@ -12,6 +12,12 @@ def check(spec: dict, result) -> bool:
         return spec["value"].casefold() in _answer(result).casefold()
     if kind == "answer_not_contains":
         return spec["value"].casefold() not in _answer(result).casefold()
+    if kind == "answer_contains_any":
+        text = _answer(result).casefold()
+        return any(v.casefold() in text for v in spec["values"])
+    if kind == "answer_contains_all":
+        text = _answer(result).casefold()
+        return all(v.casefold() in text for v in spec["values"])
     if kind == "used_tool":
         return spec["tool"] in _tools(result)
     if kind == "no_data_tool":
