@@ -41,6 +41,8 @@ def check(spec: dict, result) -> bool:
         return lo <= result.steps <= hi
     if kind == "tool_calls_at_most":
         return len(_tools(result)) <= spec["n"]
+    if kind == "tool_calls_at_least":
+        return len(_tools(result)) >= spec["n"]
     if kind == "not_degraded":
         return not result.degraded
     if kind == "not_partial":
@@ -49,7 +51,7 @@ def check(spec: dict, result) -> bool:
 
 
 HYGIENE_KINDS = frozenset({
-    "no_incident", "tool_calls_at_most", "not_partial", "steps_between",
+    "no_incident", "tool_calls_at_most", "tool_calls_at_least", "not_partial", "steps_between",
     "abstain", "no_data_tool",
 })
 
