@@ -1,11 +1,15 @@
 from ..domain.skill import SkillSpec
+from .docs_kb import DOCUMENTS
+from .docs_kb import ids_for as doc_ids
 from .registry_kb import VILLAGES, ids_for
 from .skillbox import SkillBox, declare
+from .tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS
 from .tools_fake import DEFAULT_TOOLS
 from .tools_registry import AGG_TOOLS, REGISTRY_TOOLS
 from .tools_ua import UA_TOOLS
 
 BIGGEST_VILLAGE = max(len(ids_for(v)) for v in VILLAGES)
+LONGEST_DOC = max(len(doc_ids(d)) for d in DOCUMENTS)
 
 DEFAULT_DECLARED = {
     "check_date": SkillSpec(name="check_date", capability="history.date", shape="scalar"),
@@ -32,8 +36,21 @@ AGG_DECLARED = {
     "обчислити": SkillSpec(name="обчислити", capability="math.eval", shape="scalar"),
 }
 
+DOCS_DECLARED = {
+    "список_абзаців": SkillSpec(name="список_абзаців", capability="docs.index",
+                                shape="collection", max_items=LONGEST_DOC),
+    "абзац": SkillSpec(name="абзац", capability="docs.paragraph", shape="scalar"),
+}
+
+DOCS_AGG_DECLARED = {
+    "абзаци_документа": SkillSpec(name="абзаци_документа", capability="docs.paragraphs",
+                                  shape="aggregate", cost_hint=3),
+}
+
 DECLARED = {
     "default": (DEFAULT_TOOLS, DEFAULT_DECLARED),
+    "docs": (DOCS_TOOLS, DOCS_DECLARED),
+    "docs_agg": (DOCS_AGG_TOOLS, DOCS_AGG_DECLARED),
     "ua": (UA_TOOLS, UA_DECLARED),
     "registry": (REGISTRY_TOOLS, REGISTRY_DECLARED),
     "registry_agg": (AGG_TOOLS, AGG_DECLARED),

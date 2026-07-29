@@ -58,7 +58,17 @@ CHAIN: dict[str, AppSpec] = {
     "chain-text-guard9rec@16": REG.with_(max_steps=16, answer_channel="text", planner="skeleton",
                                          plan_gather=9, plan_guard=True, recovery=True),
 }
+DOC = BASE.with_(toolset="docs", prompt_id="agent/v2-docs")
+DOCS: dict[str, AppSpec] = {
+    "docs-schema@16": DOC.with_(max_steps=16),
+    "docs-text@16": DOC.with_(max_steps=16, answer_channel="text"),
+    "docs-agg-schema@16": DOC.with_(max_steps=16, toolset="docs_agg",
+                                    prompt_id="agent/v2-docs-agg"),
+    "docs-agg-text@16": DOC.with_(max_steps=16, toolset="docs_agg",
+                                  prompt_id="agent/v2-docs-agg", answer_channel="text"),
+}
 CONDITIONS.update(CHAIN)
+CONDITIONS.update(DOCS)
 
 PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("hetero@8", "gate-notools-mamay"),
@@ -77,7 +87,10 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("chain-agg-schema@16", "chain-agg-text@16"),
          ("chain-text-plan@16", "chain-text-plan9@16"),
          ("chain-text-plan9@16", "chain-text-guard9@16"),
-         ("chain-text-guard9@16", "chain-text-guard9rec@16"))
+         ("chain-text-guard9@16", "chain-text-guard9rec@16"),
+         ("docs-schema@16", "docs-text@16"),
+         ("docs-text@16", "docs-agg-text@16"),
+         ("docs-agg-schema@16", "docs-agg-text@16"))
 
 
 def _model(routing: str, *, lapa, mamay):

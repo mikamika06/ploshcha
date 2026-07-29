@@ -3,6 +3,7 @@ from .adapters.planner_skeleton import SkeletonPlanner
 from .adapters.router_profile import PresetEffort, profile_router, single_model_router
 from .adapters.skills_declared import skillbox
 from .adapters.tools_fake import DEFAULT_TOOLS, FakeToolbox
+from .adapters.tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS
 from .adapters.tools_registry import AGG_TOOLS, REGISTRY_TOOLS
 from .adapters.tools_ua import UA_TOOLS
 from .agents import Orchestrator
@@ -11,7 +12,9 @@ from .domain.spec import AppSpec
 from .domain.task import Budget
 
 NO_DATA_TOOLS = [t for t in DEFAULT_TOOLS if t.name == FINAL_TOOL]
-TOOLSETS = {"default": DEFAULT_TOOLS, "ua": UA_TOOLS, "registry": REGISTRY_TOOLS, "registry_agg": AGG_TOOLS,
+TOOLSETS = {"default": DEFAULT_TOOLS, "ua": UA_TOOLS,
+            "registry": REGISTRY_TOOLS, "registry_agg": AGG_TOOLS,
+            "docs": DOCS_TOOLS, "docs_agg": DOCS_AGG_TOOLS,
             "none": NO_DATA_TOOLS}
 
 

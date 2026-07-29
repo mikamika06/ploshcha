@@ -121,7 +121,7 @@ def test_by_prompt_and_sensitivity_math():
     assert "spread=" in format_prompt_report(rows)
 
 
-CANDIDATE_ON_PURPOSE = {"agent/v2-ua", "agent/v2-reg", "agent/v2-iter", "agent/v2-agg", "answer/full"}
+CANDIDATE_ON_PURPOSE = {"agent/v2-ua", "agent/v2-reg", "agent/v2-iter", "agent/v2-agg", "agent/v2-docs", "agent/v2-docs-agg", "answer/full"}
 
 
 def test_frozen_prompt_is_the_one_eval_uses():

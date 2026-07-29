@@ -98,11 +98,18 @@ def test_side_effect_and_trust_default_to_the_safe_side():
         assert untrusted_skills(specs) == [], "чужого тексту ще не читаємо — це K10"
 
 
+COLLECTION_TOOLSETS = {"registry", "docs"}
+
+
 def test_conditions_with_a_collection_are_flagged_and_aggregate_ones_are_not():
     flagged = shape_warnings()
-    assert "chain-schema@16" in flagged and "chain-text@16" in flagged
-    assert "chain-agg-schema@16" not in flagged and "chain-agg-text@16" not in flagged
-    assert not [n for n in flagged if CONDITIONS[n].toolset != "registry"]
+    for name in ("chain-schema@16", "chain-text@16", "docs-schema@16", "docs-text@16"):
+        assert name in flagged, name
+    for name in ("chain-agg-schema@16", "chain-agg-text@16",
+                 "docs-agg-schema@16", "docs-agg-text@16"):
+        assert name not in flagged, name
+    off = [n for n in flagged if CONDITIONS[n].toolset not in COLLECTION_TOOLSETS]
+    assert not off, f"позначено умову без колекційного скіла: {off}"
 
 
 def test_the_warning_is_loud_but_not_corrective():
