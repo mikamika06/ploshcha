@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .tools_fake import EVENT_YEARS, FACTS, FinalAnswerArgs, Tool, _final_answer, _match
 
