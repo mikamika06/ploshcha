@@ -92,7 +92,7 @@ def runner_for(spec: AppSpec, *, lapa, mamay) -> Runner:
 
     if spec.mode == "single":
         return single_call_runner(_model(spec.routing, lapa=lapa, mamay=mamay),
-                                  system=system, max_tokens=spec.max_tokens)
+                                  system=system, max_tokens=spec.max_tokens, lane=spec.routing)
 
     def make_orch():
         return build_orchestrator(spec, lapa=lapa, mamay=mamay, system=system,
@@ -103,7 +103,8 @@ def runner_for(spec: AppSpec, *, lapa, mamay) -> Runner:
     loop = orchestrator_runner(make_orch, budget=build_budget(spec))
     if spec.mode == "gated":
         return gated_runner(_model(spec.gate_direct, lapa=lapa, mamay=mamay), build_toolbox(spec),
-                            system=system, max_tokens=spec.max_tokens, loop_runner=loop)
+                            system=system, max_tokens=spec.max_tokens, loop_runner=loop,
+                            lane=spec.gate_direct)
     return loop
 
 

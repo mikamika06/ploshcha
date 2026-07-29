@@ -151,7 +151,7 @@ class Orchestrator:
             if answering:
                 res = llm.generate(prompt, system=self.system, temperature=cfg.temperature,
                                    max_tokens=cfg.max_tokens, seed=seed)
-                state.budget.spend(res.usage.total)
+                state.budget.spend(res.usage.total, self.router.lane(kind), res.usage.prompt_tokens)
                 self._emit(state, kind, llm.model, res, None, None, seed, prompt, "none")
                 state.answer = res.text.strip()
                 state.done = True
@@ -159,7 +159,7 @@ class Orchestrator:
             res = llm.generate_structured(prompt, schema, system=self.system,
                                           temperature=cfg.temperature,
                                           max_tokens=cfg.max_tokens, seed=seed)
-            state.budget.spend(res.usage.total)
+            state.budget.spend(res.usage.total, self.router.lane(kind), res.usage.prompt_tokens)
             call, reason = self.tools.parse(_safe_json(res.text))
             self._emit(state, kind, llm.model, res, call, reason, seed, prompt, cfg.tier)
             state.hints = []
@@ -233,7 +233,7 @@ class Orchestrator:
         if state.done and not state.partial and self.verifier:
             verdict = run_verify(task, state.answer, self.router, self.effort,
                                  evidence=state.scratch, seed=seed, trace=self.trace, run_id=self.run_id)
-            state.budget.spend_aux(verdict.tokens)
+            state.budget.spend_aux(verdict.tokens, self.router.lane("judge"))
             accepted = verdict.accepted
             reason = verdict.reason
             if not accepted:
@@ -245,6 +245,8 @@ class Orchestrator:
             answer=state.answer, accepted=accepted, verdict_reason=reason,
             degraded=state.degraded, partial=state.partial, steps=state.budget.steps_used,
             tokens=state.budget.tokens_used, aux_tokens=state.budget.aux_tokens,
+            tokens_by_lane=dict(sorted(state.budget.tokens_by_lane.items())),
+            prompt_by_lane=dict(sorted(state.budget.prompt_by_lane.items())),
             incidents=state.incidents, notes=state.notes, scratch=state.scratch,
         )
 
@@ -256,7 +258,8 @@ class Orchestrator:
                          self.tail, self.answer_instruction)
         res = llm.generate(prompt, system=self.system, temperature=cfg.temperature,
                            max_tokens=cfg.max_tokens, seed=seed)
-        state.budget.spend(res.usage.total)
+        state.budget.spend(res.usage.total, self.router.lane("synthesize"),
+                           res.usage.prompt_tokens)
         self._emit(state, "synthesize", llm.model, res, None, None, seed, prompt, "none")
         return res.text.strip()
 

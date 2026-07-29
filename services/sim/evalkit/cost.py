@@ -3,25 +3,61 @@
 Прайс-мапа живе у вимірювальному шарі, а не в колесі: ціна — властивість постачальника
 й моменту часу, а не системи. Зміна цін не інвалідовує замір, лише його економічну інтерпретацію.
 
-Для гетерогенної умови точна ціна невідома: `EvalResult` не зберігає, скільки токенів обробив
-кожен ярус. Тому замість вгаданої частки повертаємо ІНТЕРВАЛ [дешевший ярус, дорожчий ярус].
-Точкова оцінка з'явиться, коли `TaskResult` понесе `tokens_by_tier` (борг 25).
+★ ДЖЕРЕЛО ЦІН (2026-07-29). Lapathoniia **не публікує** прайс (бета, видимість = тижневе
+використання токенів), тому власних цін немає. Використано **ринковий проксі за розміром базової
+моделі**: Lapa побудована на Gemma-3-12B, Mamay — на Gemma-3-27B, а serverless-ціни цих моделей
+відомі: 12B ≈ $0.05/Mtok вхід і $0.15/Mtok вихід, 27B ≈ $0.08 і $0.16
+(pricepertoken.com / openrouter, липень 2026).
+
+**Це проксі, не факт.** Головне, що з нього випливає: справжнє співвідношення ярусів ~1.1-1.6×, а не
+3×, як я спершу вписав навмання. Різниця критична — під вигаданим 3× гетерогенний routing виглядав
+удвічі дешевшим, під реальним проксі виграш падає до одиниць відсотків. Тому будь-яке економічне
+твердження супроводжується `sensitivity()`: чи витримує висновок увесь діапазон співвідношень.
+
+Вхід і вихід рахуються ОКРЕМО, бо в наших прогонах промпт домінує (історія кроків), а різниця цін
+між ярусами на вході (1.6×) майже вдвічі більша, ніж на виході (1.07×).
 """
 
-USD_PER_MTOK = {"lapa": 0.10, "mamay": 0.30}
-UNKNOWN_RATE = max(USD_PER_MTOK.values())
+PRICES = {
+    "lapa": (0.05, 0.15),
+    "mamay": (0.08, 0.16),
+}
+UNKNOWN_PRICE = (0.08, 0.16)
+RATIO_RANGE = (1.0, 3.0)
 
 
-def rate_bounds(routing: str) -> tuple[float, float]:
+def price(lane: str) -> tuple[float, float]:
+    return PRICES.get(lane, UNKNOWN_PRICE)
+
+
+def blended(lane: str, prompt_share: float = 0.8) -> float:
+    """Ставка за Mtok при заданій частці промпту — для інтервалів, де розкладки немає."""
+    p_in, p_out = price(lane)
+    return p_in * prompt_share + p_out * (1.0 - prompt_share)
+
+
+def rate_bounds(routing: str, prompt_share: float = 0.8) -> tuple[float, float]:
     if routing == "hetero":
-        return min(USD_PER_MTOK.values()), max(USD_PER_MTOK.values())
-    r = USD_PER_MTOK.get(routing, UNKNOWN_RATE)
+        rates = [blended(lane, prompt_share) for lane in PRICES]
+        return min(rates), max(rates)
+    r = blended(routing if routing in PRICES else "unknown", prompt_share)
     return r, r
 
 
 def cost_usd(tokens: int, routing: str) -> tuple[float, float]:
     lo, hi = rate_bounds(routing)
     return tokens / 1_000_000 * lo, tokens / 1_000_000 * hi
+
+
+def lane_cost(by_lane: dict[str, int], prompt_by_lane: dict[str, int] | None = None) -> float:
+    """Точна ціна: вхід і вихід за окремими ставками свого ярусу."""
+    prompts = prompt_by_lane or {}
+    total = 0.0
+    for lane, tokens in by_lane.items():
+        p_in, p_out = price(lane)
+        prompt = min(prompts.get(lane, 0), tokens)
+        total += (prompt * p_in + (tokens - prompt) * p_out) / 1_000_000
+    return total
 
 
 def tokens_by_condition(results) -> dict[str, int]:
@@ -31,11 +67,61 @@ def tokens_by_condition(results) -> dict[str, int]:
     return out
 
 
+def lanes_by_condition(results) -> dict[str, dict[str, int]]:
+    out: dict[str, dict[str, int]] = {}
+    for r in results:
+        acc = out.setdefault(r.condition, {})
+        for lane, tokens in (getattr(r, "tokens_by_lane", None) or {}).items():
+            acc[lane] = acc.get(lane, 0) + tokens
+    return out
+
+
+def prompts_by_condition(results) -> dict[str, dict[str, int]]:
+    out: dict[str, dict[str, int]] = {}
+    for r in results:
+        acc = out.setdefault(r.condition, {})
+        for lane, tokens in (getattr(r, "prompt_by_lane", None) or {}).items():
+            acc[lane] = acc.get(lane, 0) + tokens
+    return out
+
+
+def prompt_share(results) -> dict[str, float]:
+    lanes, prompts = lanes_by_condition(results), prompts_by_condition(results)
+    out = {}
+    for cond, by_lane in lanes.items():
+        total = sum(by_lane.values())
+        if total:
+            out[cond] = sum(prompts.get(cond, {}).values()) / total
+    return out
+
+
+def attributed(by_lane: dict[str, int]) -> bool:
+    """Розкладка корисна лише якщо в ній немає «unknown» і вона непорожня."""
+    return bool(by_lane) and "unknown" not in by_lane
+
+
 def cost_of_results(results, specs) -> dict[str, tuple[float, float]]:
-    """Ціна на умову як інтервал. `specs` — мапа умова -> AppSpec."""
+    """Ціна на умову: точка (lo == hi), якщо ярус відомий; інакше інтервал."""
     totals = tokens_by_condition(results)
-    return {c: cost_usd(t, getattr(specs.get(c), "routing", "unknown"))
-            for c, t in totals.items()}
+    lanes = lanes_by_condition(results)
+    out = {}
+    for cond, tokens in totals.items():
+        by_lane = lanes.get(cond, {})
+        if attributed(by_lane):
+            exact = lane_cost(by_lane, prompts_by_condition(results).get(cond, {}))
+            out[cond] = (exact, exact)
+        else:
+            out[cond] = cost_usd(tokens, getattr(specs.get(cond), "routing", "unknown"))
+    return out
+
+
+def lane_share(results) -> dict[str, dict[str, float]]:
+    out = {}
+    for cond, by_lane in lanes_by_condition(results).items():
+        total = sum(by_lane.values())
+        if total:
+            out[cond] = {lane: t / total for lane, t in sorted(by_lane.items())}
+    return out
 
 
 def usd_per_success(results, specs) -> dict[str, tuple[float, float]]:
@@ -47,15 +133,52 @@ def usd_per_success(results, specs) -> dict[str, tuple[float, float]]:
             for c, (lo, hi) in cost.items()}
 
 
+def sensitivity(results, base: str, treat: str, ratios=RATIO_RANGE) -> dict:
+    """Чи витримує економічний висновок увесь діапазон співвідношень цін ярусів.
+
+    Ціни Lapathoniia невідомі, тому «дешевше на X%» під одним співвідношенням може перевернутись під
+    іншим. Тут фіксуємо межі: множимо ціну дорожчого ярусу так, щоб співвідношення пройшло діапазон.
+    """
+    lanes, prompts = lanes_by_condition(results), prompts_by_condition(results)
+    if base not in lanes or treat not in lanes:
+        return {}
+    out = {"base": base, "treat": treat, "ratios": {}}
+    cheap_in, cheap_out = PRICES["lapa"]
+    for ratio in ratios:
+        scaled = {"lapa": (cheap_in, cheap_out),
+                  "mamay": (cheap_in * ratio, cheap_out * ratio)}
+        costs = {}
+        for cond in (base, treat):
+            total = 0.0
+            for lane, tokens in lanes[cond].items():
+                p_in, p_out = scaled.get(lane, scaled["mamay"])
+                prompt = min(prompts.get(cond, {}).get(lane, 0), tokens)
+                total += (prompt * p_in + (tokens - prompt) * p_out) / 1_000_000
+            costs[cond] = total
+        out["ratios"][ratio] = {
+            "base_usd": costs[base], "treat_usd": costs[treat],
+            "treat_cheaper_by": (1 - costs[treat] / costs[base]) if costs[base] else 0.0,
+        }
+    verdicts = [v["treat_cheaper_by"] > 0 for v in out["ratios"].values()]
+    out["robust"] = all(verdicts) or not any(verdicts)
+    return out
+
+
+def _span(lo: float, hi: float) -> str:
+    if lo == float("inf"):
+        return "—"
+    return f"{lo:.5f}" if hi <= lo else f"{lo:.5f}-{hi:.5f}"
+
+
 def format_cost(results, specs) -> str:
-    lines = ["умова                     токени      $ (інтервал)        $/успіх"]
+    lines = ["умова                     токени      $            $/успіх       ярус (частка)"]
     per = usd_per_success(results, specs)
     cost = cost_of_results(results, specs)
     toks = tokens_by_condition(results)
+    share = lane_share(results)
     for c in sorted(cost):
-        lo, hi = cost[c]
-        plo, phi = per[c]
-        span = f"{lo:.5f}-{hi:.5f}" if hi > lo else f"{lo:.5f}"
-        pspan = "—" if plo == float("inf") else (f"{plo:.5f}-{phi:.5f}" if phi > plo else f"{plo:.5f}")
-        lines.append(f"{c:<24}{toks[c]:>8}   {span:>18}   {pspan}")
+        parts = share.get(c, {})
+        mix = " ".join(f"{k}={v:.0%}" for k, v in parts.items()) or "—"
+        lines.append(f"{c:<24}{toks[c]:>8}   {_span(*cost[c]):<12} "
+                     f"{_span(*per[c]):<13} {mix}")
     return "\n".join(lines)

@@ -69,11 +69,31 @@ def test_the_fixture_covers_the_grid_it_froze(expected):
     assert not gone, f"заморожені умови зникли з решітки: {gone}"
 
 
+def _project(observed: dict, template: dict) -> dict:
+    """Порівнюємо лише те, що існувало на момент заморозки.
+
+    Інваріант паритету — «нічого зі старого не змінилось», а не «дамп побайтово той самий»: інакше
+    будь-яке ДОДАВАННЯ поля (ADR-0004 дозволяє лише додавати) ламало б фікстуру, і її довелось би
+    перезнімати — тобто втратити властивість «знято ДО рефакторингу». Зникнення поля тут дає KeyError.
+    """
+    return {k: _project(observed[k], v) if isinstance(v, dict) else observed[k]
+            for k, v in template.items()}
+
+
 def test_every_condition_reproduces_the_frozen_run(expected):
     observed = _observed(_frozen_names(expected))
     assert sorted(observed) == sorted(expected), "склад умов змінився"
-    diff = [k for k in expected if observed[k] != expected[k]]
+    diff = [k for k in expected if _project(observed[k], expected[k]) != expected[k]]
     assert not diff, f"специфікація змінила поведінку в {len(diff)} клітинках: {diff[:5]}"
+
+
+def test_parity_still_notices_a_dropped_or_changed_field(expected):
+    """Проєкція не має перетворити паритет на формальність."""
+    key = next(iter(expected))
+    tampered = dict(expected[key], steps=expected[key]["steps"] + 1)
+    assert _project(tampered, expected[key]) != expected[key]
+    with pytest.raises(KeyError):
+        _project({k: v for k, v in expected[key].items() if k != "steps"}, expected[key])
 
 
 def test_the_fixture_actually_discriminates(expected):
@@ -117,11 +137,32 @@ def test_gate_direct_model_is_an_axis():
             != CONDITIONS["gate-notools-lapa"].sha256)
 
 
-def test_hetero_cost_is_an_interval_not_a_guess():
+def test_hetero_cost_is_an_interval_when_lanes_are_unknown():
     lo, hi = rate_bounds("hetero")
-    assert lo < hi, "гетеро без tokens_by_tier не має точкової ціни"
+    assert lo < hi, "без розкладки за ярусом гетеро не має точкової ціни"
     assert rate_bounds("lapa")[0] == rate_bounds("lapa")[1]
-    assert cost_usd(1_000_000, "lapa") == (0.10, 0.10)
+    lo_lapa, _ = cost_usd(1_000_000, "lapa")
+    assert lo_lapa == pytest.approx(0.05 * 0.8 + 0.15 * 0.2), "ціна з ринкового проксі, не з голови"
+
+
+def test_hetero_cost_becomes_exact_once_lanes_are_attributed():
+    """Борг 25: розкладка за ярусом перетворює інтервал на число."""
+    from evalkit.cost import attributed, lane_cost, lane_share
+
+    rows = [EvalResult(item_id="x", category="c", condition="hetero@8", seed=1, success=True,
+                       checks={}, tokens=1_000_000,
+                       tokens_by_lane={"lapa": 600_000, "mamay": 400_000},
+                       prompt_by_lane={"lapa": 600_000, "mamay": 400_000})]
+    lo, hi = cost_of_results(rows, CONDITIONS)["hetero@8"]
+    assert lo == hi == pytest.approx(0.6 * 0.05 + 0.4 * 0.08), "усе промпт — лише вхідні ставки"
+    assert lane_share(rows)["hetero@8"] == {"lapa": pytest.approx(0.6), "mamay": pytest.approx(0.4)}
+
+    blind = [rows[0].model_copy(update={"tokens_by_lane": {"unknown": 1_000_000}})]
+    blo, bhi = cost_of_results(blind, CONDITIONS)["hetero@8"]
+    assert blo < bhi, "«unknown» не є атрибуцією — інтервал мусить лишитись"
+    assert not attributed({"unknown": 5}) and attributed({"lapa": 5})
+    assert lane_cost({"lapa": 1_000_000}, {"lapa": 1_000_000}) == pytest.approx(0.05)
+    assert lane_cost({"lapa": 1_000_000}, {}) == pytest.approx(0.15), "нуль промпту = усе вихід"
 
 
 def test_cost_ranks_lapa_below_mamay():

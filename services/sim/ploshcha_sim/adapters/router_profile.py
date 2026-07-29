@@ -1,5 +1,12 @@
 from ..ports.llm import LlmPort
-from ..ports.router import STEP_KINDS, EffortConfig, EffortPolicy, ModelRouter, StepKind
+from ..ports.router import (
+    STEP_KINDS,
+    EffortConfig,
+    EffortPolicy,
+    ModelLane,
+    ModelRouter,
+    StepKind,
+)
 
 LAPA_KINDS: tuple[StepKind, ...] = ("parse", "classify", "select", "ground", "gate")
 MAMAY_KINDS: tuple[StepKind, ...] = ("decide", "generate", "synthesize", "judge")
@@ -9,9 +16,11 @@ HIGH_KINDS: tuple[StepKind, ...] = ("decide", "generate", "synthesize", "judge")
 
 
 class ProfileRouter(ModelRouter):
-    def __init__(self, mapping: dict[StepKind, LlmPort], default: LlmPort | None = None):
+    def __init__(self, mapping: dict[StepKind, LlmPort], default: LlmPort | None = None,
+                 lanes: dict[StepKind, ModelLane] | None = None):
         self._map = dict(mapping)
         self._default = default
+        self._lanes = dict(lanes or {})
 
     def route(self, kind: StepKind) -> LlmPort:
         llm = self._map.get(kind, self._default)
@@ -19,18 +28,23 @@ class ProfileRouter(ModelRouter):
             raise KeyError(f"no model routed for kind={kind}")
         return llm
 
+    def lane(self, kind: StepKind) -> ModelLane:
+        return self._lanes.get(kind, "unknown")
+
 
 def profile_router(lapa: LlmPort, mamay: LlmPort) -> ProfileRouter:
     mapping: dict[StepKind, LlmPort] = {}
+    lanes: dict[StepKind, ModelLane] = {}
     for k in LAPA_KINDS:
-        mapping[k] = lapa
+        mapping[k], lanes[k] = lapa, "lapa"
     for k in MAMAY_KINDS:
-        mapping[k] = mamay
-    return ProfileRouter(mapping)
+        mapping[k], lanes[k] = mamay, "mamay"
+    return ProfileRouter(mapping, lanes=lanes)
 
 
-def single_model_router(llm: LlmPort) -> ProfileRouter:
-    return ProfileRouter({k: llm for k in STEP_KINDS})
+def single_model_router(llm: LlmPort, lane: ModelLane = "unknown") -> ProfileRouter:
+    return ProfileRouter({k: llm for k in STEP_KINDS},
+                         lanes={k: lane for k in STEP_KINDS})
 
 
 class PresetEffort(EffortPolicy):

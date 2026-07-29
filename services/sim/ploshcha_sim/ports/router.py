@@ -17,6 +17,9 @@ STEP_KINDS: tuple[StepKind, ...] = (
 
 Tier = Literal["none", "wire", "strict"]
 
+# Ярус моделі — НЕ те саме, що Tier (той про обмеження схеми).
+ModelLane = Literal["lapa", "mamay", "unknown"]
+
 ESCALATE_KIND: dict[StepKind, StepKind] = {
     "parse": "decide",
     "classify": "decide",
@@ -45,6 +48,9 @@ class EffortConfig(BaseModel):
 class ModelRouter(ABC):
     @abstractmethod
     def route(self, kind: StepKind) -> LlmPort: ...
+
+    def lane(self, kind: StepKind) -> ModelLane:
+        return "unknown"
 
 
 class EffortPolicy(ABC):

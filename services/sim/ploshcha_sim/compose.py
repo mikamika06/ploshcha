@@ -27,7 +27,9 @@ def build_skillbox(spec: AppSpec):
 def build_router(spec: AppSpec, *, lapa, mamay):
     if spec.routing == "hetero":
         return profile_router(lapa, mamay)
-    return single_model_router(mamay if spec.routing == "mamay" else lapa)
+    if spec.routing == "mamay":
+        return single_model_router(mamay, lane="mamay")
+    return single_model_router(lapa, lane="lapa")
 
 
 def build_planner(spec: AppSpec):

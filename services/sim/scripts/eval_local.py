@@ -28,7 +28,7 @@ from evalkit.conditions import (
     shape_warnings,
     spec_shas,
 )
-from evalkit.cost import format_cost
+from evalkit.cost import RATIO_RANGE, format_cost, prompt_share, sensitivity
 from evalkit.harness import load_items, run_eval
 from evalkit.report import aggregate, format_report, paired
 from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm
@@ -87,6 +87,17 @@ def main():
     print(format_report(results))
     print()
     print(format_cost(results, specs))
+    shares = prompt_share(results)
+    if shares:
+        print("частка промпту: " + " ".join(f"{c}={v:.0%}" for c, v in sorted(shares.items())))
+    for base, treat in PAIRS:
+        if base in runners and treat in runners:
+            s = sensitivity(results, base, treat)
+            if s:
+                spans = " ".join(f"×{r:.1f}:{v['treat_cheaper_by']:+.1%}"
+                                 for r, v in s["ratios"].items())
+                print(f"чутливість {base} -> {treat}: {spans} "
+                      f"{'стійко' if s['robust'] else 'ПЕРЕВЕРТАЄТЬСЯ'}")
     print()
     for base, treat in PAIRS:
         if base in runners and treat in runners:
