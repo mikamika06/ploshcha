@@ -1,6 +1,7 @@
 import json
 from collections.abc import Callable
 
+from ..domain.gate import FINAL_TOOL
 from ..domain.recovery import (
     CAPS,
     NOT_A_FAILURE,
@@ -34,8 +35,11 @@ def _safe_json(text):
 VERBATIM_WINDOW = 2
 
 
+STEP_INSTRUCTION = "Наступний крок — один JSON (виклик інструмента або final_answer):"
+
+
 def _render(state: TaskState, recall=None, verbatim: int | None = None,
-            tail: str | None = None) -> str:
+            tail: str | None = None, instruction: str | None = None) -> str:
     lines = [f"Задача: {state.task}"]
     if recall is not None and recall.hits:
         lines.append("Пригадане:")
@@ -47,7 +51,7 @@ def _render(state: TaskState, recall=None, verbatim: int | None = None,
         lines.append(f"Результат: {json.dumps(item['result'], ensure_ascii=False)}")
     for hint in state.hints:
         lines.append(f"Підказка: {hint}")
-    lines.append("Наступний крок — один JSON (виклик інструмента або final_answer):")
+    lines.append(instruction if instruction is not None else STEP_INSTRUCTION)
     if tail:
         lines.append(tail)
     return "\n".join(lines)
@@ -92,7 +96,8 @@ class Orchestrator:
                  memory=None, trace: TracePort | None = None, run_id: str = "",
                  system: str | None = None, recovery: bool = False,
                  notebook: Callable[[], Notebook] | None = None,
-                 tail: str | None = None, prompt_id: str = "", prompt_sha: str = ""):
+                 tail: str | None = None, prompt_id: str = "", prompt_sha: str = "",
+                 answer_channel: str = "schema", answer_instruction: str | None = None):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -107,6 +112,8 @@ class Orchestrator:
         self.tail = tail
         self.prompt_id = prompt_id
         self.prompt_sha = prompt_sha
+        self.answer_channel = answer_channel
+        self.answer_instruction = answer_instruction
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
         state = TaskState(task=task, budget=budget or Budget())
@@ -125,13 +132,22 @@ class Orchestrator:
             if state.overrides:
                 cfg = cfg.model_copy(update=state.overrides)
                 state.overrides = {}
+            answering = self._is_answer_step(state)
             schema = self.tools.strict_schema() if cfg.tier == "strict" else self.tools.wire_schema()
             recall = None
             if notebook is not None:
                 recall = notebook.recall(_recall_query(state), state.budget.steps_used)
                 self._emit_memory(state, "mem_read", recall.as_trace(), seed)
             prompt = _render(state, recall, VERBATIM_WINDOW if notebook is not None else None,
-                             self.tail)
+                             self.tail, self.answer_instruction if answering else None)
+            if answering:
+                res = llm.generate(prompt, system=self.system, temperature=cfg.temperature,
+                                   max_tokens=cfg.max_tokens, seed=seed)
+                state.budget.spend(res.usage.total)
+                self._emit(state, kind, llm.model, res, None, None, seed, prompt, "none")
+                state.answer = res.text.strip()
+                state.done = True
+                break
             res = llm.generate_structured(prompt, schema, system=self.system,
                                           temperature=cfg.temperature,
                                           max_tokens=cfg.max_tokens, seed=seed)
@@ -149,8 +165,11 @@ class Orchestrator:
                 state.degraded = True
                 break
 
-            if call.tool == "final_answer":
-                state.answer = str(call.args.get("text", ""))
+            if call.tool == FINAL_TOOL:
+                if self.answer_channel == "text":
+                    state.answer = self._answer_freely(state, llm, cfg, seed, notebook)
+                else:
+                    state.answer = str(call.args.get("text", ""))
                 state.done = True
                 break
 
@@ -210,6 +229,24 @@ class Orchestrator:
             tokens=state.budget.tokens_used, aux_tokens=state.budget.aux_tokens,
             incidents=state.incidents, notes=state.notes, scratch=state.scratch,
         )
+
+    def _answer_freely(self, state: TaskState, llm, cfg, seed, notebook) -> str:
+        """Відповідь — не дія, тому не йде через схему дій (K7b)."""
+        recall = notebook.recall(_recall_query(state), state.budget.steps_used) \
+            if notebook is not None else None
+        prompt = _render(state, recall, VERBATIM_WINDOW if notebook is not None else None,
+                         self.tail, self.answer_instruction)
+        res = llm.generate(prompt, system=self.system, temperature=cfg.temperature,
+                           max_tokens=cfg.max_tokens, seed=seed)
+        state.budget.spend(res.usage.total)
+        self._emit(state, "synthesize", llm.model, res, None, None, seed, prompt, "none")
+        return res.text.strip()
+
+    def _is_answer_step(self, state: TaskState) -> bool:
+        if self.answer_channel != "text" or state.plan is None:
+            return False
+        step = state.plan.current()
+        return step is not None and step.tool_hint == FINAL_TOOL
 
     def _routable(self, kind: StepKind) -> bool:
         try:
