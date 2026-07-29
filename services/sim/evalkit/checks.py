@@ -20,6 +20,8 @@ def check(spec: dict, result) -> bool:
         return all(v.casefold() in text for v in spec["values"])
     if kind == "used_tool":
         return spec["tool"] in _tools(result)
+    if kind == "used_tool_any":
+        return any(t in _tools(result) for t in spec["tools"])
     if kind == "no_data_tool":
         return len(_tools(result)) == 0
     if kind == "abstain":

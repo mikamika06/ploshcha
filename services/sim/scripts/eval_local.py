@@ -31,6 +31,7 @@ from evalkit.report import aggregate, format_report, paired
 from ploshcha_sim.adapters import FakeToolbox, PresetEffort, profile_router, single_model_router
 from ploshcha_sim.adapters.planner_skeleton import SkeletonPlanner
 from ploshcha_sim.adapters.tools_fake import DEFAULT_TOOLS
+from ploshcha_sim.adapters.tools_ua import UA_TOOLS
 from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm
 from ploshcha_sim.agents import Orchestrator
 from ploshcha_sim.domain.task import Budget
@@ -56,7 +57,9 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("hetero@8", "gate-notools-mamay"),
          ("hetero@8", "gate-tools-hetero"),
          ("hetero-plan@8", "hetero-textans@8"),
-         ("hetero@8", "hetero-textfull@8"))
+         ("hetero@8", "hetero-textfull@8"),
+         ("hetero-textans@8", "hetero-ua-textans@8"),
+         ("hetero@8", "hetero-ua-tools@8"))
 NO_TOOLS = [t for t in DEFAULT_TOOLS if t.name == "final_answer"]
 
 
@@ -65,12 +68,14 @@ def make_llm(model, url, key):
 
 
 def orch_cond(router_factory, verifier, *, recovery=False, max_steps=5, prompt=None,
-              answer_channel="schema", planner=None, answer_prompt="answer/plain"):
+              answer_channel="schema", planner=None, answer_prompt="answer/plain",
+              tools=None):
     variant = prompt or resolve(PROMPT_ID)
     answer_instruction = resolve(answer_prompt).render_system()
 
     def make_orch():
-        return Orchestrator(router_factory(), PresetEffort(), FakeToolbox(),
+        return Orchestrator(router_factory(), PresetEffort(),
+                            tools() if tools else FakeToolbox(),
                             planner=planner() if planner else None,
                             verifier=verifier, system=variant.render_system(),
                             tail=variant.tail or None, prompt_id=variant.id,
@@ -120,6 +125,12 @@ def main():
         "hetero-textfull@8": orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8,
                                        prompt=variant, answer_channel="text",
                                        answer_prompt="answer/full"),
+        "hetero-ua-tools@8": orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8,
+                                      prompt=resolve("agent/v2-ua"),
+                                      tools=lambda: FakeToolbox(tools=UA_TOOLS)),
+        "hetero-ua-textans@8": orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8,
+                                        prompt=resolve("agent/v2-ua"), answer_channel="text",
+                                        tools=lambda: FakeToolbox(tools=UA_TOOLS)),
         "gate-tools-hetero": gated_runner(
             mamay, FakeToolbox(), system=variant.render_system(),
             loop_runner=orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8,
