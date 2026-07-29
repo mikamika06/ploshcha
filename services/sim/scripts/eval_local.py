@@ -19,10 +19,17 @@ def load_env(path):
 
 load_env(ROOT / ".env")
 
-from evalkit.harness import load_items, orchestrator_runner, run_eval, single_call_runner
+from evalkit.harness import (
+    gated_runner,
+    load_items,
+    orchestrator_runner,
+    run_eval,
+    single_call_runner,
+)
 from evalkit.prompts import resolve
 from evalkit.report import aggregate, format_report, paired
 from ploshcha_sim.adapters import FakeToolbox, PresetEffort, profile_router, single_model_router
+from ploshcha_sim.adapters.tools_fake import DEFAULT_TOOLS
 from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm
 from ploshcha_sim.agents import Orchestrator
 from ploshcha_sim.domain.task import Budget
@@ -44,7 +51,10 @@ def parse_args(argv):
     return seeds, limit, items, prompt
 
 PROMPT_ID = "agent/v2"
-PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"))
+PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
+         ("hetero@8", "gate-notools-mamay"),
+         ("hetero@8", "gate-tools-hetero"))
+NO_TOOLS = [t for t in DEFAULT_TOOLS if t.name == "final_answer"]
 
 
 def make_llm(model, url, key):
@@ -86,6 +96,18 @@ def main():
         "hetero@8": orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8, prompt=variant),
         "hetero+rec@8": orch_cond(lambda: profile_router(lapa, mamay), True, recovery=True, max_steps=8, prompt=variant),
         "hetero-nov@8": orch_cond(lambda: profile_router(lapa, mamay), False, max_steps=8, prompt=variant),
+        "gate-notools-mamay": gated_runner(
+            mamay, FakeToolbox(tools=NO_TOOLS), system=variant.render_system(),
+            loop_runner=orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8,
+                                  prompt=variant)),
+        "gate-notools-lapa": gated_runner(
+            lapa, FakeToolbox(tools=NO_TOOLS), system=variant.render_system(),
+            loop_runner=orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8,
+                                  prompt=variant)),
+        "gate-tools-hetero": gated_runner(
+            mamay, FakeToolbox(), system=variant.render_system(),
+            loop_runner=orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8,
+                                  prompt=variant)),
     }
     print(f"{len(items)} задач × {len(runners)} умов × {len(seeds)} seed = "
           f"{len(items) * len(runners) * len(seeds)} прогонів\n")

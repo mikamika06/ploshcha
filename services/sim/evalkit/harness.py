@@ -3,6 +3,7 @@ from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 
+from ploshcha_sim.domain.gate import gate_reason, needs_loop
 from ploshcha_sim.domain.task import Budget, TaskResult
 
 from .checks import outcome_tier, split_checks
@@ -62,6 +63,23 @@ def single_call_runner(llm, *, system: str | None = None, max_tokens: int = 512)
     def run(task: str, seed: int) -> TaskResult:
         res = llm.generate(task, system=system, max_tokens=max_tokens, seed=seed)
         return TaskResult(answer=res.text, accepted=True, steps=1, tokens=res.usage.total)
+    return run
+
+
+def gated_runner(llm, tools, *, system: str | None = None, max_tokens: int = 512,
+                 loop_runner: Runner | None = None) -> Runner:
+    """Гейт зі складу інструментів: без інструментів даних цикл не потрібен (M0 §5 — правилами).
+
+    Прогін через оркестратор обовʼязково загортає відповідь у тул-схему з латинськими ключами,
+    що псує український вивід (UA-hardness §4.6). Заміряно: прямий виклик 1.000 проти 0.867.
+    """
+    if needs_loop(tools.specs()) and loop_runner is not None:
+        return loop_runner
+
+    def run(task: str, seed: int) -> TaskResult:
+        res = llm.generate(task, system=system, max_tokens=max_tokens, seed=seed)
+        return TaskResult(answer=res.text, accepted=True, steps=1, tokens=res.usage.total,
+                          notes=[f"gate:{gate_reason(tools.specs())}"])
     return run
 
 
