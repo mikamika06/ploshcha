@@ -31,7 +31,7 @@ ITEMS_DIR = Path(__file__).resolve().parents[1] / "evalkit" / "items"
 
 
 def parse_args(argv):
-    seeds, limit, items = [1, 2, 3], None, "starter"
+    seeds, limit, items, prompt = [1, 2, 3], None, "starter", PROMPT_ID
     for a in argv:
         if a.startswith("--seeds="):
             seeds = [int(x) for x in a.split("=", 1)[1].split(",")]
@@ -39,7 +39,9 @@ def parse_args(argv):
             limit = int(a.split("=", 1)[1])
         elif a.startswith("--items="):
             items = a.split("=", 1)[1]
-    return seeds, limit, items
+        elif a.startswith("--prompt="):
+            prompt = a.split("=", 1)[1]
+    return seeds, limit, items, prompt
 
 PROMPT_ID = "agent/v2"
 PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"))
@@ -65,7 +67,9 @@ def main():
     if not key:
         print("нема LAPA_API_KEY")
         return 1
-    seeds, limit, items_name = parse_args(sys.argv[1:])
+    seeds, limit, items_name, prompt_id = parse_args(sys.argv[1:])
+    variant = resolve(prompt_id)
+    print(f"промпт {variant.id} ({variant.slot}, sha={variant.sha256})")
     lapa = make_llm(os.environ["LAPA_MODEL"], url, key)
     mamay = make_llm(os.environ["MAMAY_MODEL"], url, key)
 
@@ -73,20 +77,20 @@ def main():
     if limit:
         items = items[:limit]
     runners = {
-        "single-mamay": single_call_runner(mamay, system=resolve(PROMPT_ID).render_system()),
-        "single-lapa": single_call_runner(lapa, system=resolve(PROMPT_ID).render_system()),
-        "mamay@5": orch_cond(lambda: single_model_router(mamay), True),
-        "mamay@8": orch_cond(lambda: single_model_router(mamay), True, max_steps=8),
-        "mamay+rec@8": orch_cond(lambda: single_model_router(mamay), True, recovery=True, max_steps=8),
-        "hetero@5": orch_cond(lambda: profile_router(lapa, mamay), True),
-        "hetero@8": orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8),
-        "hetero+rec@8": orch_cond(lambda: profile_router(lapa, mamay), True, recovery=True, max_steps=8),
-        "hetero-nov@8": orch_cond(lambda: profile_router(lapa, mamay), False, max_steps=8),
+        "single-mamay": single_call_runner(mamay, system=variant.render_system()),
+        "single-lapa": single_call_runner(lapa, system=variant.render_system()),
+        "mamay@5": orch_cond(lambda: single_model_router(mamay), True, prompt=variant),
+        "mamay@8": orch_cond(lambda: single_model_router(mamay), True, max_steps=8, prompt=variant),
+        "mamay+rec@8": orch_cond(lambda: single_model_router(mamay), True, recovery=True, max_steps=8, prompt=variant),
+        "hetero@5": orch_cond(lambda: profile_router(lapa, mamay), True, prompt=variant),
+        "hetero@8": orch_cond(lambda: profile_router(lapa, mamay), True, max_steps=8, prompt=variant),
+        "hetero+rec@8": orch_cond(lambda: profile_router(lapa, mamay), True, recovery=True, max_steps=8, prompt=variant),
+        "hetero-nov@8": orch_cond(lambda: profile_router(lapa, mamay), False, max_steps=8, prompt=variant),
     }
     print(f"{len(items)} задач × {len(runners)} умов × {len(seeds)} seed = "
           f"{len(items) * len(runners) * len(seeds)} прогонів\n")
     results = run_eval(items, runners, seeds,
-                       prompt_ids={name: PROMPT_ID for name in runners})
+                       prompt_ids={name: variant.id for name in runners})
     print(format_report(results))
     print()
     for base, treat in PAIRS:
@@ -98,7 +102,7 @@ def main():
     out = ROOT / "docs" / "research" / "eval-runs"
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{items_name}-local.json").write_text(
-        json.dumps({"prompt": PROMPT_ID, "items": items_name, "seeds": seeds,
+        json.dumps({"prompt": variant.id, "prompt_sha": variant.sha256, "items": items_name, "seeds": seeds,
                     "aggregate": aggregate(results),
                     "paired": [paired(results, b, t) for b, t in PAIRS
                                if b in runners and t in runners],
