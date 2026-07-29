@@ -1,6 +1,11 @@
 from .adapters.memory_notebook import NotebookMemory
 from .adapters.planner_skeleton import SkeletonPlanner
-from .adapters.router_profile import PresetEffort, profile_router, single_model_router
+from .adapters.router_profile import (
+    PresetEffort,
+    profile_router,
+    sampling_effort,
+    single_model_router,
+)
 from .adapters.skills_declared import skillbox
 from .adapters.tools_fake import DEFAULT_TOOLS, FakeToolbox
 from .adapters.tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS, DOCS_YEARS_TOOLS
@@ -45,6 +50,11 @@ def build_router(spec: AppSpec, *, lapa, mamay):
     return single_model_router(lapa, lane="lapa")
 
 
+def build_effort(spec: AppSpec):
+    """`pass^k` має сенс лише при temperature > 0: при 0 усі seeds дають ту саму трасу (V0)."""
+    return PresetEffort() if spec.temperature == 0.0 else sampling_effort(spec.temperature)
+
+
 def build_planner(spec: AppSpec):
     return SkeletonPlanner(gather=spec.plan_gather) if spec.planner == "skeleton" else None
 
@@ -67,7 +77,7 @@ def build_orchestrator(spec: AppSpec, *, lapa, mamay, system: str | None = None,
     """
     return Orchestrator(
         build_router(spec, lapa=lapa, mamay=mamay),
-        PresetEffort(),
+        build_effort(spec),
         build_toolbox(spec),
         planner=build_planner(spec),
         verifier=spec.verifier,

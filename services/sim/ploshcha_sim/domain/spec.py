@@ -33,6 +33,7 @@ class AppSpec(BaseModel):
     recovery: bool = False
     max_steps: int = 5
     max_tokens: int = 512
+    temperature: float = 0.0
 
     @property
     def sha256(self) -> str:

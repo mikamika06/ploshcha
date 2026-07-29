@@ -68,6 +68,8 @@ DOCS: dict[str, AppSpec] = {
                                   prompt_id="agent/v2-docs-agg", answer_channel="text"),
     "docs-years@16": DOC.with_(max_steps=16, toolset="docs_years",
                                prompt_id="agent/v2-docs-years"),
+    "docs-years-t7@16": DOC.with_(max_steps=16, toolset="docs_years",
+                                  prompt_id="agent/v2-docs-years", temperature=0.7),
 }
 COVER: dict[str, AppSpec] = {
     "chain-cover-schema@16": REG.with_(max_steps=16, coverage=True),
@@ -85,6 +87,9 @@ COVER: dict[str, AppSpec] = {
                                toolset="registry_teach", coverage_guard=True),
     "chain-sum@32": REG.with_(max_steps=32, coverage=True, recovery=True,
                               toolset="registry_sum", prompt_id="agent/v2-sum"),
+    "chain-reduce-t7@32": REG.with_(max_steps=32, coverage=True, recovery=True,
+                                    toolset="registry_reduce", prompt_id="agent/v2-reduce",
+                                    temperature=0.7),
     "chain-reduce@32": REG.with_(max_steps=32, coverage=True, recovery=True,
                                  toolset="registry_reduce", prompt_id="agent/v2-reduce"),
     "chain-sumguard@32": REG.with_(max_steps=32, coverage=True, recovery=True,
@@ -128,7 +133,9 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("chain-teach@32", "chain-both@32"),
          ("chain-cover-rec@32", "chain-sum@32"),
          ("chain-sum@32", "chain-sumguard@32"),
-         ("chain-cover-rec@32", "chain-reduce@32"))
+         ("chain-cover-rec@32", "chain-reduce@32"),
+         ("chain-reduce@32", "chain-reduce-t7@32"),
+         ("docs-years@16", "docs-years-t7@16"))
 
 
 def _model(routing: str, *, lapa, mamay):
