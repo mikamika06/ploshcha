@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from ploshcha_sim.domain.task import Budget, TaskResult
 
-from .checks import run_checks
+from .checks import outcome_tier, split_checks
 
 Runner = Callable[[str, int], TaskResult]
 
@@ -26,6 +26,9 @@ class EvalResult(BaseModel):
     seed: int
     success: bool
     checks: dict[str, bool]
+    hygiene: dict[str, bool] = Field(default_factory=dict)
+    hygiene_ok: bool = True
+    tier: str = "empty"
     steps: int = 0
     tokens: int = 0
     aux_tokens: int = 0
@@ -33,6 +36,8 @@ class EvalResult(BaseModel):
     degraded: bool = False
     partial: bool = False
     incidents: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
     answer: str | None = None
 
 
@@ -67,13 +72,17 @@ def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int]
         for condition, runner in runners.items():
             for seed in seeds:
                 result = runner(item.task, seed)
-                checks = run_checks(item.checks, result)
+                checks, hygiene = split_checks(item.checks, result)
                 out.append(EvalResult(
                     item_id=item.id, category=item.category, condition=condition,
                     prompt_id=(prompt_ids or {}).get(condition, ""), seed=seed,
-                    success=all(checks.values()), checks=checks,
+                    success=all(checks.values()) if checks else False, checks=checks,
+                    hygiene=hygiene, hygiene_ok=all(hygiene.values()),
+                    tier=outcome_tier(result),
                     steps=result.steps, tokens=result.tokens, aux_tokens=result.aux_tokens,
                     accepted=result.accepted, degraded=result.degraded, partial=result.partial,
-                    incidents=list(result.incidents), answer=result.answer,
+                    incidents=list(result.incidents), notes=list(result.notes),
+                    tools=[x["call"]["tool"] for x in result.scratch],
+                    answer=result.answer,
                 ))
     return out

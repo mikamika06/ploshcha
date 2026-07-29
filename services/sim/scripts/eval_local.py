@@ -21,25 +21,28 @@ load_env(ROOT / ".env")
 
 from evalkit.harness import load_items, orchestrator_runner, run_eval, single_call_runner
 from evalkit.prompts import resolve
-from evalkit.report import aggregate, format_report
+from evalkit.report import aggregate, format_report, paired
 from ploshcha_sim.adapters import FakeToolbox, PresetEffort, profile_router, single_model_router
 from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm
 from ploshcha_sim.agents import Orchestrator
 from ploshcha_sim.domain.task import Budget
 
-ITEMS = Path(__file__).resolve().parents[1] / "evalkit" / "items" / "starter.jsonl"
+ITEMS_DIR = Path(__file__).resolve().parents[1] / "evalkit" / "items"
 
 
 def parse_args(argv):
-    seeds, limit = [1, 2, 3], None
+    seeds, limit, items = [1, 2, 3], None, "starter"
     for a in argv:
         if a.startswith("--seeds="):
             seeds = [int(x) for x in a.split("=", 1)[1].split(",")]
         elif a.startswith("--limit="):
             limit = int(a.split("=", 1)[1])
-    return seeds, limit
+        elif a.startswith("--items="):
+            items = a.split("=", 1)[1]
+    return seeds, limit, items
 
 PROMPT_ID = "agent/v2"
+PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"))
 
 
 def make_llm(model, url, key):
@@ -62,11 +65,11 @@ def main():
     if not key:
         print("нема LAPA_API_KEY")
         return 1
-    seeds, limit = parse_args(sys.argv[1:])
+    seeds, limit, items_name = parse_args(sys.argv[1:])
     lapa = make_llm(os.environ["LAPA_MODEL"], url, key)
     mamay = make_llm(os.environ["MAMAY_MODEL"], url, key)
 
-    items = load_items(str(ITEMS))
+    items = load_items(str(ITEMS_DIR / f"{items_name}.jsonl"))
     if limit:
         items = items[:limit]
     runners = {
@@ -82,15 +85,28 @@ def main():
     }
     print(f"{len(items)} задач × {len(runners)} умов × {len(seeds)} seed = "
           f"{len(items) * len(runners) * len(seeds)} прогонів\n")
-    results = run_eval(items, runners, seeds)
+    results = run_eval(items, runners, seeds,
+                       prompt_ids={name: PROMPT_ID for name in runners})
     print(format_report(results))
+    print()
+    for base, treat in PAIRS:
+        if base in runners and treat in runners:
+            pr = paired(results, base, treat)
+            print(f"паровано {base} -> {treat}: клітинок={pr['cells']} "
+                  f"вилікувано={pr['fixed']} зламано={pr['broke']} net={pr['net']} "
+                  f"(з інцидентами={pr['incident_cells']}, врятовано={pr['rescued_with_incident']})")
     out = ROOT / "docs" / "research" / "eval-runs"
     out.mkdir(parents=True, exist_ok=True)
-    (out / "starter-local.json").write_text(
-        json.dumps([r.model_dump() for r in results] + aggregate(results), ensure_ascii=False, indent=2),
+    (out / f"{items_name}-local.json").write_text(
+        json.dumps({"prompt": PROMPT_ID, "items": items_name, "seeds": seeds,
+                    "aggregate": aggregate(results),
+                    "paired": [paired(results, b, t) for b, t in PAIRS
+                               if b in runners and t in runners],
+                    "results": [r.model_dump() for r in results]},
+                   ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    print(f"\n{len(results)} прогонів × {len(items)} задач; звіт у {out / 'starter-local.json'}")
+    print(f"\n{len(results)} прогонів × {len(items)} задач; звіт у {out / (items_name + '-local.json')}")
     return 0
 
 
