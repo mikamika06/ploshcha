@@ -55,6 +55,7 @@ class TaskState(BaseModel):
     route_as: str | None = None
     attempts: dict[str, int] = Field(default_factory=dict)
     incidents: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
     recoveries: int = 0
     plan: TaskPlan | None = None
 
@@ -69,4 +70,5 @@ class TaskResult(BaseModel):
     tokens: int = 0
     aux_tokens: int = 0
     incidents: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
     scratch: list[dict] = Field(default_factory=list)

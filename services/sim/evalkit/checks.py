@@ -40,5 +40,29 @@ def check(spec: dict, result) -> bool:
     raise ValueError(f"unknown check kind: {kind}")
 
 
+HYGIENE_KINDS = frozenset({"no_incident", "tool_calls_at_most", "not_partial", "steps_between"})
+
+
+def is_hygiene(spec: dict) -> bool:
+    return spec["kind"] in HYGIENE_KINDS
+
+
 def run_checks(specs: list[dict], result) -> dict[str, bool]:
     return {str(s): check(s, result) for s in specs}
+
+
+def split_checks(specs: list[dict], result) -> tuple[dict[str, bool], dict[str, bool]]:
+    """Успіх задачі рахується ЛИШЕ за результатом; гігієна шляху — окремо."""
+    outcome, hygiene = {}, {}
+    for spec in specs:
+        (hygiene if is_hygiene(spec) else outcome)[str(spec)] = check(spec, result)
+    return outcome, hygiene
+
+
+def outcome_tier(result) -> str:
+    """повна відповідь / часткова з доказом / нічого — це три різні речі."""
+    if result.answer is None or not str(result.answer).strip():
+        return "empty"
+    if getattr(result, "partial", False):
+        return "partial" if result.scratch else "empty"
+    return "full"
