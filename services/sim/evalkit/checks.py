@@ -40,7 +40,10 @@ def check(spec: dict, result) -> bool:
     raise ValueError(f"unknown check kind: {kind}")
 
 
-HYGIENE_KINDS = frozenset({"no_incident", "tool_calls_at_most", "not_partial", "steps_between"})
+HYGIENE_KINDS = frozenset({
+    "no_incident", "tool_calls_at_most", "not_partial", "steps_between",
+    "abstain", "no_data_tool",
+})
 
 
 def is_hygiene(spec: dict) -> bool:
