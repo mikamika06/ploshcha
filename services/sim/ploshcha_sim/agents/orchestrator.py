@@ -81,7 +81,7 @@ def _note_text(call: dict, result) -> tuple[str, str]:
 def _tool_known(result) -> bool | None:
     if not result.ok or not isinstance(result.value, dict):
         return None
-    known = result.value.get("known")
+    known = result.value.get("known", result.value.get("відомо"))
     return known if isinstance(known, bool) else None
 
 

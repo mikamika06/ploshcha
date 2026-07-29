@@ -11,6 +11,8 @@ EVENT_YEARS = {
     "проголошення незалежності України": 1991,
     "Акт Злуки": 1919,
 }
+LEMMA_MATCH_MIN = 0.5
+
 FACTS = {
     "Тарас Шевченко": "Український поет і художник, автор «Кобзаря».",
     "Битва під Крутами": "Бій 29 січня 1918 року між військами УНР і більшовиками.",
@@ -46,13 +48,29 @@ class Tool:
         return ToolSpec(name=self.name, description=self.description, params=self.params.model_json_schema())
 
 
+def _lemma_set(text: str) -> frozenset[str]:
+    from .retriever_lexical import lemmas
+    return frozenset(lemmas(text))
+
+
 def _match(query: str, table: dict):
     q = query.strip().casefold()
     for key, value in table.items():
         kk = key.casefold()
         if kk == q or kk in q or q in kk:
             return value
-    return None
+    ql = _lemma_set(query)
+    if not ql:
+        return None
+    best, score = None, 0.0
+    for key, value in table.items():
+        kl = _lemma_set(key)
+        if not kl:
+            continue
+        overlap = len(ql & kl) / len(kl)
+        if overlap > score:
+            best, score = value, overlap
+    return best if score >= LEMMA_MATCH_MIN else None
 
 
 def _check_date(a: CheckDateArgs) -> dict:
