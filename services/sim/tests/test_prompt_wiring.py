@@ -121,7 +121,21 @@ def test_by_prompt_and_sensitivity_math():
     assert "spread=" in format_prompt_report(rows)
 
 
+CANDIDATE_ON_PURPOSE = {"agent/v2-ua", "agent/v2-reg", "agent/v2-iter", "agent/v2-agg", "answer/full"}
+
+
 def test_frozen_prompt_is_the_one_eval_uses():
-    text = (Path(__file__).resolve().parents[1] / "scripts" / "eval_local.py").read_text()
-    assert 'PROMPT_ID = "agent/v2"' in text
+    """Раніше цей тест грепав текст скрипта; тепер промпт — поле специфікації, тож перевіряємо дані."""
+    from evalkit.conditions import CONDITIONS
+    from ploshcha_sim.domain.spec import AppSpec
+
+    assert AppSpec().prompt_id == "agent/v2"
     assert resolve("agent/v2").status == "frozen"
+
+    for name, spec in CONDITIONS.items():
+        for pid in (spec.prompt_id, spec.answer_prompt_id):
+            variant = resolve(pid)
+            assert variant.status != "rejected", f"{name} використовує відкинутий промпт {pid}"
+            if variant.status != "frozen":
+                assert pid in CANDIDATE_ON_PURPOSE, (
+                    f"{name} тихо взяв незаморожений промпт {pid} ({variant.status})")

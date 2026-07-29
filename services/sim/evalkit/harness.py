@@ -20,6 +20,7 @@ class EvalItem(BaseModel):
     gold: list[str] = Field(default_factory=list)
     foil: list[str] = Field(default_factory=list)
     gold_tools: list[str] = Field(default_factory=list)
+    chain_len: int = 0
 
 
 class EvalResult(BaseModel):
@@ -27,6 +28,7 @@ class EvalResult(BaseModel):
     category: str
     condition: str
     prompt_id: str = ""
+    spec_sha: str = ""
     seed: int
     success: bool
     checks: dict[str, bool]
@@ -87,7 +89,8 @@ def gated_runner(llm, tools, *, system: str | None = None, max_tokens: int = 512
 
 
 def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int],
-             prompt_ids: dict[str, str] | None = None) -> list[EvalResult]:
+             prompt_ids: dict[str, str] | None = None,
+             spec_shas: dict[str, str] | None = None) -> list[EvalResult]:
     out: list[EvalResult] = []
     for item in items:
         for condition, runner in runners.items():
@@ -96,7 +99,8 @@ def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int]
                 checks, hygiene = split_checks(item.checks, result)
                 out.append(EvalResult(
                     item_id=item.id, category=item.category, condition=condition,
-                    prompt_id=(prompt_ids or {}).get(condition, ""), seed=seed,
+                    prompt_id=(prompt_ids or {}).get(condition, ""),
+                    spec_sha=(spec_shas or {}).get(condition, ""), seed=seed,
                     success=all(checks.values()) if checks else False, checks=checks,
                     hygiene=hygiene, hygiene_ok=all(hygiene.values()),
                     tier=outcome_tier(result),

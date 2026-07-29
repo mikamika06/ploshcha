@@ -1,0 +1,4050 @@
+{
+ "gate-notools-lapa|abstain-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 11,
+  "verdict_reason": null
+ },
+ "gate-notools-lapa|abstain-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 11,
+  "verdict_reason": null
+ },
+ "gate-notools-lapa|calc-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 15,
+  "verdict_reason": null
+ },
+ "gate-notools-lapa|calc-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 15,
+  "verdict_reason": null
+ },
+ "gate-notools-lapa|date-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 17,
+  "verdict_reason": null
+ },
+ "gate-notools-lapa|date-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 17,
+  "verdict_reason": null
+ },
+ "gate-notools-lapa|hop-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 32,
+  "verdict_reason": null
+ },
+ "gate-notools-lapa|hop-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 32,
+  "verdict_reason": null
+ },
+ "gate-notools-mamay|abstain-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 11,
+  "verdict_reason": null
+ },
+ "gate-notools-mamay|abstain-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 11,
+  "verdict_reason": null
+ },
+ "gate-notools-mamay|calc-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 15,
+  "verdict_reason": null
+ },
+ "gate-notools-mamay|calc-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 15,
+  "verdict_reason": null
+ },
+ "gate-notools-mamay|date-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 17,
+  "verdict_reason": null
+ },
+ "gate-notools-mamay|date-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 17,
+  "verdict_reason": null
+ },
+ "gate-notools-mamay|hop-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 32,
+  "verdict_reason": null
+ },
+ "gate-notools-mamay|hop-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [
+   "gate:no_data_tools"
+  ],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 32,
+  "verdict_reason": null
+ },
+ "gate-tools-hetero|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "gate-tools-hetero|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "gate-tools-hetero|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "gate-tools-hetero|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "gate-tools-hetero|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "gate-tools-hetero|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "gate-tools-hetero|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "gate-tools-hetero|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero+rec@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero+rec@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero+rec@8|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero+rec@8|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero+rec@8|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero+rec@8|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero+rec@8|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero+rec@8|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-nov@8|abstain-01|1": {
+  "accepted": true,
+  "answer": "1918 рік",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": null
+ },
+ "hetero-nov@8|abstain-01|2": {
+  "accepted": true,
+  "answer": "1918 рік",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": null
+ },
+ "hetero-nov@8|calc-01|1": {
+  "accepted": true,
+  "answer": "1918 рік",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": null
+ },
+ "hetero-nov@8|calc-01|2": {
+  "accepted": true,
+  "answer": "1918 рік",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": null
+ },
+ "hetero-nov@8|date-01|1": {
+  "accepted": true,
+  "answer": "1918 рік",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": null
+ },
+ "hetero-nov@8|date-01|2": {
+  "accepted": true,
+  "answer": "1918 рік",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": null
+ },
+ "hetero-nov@8|hop-01|1": {
+  "accepted": true,
+  "answer": "1918 рік",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": null
+ },
+ "hetero-nov@8|hop-01|2": {
+  "accepted": true,
+  "answer": "1918 рік",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": null
+ },
+ "hetero-plan@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-plan@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-plan@8|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-plan@8|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-plan@8|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-plan@8|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-plan@8|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-plan@8|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textans@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textans@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textans@8|calc-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 40,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 71,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textans@8|calc-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 40,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 71,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textans@8|date-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 42,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 75,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textans@8|date-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 42,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 75,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textans@8|hop-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 57,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 105,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textans@8|hop-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 57,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 105,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textfull@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 106,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textfull@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 106,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textfull@8|calc-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 40,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 118,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textfull@8|calc-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 40,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 118,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textfull@8|date-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 42,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 124,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textfull@8|date-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 42,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 124,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textfull@8|hop-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 57,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 169,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-textfull@8|hop-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 57,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 169,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-textans@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 96,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-textans@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 96,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-textans@8|calc-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 40,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 108,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-textans@8|calc-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 40,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 108,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-textans@8|date-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 42,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 114,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-textans@8|date-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 42,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 114,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-textans@8|hop-01|1": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 57,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 159,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-textans@8|hop-01|2": {
+  "accepted": false,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 57,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 3,
+  "tokens": 159,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-tools@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-tools@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-tools@8|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-tools@8|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-tools@8|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-tools@8|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-tools@8|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero-ua-tools@8|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "tool": "перевірити_дату",
+     "подія": "Битва під Крутами",
+     "рік": 1918
+    },
+    "result": {
+     "відомо": true,
+     "збігається": true,
+     "рік_довідника": 1918
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@5|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@5|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@5|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@5|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@5|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@5|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@5|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@5|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@8|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@8|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@8|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@8|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@8|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "hetero@8|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay+rec@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay+rec@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay+rec@8|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay+rec@8|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay+rec@8|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay+rec@8|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay+rec@8|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay+rec@8|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@5|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@5|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@5|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@5|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@5|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@5|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@5|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@5|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 32,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 51,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@8|calc-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@8|calc-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 36,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 59,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@8|date-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@8|date-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 38,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 63,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@8|hop-01|1": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "mamay@8|hop-01|2": {
+  "accepted": false,
+  "answer": "1918 рік",
+  "aux_tokens": 53,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 93,
+  "verdict_reason": "verify_parse_fail"
+ },
+ "single-lapa|abstain-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 11,
+  "verdict_reason": null
+ },
+ "single-lapa|abstain-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 11,
+  "verdict_reason": null
+ },
+ "single-lapa|calc-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 15,
+  "verdict_reason": null
+ },
+ "single-lapa|calc-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 15,
+  "verdict_reason": null
+ },
+ "single-lapa|date-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 17,
+  "verdict_reason": null
+ },
+ "single-lapa|date-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 17,
+  "verdict_reason": null
+ },
+ "single-lapa|hop-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 32,
+  "verdict_reason": null
+ },
+ "single-lapa|hop-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 32,
+  "verdict_reason": null
+ },
+ "single-mamay|abstain-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 11,
+  "verdict_reason": null
+ },
+ "single-mamay|abstain-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 11,
+  "verdict_reason": null
+ },
+ "single-mamay|calc-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 15,
+  "verdict_reason": null
+ },
+ "single-mamay|calc-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 15,
+  "verdict_reason": null
+ },
+ "single-mamay|date-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 17,
+  "verdict_reason": null
+ },
+ "single-mamay|date-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 17,
+  "verdict_reason": null
+ },
+ "single-mamay|hop-01|1": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 32,
+  "verdict_reason": null
+ },
+ "single-mamay|hop-01|2": {
+  "accepted": true,
+  "answer": "Битва під Крутами відбулася 1918 року.",
+  "aux_tokens": 0,
+  "degraded": false,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [],
+  "steps": 1,
+  "tokens": 32,
+  "verdict_reason": null
+ },
+ "stuck-hetero+rec@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 152,
+  "verdict_reason": null
+ },
+ "stuck-hetero+rec@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 152,
+  "verdict_reason": null
+ },
+ "stuck-hetero+rec@8|calc-01|1": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 168,
+  "verdict_reason": null
+ },
+ "stuck-hetero+rec@8|calc-01|2": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 168,
+  "verdict_reason": null
+ },
+ "stuck-hetero+rec@8|date-01|1": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 176,
+  "verdict_reason": null
+ },
+ "stuck-hetero+rec@8|date-01|2": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 176,
+  "verdict_reason": null
+ },
+ "stuck-hetero+rec@8|hop-01|1": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 236,
+  "verdict_reason": null
+ },
+ "stuck-hetero+rec@8|hop-01|2": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 236,
+  "verdict_reason": null
+ },
+ "stuck-hetero-nov@8|abstain-01|1": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 52,
+  "verdict_reason": null
+ },
+ "stuck-hetero-nov@8|abstain-01|2": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 52,
+  "verdict_reason": null
+ },
+ "stuck-hetero-nov@8|calc-01|1": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 60,
+  "verdict_reason": null
+ },
+ "stuck-hetero-nov@8|calc-01|2": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 60,
+  "verdict_reason": null
+ },
+ "stuck-hetero-nov@8|date-01|1": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 64,
+  "verdict_reason": null
+ },
+ "stuck-hetero-nov@8|date-01|2": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 64,
+  "verdict_reason": null
+ },
+ "stuck-hetero-nov@8|hop-01|1": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 94,
+  "verdict_reason": null
+ },
+ "stuck-hetero-nov@8|hop-01|2": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 94,
+  "verdict_reason": null
+ },
+ "stuck-mamay+rec@8|abstain-01|1": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 152,
+  "verdict_reason": null
+ },
+ "stuck-mamay+rec@8|abstain-01|2": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 152,
+  "verdict_reason": null
+ },
+ "stuck-mamay+rec@8|calc-01|1": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 168,
+  "verdict_reason": null
+ },
+ "stuck-mamay+rec@8|calc-01|2": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 168,
+  "verdict_reason": null
+ },
+ "stuck-mamay+rec@8|date-01|1": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 176,
+  "verdict_reason": null
+ },
+ "stuck-mamay+rec@8|date-01|2": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 176,
+  "verdict_reason": null
+ },
+ "stuck-mamay+rec@8|hop-01|1": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 236,
+  "verdict_reason": null
+ },
+ "stuck-mamay+rec@8|hop-01|2": {
+  "accepted": false,
+  "answer": "Часткова відповідь на основі здобутого:\ncheck_date: {\"matches\": true, \"actual_year\": 1918, \"known\": true}",
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [
+   "dup_call",
+   "dup_call",
+   "dup_call"
+  ],
+  "notes": [],
+  "partial": true,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 4,
+  "tokens": 236,
+  "verdict_reason": null
+ },
+ "stuck-mamay@8|abstain-01|1": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 52,
+  "verdict_reason": null
+ },
+ "stuck-mamay@8|abstain-01|2": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 52,
+  "verdict_reason": null
+ },
+ "stuck-mamay@8|calc-01|1": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 60,
+  "verdict_reason": null
+ },
+ "stuck-mamay@8|calc-01|2": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 60,
+  "verdict_reason": null
+ },
+ "stuck-mamay@8|date-01|1": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 64,
+  "verdict_reason": null
+ },
+ "stuck-mamay@8|date-01|2": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 64,
+  "verdict_reason": null
+ },
+ "stuck-mamay@8|hop-01|1": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 94,
+  "verdict_reason": null
+ },
+ "stuck-mamay@8|hop-01|2": {
+  "accepted": false,
+  "answer": null,
+  "aux_tokens": 0,
+  "degraded": true,
+  "incidents": [],
+  "notes": [],
+  "partial": false,
+  "scratch": [
+   {
+    "call": {
+     "event": "Битва під Крутами",
+     "tool": "check_date",
+     "year": 1918
+    },
+    "result": {
+     "actual_year": 1918,
+     "known": true,
+     "matches": true
+    }
+   }
+  ],
+  "steps": 2,
+  "tokens": 94,
+  "verdict_reason": null
+ }
+}
