@@ -3,7 +3,7 @@ from .docs_kb import DOCUMENTS
 from .docs_kb import ids_for as doc_ids
 from .registry_kb import VILLAGES, ids_for
 from .skillbox import SkillBox, declare
-from .tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS
+from .tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS, DOCS_YEARS_TOOLS
 from .tools_fake import DEFAULT_TOOLS
 from .tools_registry import (
     AGG_TOOLS,
@@ -67,6 +67,11 @@ DOCS_AGG_DECLARED = {
                                   shape="aggregate", cost_hint=3),
 }
 
+DOCS_YEARS_DECLARED = {
+    "роки_документа": SkillSpec(name="роки_документа", capability="docs.years",
+                                shape="aggregate", cost_hint=3),
+}
+
 DECLARED = {
     "default": (DEFAULT_TOOLS, DEFAULT_DECLARED),
     "ua": (UA_TOOLS, UA_DECLARED),
@@ -77,6 +82,7 @@ DECLARED = {
     "registry_agg": (AGG_TOOLS, AGG_DECLARED),
     "docs": (DOCS_TOOLS, DOCS_DECLARED),
     "docs_agg": (DOCS_AGG_TOOLS, DOCS_AGG_DECLARED),
+    "docs_years": (DOCS_YEARS_TOOLS, DOCS_YEARS_DECLARED),
 }
 
 

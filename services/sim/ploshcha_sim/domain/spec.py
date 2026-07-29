@@ -7,7 +7,7 @@ from pydantic import BaseModel
 Mode = Literal["single", "loop", "gated"]
 Routing = Literal["hetero", "mamay", "lapa"]
 Toolset = Literal["default", "ua", "registry", "registry_agg", "registry_teach", "registry_sum", "registry_reduce",
-                   "docs", "docs_agg", "none"]
+                   "docs", "docs_agg", "docs_years", "none"]
 PlannerKind = Literal["none", "skeleton"]
 MemoryKind = Literal["none", "notebook"]
 AnswerChannel = Literal["schema", "text"]

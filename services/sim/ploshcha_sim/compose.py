@@ -3,7 +3,7 @@ from .adapters.planner_skeleton import SkeletonPlanner
 from .adapters.router_profile import PresetEffort, profile_router, single_model_router
 from .adapters.skills_declared import skillbox
 from .adapters.tools_fake import DEFAULT_TOOLS, FakeToolbox
-from .adapters.tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS
+from .adapters.tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS, DOCS_YEARS_TOOLS
 from .adapters.tools_registry import (
     AGG_TOOLS,
     REGISTRY_REDUCE_TOOLS,
@@ -24,6 +24,7 @@ TOOLSETS = {"default": DEFAULT_TOOLS, "ua": UA_TOOLS,
             "registry_sum": REGISTRY_SUM_TOOLS,
             "registry_reduce": REGISTRY_REDUCE_TOOLS,
             "docs": DOCS_TOOLS, "docs_agg": DOCS_AGG_TOOLS,
+            "docs_years": DOCS_YEARS_TOOLS,
             "none": NO_DATA_TOOLS}
 
 

@@ -66,6 +66,8 @@ DOCS: dict[str, AppSpec] = {
                                     prompt_id="agent/v2-docs-agg"),
     "docs-agg-text@16": DOC.with_(max_steps=16, toolset="docs_agg",
                                   prompt_id="agent/v2-docs-agg", answer_channel="text"),
+    "docs-years@16": DOC.with_(max_steps=16, toolset="docs_years",
+                               prompt_id="agent/v2-docs-years"),
 }
 COVER: dict[str, AppSpec] = {
     "chain-cover-schema@16": REG.with_(max_steps=16, coverage=True),
@@ -115,6 +117,7 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("docs-schema@16", "docs-text@16"),
          ("docs-text@16", "docs-agg-text@16"),
          ("docs-agg-schema@16", "docs-agg-text@16"),
+         ("docs-agg-schema@16", "docs-years@16"),
          ("chain-schema@16", "chain-cover-schema@16"),
          ("chain-text@16", "chain-cover-text@16"),
          ("docs-schema@16", "docs-cover-schema@16"),

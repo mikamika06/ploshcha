@@ -1,3 +1,5 @@
+import re
+
 from pydantic import BaseModel
 
 from .docs_kb import DOCUMENTS, PARAGRAPHS, ids_for
@@ -64,6 +66,33 @@ def _абзаци_документа(a: ДокументArgs) -> dict:
     return {"відомо": True, "документ": doc,
             "абзаци": [{"ідентифікатор": pid, **PARAGRAPHS[pid]} for pid in ids_for(doc)]}
 
+
+def _роки_документа(a: ДокументArgs) -> dict:
+    """Цифри-роки з кожного абзацу дістає КОД (regex), а не модель.
+
+    Розділяє два діагнози: якщо з цією підказкою бал стрибає — провал був у увазі до довгого тексту;
+    якщо не стрибає — це розуміння (заміряно: 4 з 5 провалів були на слові «рік» у абзацах БЕЗ дати).
+    """
+    doc = _match_document(a.документ)
+    if doc is None:
+        return {"відомо": False, "абзаци": []}
+    out = []
+    for pid in ids_for(doc):
+        text = PARAGRAPHS[pid]["текст"]
+        years = re.findall(r"\b(1[89]\d\d)\b", text)
+        out.append({"ідентифікатор": pid, "текст": text,
+                    "роки_цифрами": years, "є_рік": bool(years)})
+    return {"відомо": True, "документ": doc, "абзаци": out,
+            "з_роком": sum(1 for x in out if x["є_рік"]),
+            "без_року": [x["ідентифікатор"] for x in out if not x["є_рік"]]}
+
+
+DOCS_YEARS_TOOLS = [
+    Tool("роки_документа",
+         "Дістати всі абзаци документа разом із роками, знайденими цифрами, та підсумком.",
+         ДокументArgs, _роки_документа),
+    Tool("final_answer", "Завершити й повернути фінальну відповідь.", FinalAnswerArgs, _final_answer),
+]
 
 DOCS_TOOLS = [
     Tool("список_абзаців", "Перелічити ідентифікатори абзаців документа.",
