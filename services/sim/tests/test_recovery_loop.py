@@ -95,7 +95,8 @@ def test_tool_unknown_adds_hint_without_extra_step():
     unknown = '{"tool": "lookup_fact", "entity": "Невідома Особа"}'
     orch, llm = _orch([unknown, FINAL], recovery=True)
     r = orch.run("t", seed=1, budget=Budget(max_steps=5))
-    assert r.incidents == ["tool_unknown"]
+    assert r.notes == ["tool_unknown"], "«інструмент не знає» — нотатка, не збій"
+    assert r.incidents == []
     assert "Підказка:" in llm.calls[1]["prompt"]
     assert r.steps == 2
 
@@ -106,6 +107,29 @@ def test_tool_error_hint_carries_detail():
     r = orch.run("t", seed=1, budget=Budget(max_steps=5))
     assert r.incidents == ["tool_error"]
     assert "disallowed characters" in llm.calls[1]["prompt"]
+
+
+def test_reasking_after_unknown_is_not_a_near_duplicate():
+    unknown_a = '{"tool": "lookup_fact", "entity": "Пилип Орлик"}'
+    unknown_b = '{"tool": "lookup_fact", "entity": "гетьман Пилип Орлик"}'
+    orch, llm = _orch([unknown_a, unknown_b, FINAL], recovery=True)
+    r = orch.run("хто такий Пилип Орлик", seed=1, budget=Budget(max_steps=6))
+    assert r.notes == ["tool_unknown", "tool_unknown"], \
+        "переформулювання після 'не знаю' — це пошук, не топтання"
+    assert r.incidents == []
+    assert r.answer == "Гетьман Війська Запорозького"
+    assert not r.partial
+
+
+def test_soft_hints_do_not_starve_a_later_real_incident():
+    unknown = '{"tool": "lookup_fact", "entity": "Пилип Орлик"}'
+    unknown2 = '{"tool": "lookup_fact", "entity": "гетьман Орлик"}'
+    orch, llm = _orch([unknown, unknown2, DUP, DUP, FINAL], recovery=True)
+    r = orch.run("t", seed=1, budget=Budget(max_steps=8))
+    assert r.notes == ["tool_unknown", "tool_unknown"]
+    assert r.incidents == ["dup_call"]
+    assert not r.partial, "дві мʼякі підказки не мають доводити до здачі"
+    assert r.answer == "Гетьман Війська Запорозького"
 
 
 def test_steps_equal_llm_calls_invariant():

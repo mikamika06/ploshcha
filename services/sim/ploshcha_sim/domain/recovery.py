@@ -12,6 +12,8 @@ IncidentCode = Literal[
     "empty_output", "truncated", "budget_exhausted",
 ]
 
+NOT_A_FAILURE: tuple[IncidentCode, ...] = ("tool_unknown",)
+
 Rung = Literal["nudge", "retighten", "widen", "escalate", "replan", "partial"]
 
 REJECT_TO_INCIDENT: dict[str, IncidentCode] = {
@@ -47,6 +49,12 @@ CAPS: dict[Rung, int] = {
     "replan": 1,
     "partial": 1,
 }
+
+SOFT_SUFFIX = ":soft"
+
+
+def attempt_key(rung: Rung, soft: bool) -> str:
+    return f"{rung}{SOFT_SUFFIX}" if soft else rung
 
 NEAR_DUP_THRESHOLD = 0.2
 WIDEN_FACTOR = 2
@@ -126,11 +134,12 @@ def policy(code: IncidentCode, attempts: dict[str, int], *,
     ladder = LADDERS.get(code)
     if ladder is None:
         return None
+    soft = code in SOFT_CODES
     exhausted = cap_total is not None and spent >= cap_total
     for rung in ladder:
         if rung in disabled:
             continue
-        if attempts.get(rung, 0) >= CAPS[rung]:
+        if attempts.get(attempt_key(rung, soft), 0) >= CAPS[rung]:
             continue
         if rung == "replan" and not plan_exists:
             continue

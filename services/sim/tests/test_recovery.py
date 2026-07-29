@@ -6,6 +6,7 @@ from ploshcha_sim.domain.recovery import (
     NEAR_DUP_THRESHOLD,
     PARSE_CODES,
     SOFT_CODES,
+    attempt_key,
     WIDEN_CEILING,
     Recovery,
     StepOutcome,
@@ -188,7 +189,17 @@ def test_hard_ladders_end_with_partial_soft_never_terminate():
 def test_soft_codes_are_tool_feedback_only():
     assert set(SOFT_CODES) == {"tool_error", "tool_unknown"}
     assert policy("tool_error", {}) == "nudge"
-    assert policy("tool_error", {"nudge": 2}) is None
+    assert policy("tool_error", {"nudge:soft": 2}) is None
+
+
+def test_soft_hints_do_not_eat_the_hard_nudge_budget():
+    spent_by_soft = {"nudge:soft": 2}
+    assert policy("tool_unknown", spent_by_soft) is None, "мʼякий ліміт вичерпано"
+    assert policy("dup_call", spent_by_soft) == "nudge", "жорсткий ліміт лишається цілим"
+
+    spent_by_hard = {"nudge": 2}
+    assert policy("dup_call", spent_by_hard) == "partial"
+    assert policy("tool_unknown", spent_by_hard) == "nudge", "мʼякі не залежать від жорстких"
 
 
 def test_every_rung_in_ladders_has_a_cap():
@@ -212,5 +223,6 @@ def test_policy_terminates_for_every_code(code):
         rung = policy(code, attempts, plan_exists=True)
         if rung is None:
             return
-        attempts[rung] = attempts.get(rung, 0) + 1
+        key = attempt_key(rung, code in SOFT_CODES)
+        attempts[key] = attempts.get(key, 0) + 1
     raise AssertionError(f"драбина {code} не завершилась")

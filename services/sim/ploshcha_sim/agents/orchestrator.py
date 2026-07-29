@@ -3,6 +3,8 @@ from collections.abc import Callable
 
 from ..domain.recovery import (
     CAPS,
+    NOT_A_FAILURE,
+    attempt_key,
     SOFT_CODES,
     StepOutcome,
     build,
@@ -168,7 +170,7 @@ class Orchestrator:
             seen.append(sig)
             history.append((call.tool, dict(call.args)))
             result = self.tools.call(call)
-            history_ok.append(result.ok)
+            history_ok.append(result.ok and _tool_known(result) is not False)
             if result.ok and state.plan is not None:
                 state.plan.advance()
             entry = {
@@ -206,7 +208,7 @@ class Orchestrator:
             answer=state.answer, accepted=accepted, verdict_reason=reason,
             degraded=state.degraded, partial=state.partial, steps=state.budget.steps_used,
             tokens=state.budget.tokens_used, aux_tokens=state.budget.aux_tokens,
-            incidents=state.incidents, scratch=state.scratch,
+            incidents=state.incidents, notes=state.notes, scratch=state.scratch,
         )
 
     def _routable(self, kind: StepKind) -> bool:
@@ -233,20 +235,24 @@ class Orchestrator:
                 target = escalated(kind)
                 if target is not None and self._routable(target):
                     break
-                state.attempts["escalate"] = CAPS["escalate"]
+                state.attempts[attempt_key("escalate", soft)] = CAPS["escalate"]
                 target = None
                 continue
             if rung == "replan":
                 fresh_plan = self.planner.replan(state.task, state)
                 if fresh_plan is not None:
                     break
-                state.attempts["replan"] = CAPS["replan"]
+                state.attempts[attempt_key("replan", soft)] = CAPS["replan"]
                 continue
             break
-        state.attempts[rung] = state.attempts.get(rung, 0) + 1
+        key = attempt_key(rung, soft)
+        state.attempts[key] = state.attempts.get(key, 0) + 1
         if not soft:
             state.recoveries += 1
-        state.incidents.append(code)
+        if code in NOT_A_FAILURE:
+            state.notes.append(code)
+        else:
+            state.incidents.append(code)
         plan = build(code, rung, current_max_tokens=cfg.max_tokens, detail=detail)
         if rung == "partial":
             text = partial_answer(state.scratch)
