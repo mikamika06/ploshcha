@@ -19,7 +19,7 @@ from ploshcha_sim.domain.skill import (
 from ploshcha_sim.domain.spec import AppSpec
 from ploshcha_sim.ports.tool import ToolCall
 
-TOOLSET_NAMES = ("default", "ua", "registry", "registry_agg")
+TOOLSET_NAMES = ("default", "ua", "registry", "registry_teach", "registry_agg")
 
 
 def _box(toolset: str) -> SkillBox:
@@ -114,7 +114,7 @@ def test_side_effect_and_trust_default_to_the_safe_side():
         assert untrusted_skills(specs) == [], "чужого тексту ще не читаємо — це K10"
 
 
-COLLECTION_TOOLSETS = {"registry", "docs"}
+COLLECTION_TOOLSETS = {"registry", "registry_teach", "registry_sum", "registry_reduce", "docs"}
 
 
 def test_conditions_with_a_collection_are_flagged_and_aggregate_ones_are_not():

@@ -75,6 +75,19 @@ COVER: dict[str, AppSpec] = {
     "chain-cover-schema@32": REG.with_(max_steps=32, coverage=True),
     "chain-schema@32": REG.with_(max_steps=32),
     "chain-cover-rec@32": REG.with_(max_steps=32, coverage=True, recovery=True),
+    "chain-teach@32": REG.with_(max_steps=32, coverage=True, recovery=True,
+                                toolset="registry_teach"),
+    "chain-coverguard@32": REG.with_(max_steps=32, coverage=True, recovery=True,
+                                     coverage_guard=True),
+    "chain-both@32": REG.with_(max_steps=32, coverage=True, recovery=True,
+                               toolset="registry_teach", coverage_guard=True),
+    "chain-sum@32": REG.with_(max_steps=32, coverage=True, recovery=True,
+                              toolset="registry_sum", prompt_id="agent/v2-sum"),
+    "chain-reduce@32": REG.with_(max_steps=32, coverage=True, recovery=True,
+                                 toolset="registry_reduce", prompt_id="agent/v2-reduce"),
+    "chain-sumguard@32": REG.with_(max_steps=32, coverage=True, recovery=True,
+                                   toolset="registry_sum", prompt_id="agent/v2-sum",
+                                   coverage_guard=True),
 }
 
 CONDITIONS.update(CHAIN)
@@ -106,7 +119,13 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("chain-text@16", "chain-cover-text@16"),
          ("docs-schema@16", "docs-cover-schema@16"),
          ("docs-text@16", "docs-cover-text@16"),
-         ("chain-cover-schema@32", "chain-cover-rec@32"))
+         ("chain-cover-schema@32", "chain-cover-rec@32"),
+         ("chain-cover-rec@32", "chain-teach@32"),
+         ("chain-cover-rec@32", "chain-coverguard@32"),
+         ("chain-teach@32", "chain-both@32"),
+         ("chain-cover-rec@32", "chain-sum@32"),
+         ("chain-sum@32", "chain-sumguard@32"),
+         ("chain-cover-rec@32", "chain-reduce@32"))
 
 
 def _model(routing: str, *, lapa, mamay):

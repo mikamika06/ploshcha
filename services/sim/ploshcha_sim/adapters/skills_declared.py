@@ -5,7 +5,13 @@ from .registry_kb import VILLAGES, ids_for
 from .skillbox import SkillBox, declare
 from .tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS
 from .tools_fake import DEFAULT_TOOLS
-from .tools_registry import AGG_TOOLS, REGISTRY_TOOLS
+from .tools_registry import (
+    AGG_TOOLS,
+    REGISTRY_REDUCE_TOOLS,
+    REGISTRY_SUM_TOOLS,
+    REGISTRY_TEACH_TOOLS,
+    REGISTRY_TOOLS,
+)
 from .tools_ua import UA_TOOLS
 
 BIGGEST_VILLAGE = max(len(ids_for(v)) for v in VILLAGES)
@@ -30,6 +36,20 @@ REGISTRY_DECLARED = {
     "обчислити": SkillSpec(name="обчислити", capability="math.eval", shape="scalar"),
 }
 
+REGISTRY_SUM_DECLARED = {
+    "список_записів": SkillSpec(name="список_записів", capability="registry.index",
+                                shape="collection", max_items=BIGGEST_VILLAGE),
+    "запис": SkillSpec(name="запис", capability="registry.record", shape="scalar"),
+    "підсумувати": SkillSpec(name="підсумувати", capability="math.sum", shape="scalar"),
+}
+
+REGISTRY_REDUCE_DECLARED = {
+    "список_записів": SkillSpec(name="список_записів", capability="registry.index",
+                                shape="collection", max_items=BIGGEST_VILLAGE),
+    "звести": SkillSpec(name="звести", capability="registry.reduce", shape="aggregate",
+                        cost_hint=2),
+}
+
 AGG_DECLARED = {
     "записи_села": SkillSpec(name="записи_села", capability="registry.records",
                              shape="aggregate", cost_hint=3),
@@ -49,11 +69,14 @@ DOCS_AGG_DECLARED = {
 
 DECLARED = {
     "default": (DEFAULT_TOOLS, DEFAULT_DECLARED),
-    "docs": (DOCS_TOOLS, DOCS_DECLARED),
-    "docs_agg": (DOCS_AGG_TOOLS, DOCS_AGG_DECLARED),
     "ua": (UA_TOOLS, UA_DECLARED),
     "registry": (REGISTRY_TOOLS, REGISTRY_DECLARED),
+    "registry_teach": (REGISTRY_TEACH_TOOLS, REGISTRY_DECLARED),
+    "registry_sum": (REGISTRY_SUM_TOOLS, REGISTRY_SUM_DECLARED),
+    "registry_reduce": (REGISTRY_REDUCE_TOOLS, REGISTRY_REDUCE_DECLARED),
     "registry_agg": (AGG_TOOLS, AGG_DECLARED),
+    "docs": (DOCS_TOOLS, DOCS_DECLARED),
+    "docs_agg": (DOCS_AGG_TOOLS, DOCS_AGG_DECLARED),
 }
 
 

@@ -45,6 +45,10 @@ STEP_INSTRUCTION = "Наступний крок — один JSON (виклик 
 
 PREMATURE_FINAL = "premature_final"
 NO_FINAL = "no_final_answer"
+PREMATURE_COVER = "premature_final_pending"
+COVER_GUARD_CAP = 2
+COVER_GUARD_HINT = ("Перелік ще не обійдений — лишились елементи зі списку вище. "
+                   "Не завершуй: дістань наступний елемент.")
 PLAN_GUARD_CAP = 2
 PLAN_GUARD_HINT = ("У плані ще лишились кроки збору даних. Не завершуй — виклич інструмент "
                    "для наступного елемента, який ще не здобутий.")
@@ -113,7 +117,8 @@ class Orchestrator:
                  notebook: Callable[[], Notebook] | None = None,
                  tail: str | None = None, prompt_id: str = "", prompt_sha: str = "",
                  answer_channel: str = "schema", answer_instruction: str | None = None,
-                 plan_guard: bool = False, coverage: bool = False):
+                 plan_guard: bool = False, coverage: bool = False,
+                 coverage_guard: bool = False):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -132,6 +137,7 @@ class Orchestrator:
         self.answer_instruction = answer_instruction
         self.plan_guard = plan_guard
         self.coverage = coverage
+        self.coverage_guard = coverage_guard
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
         state = TaskState(task=task, budget=budget or Budget())
@@ -141,6 +147,7 @@ class Orchestrator:
         history: list[tuple[str, dict]] = []
         history_ok: list[bool] = []
         guard_blocks = 0
+        cover_blocks = 0
         while not state.done and state.budget.can_continue():
             kind = self.planner.next_kind(state)
             if state.route_as:
@@ -183,6 +190,16 @@ class Orchestrator:
                     continue
                 state.degraded = True
                 break
+
+            if call.tool == FINAL_TOOL and self.coverage_guard and state.pending:
+                if cover_blocks < COVER_GUARD_CAP:
+                    cover_blocks += 1
+                    state.incidents.append(PREMATURE_COVER)
+                    if COVER_GUARD_HINT not in state.hints:
+                        state.hints.append(COVER_GUARD_HINT)
+                    continue
+                state.partial = True
+                state.notes.append(f"{PREMATURE_COVER}:allowed_after_cap")
 
             if call.tool == FINAL_TOOL and self._plan_unfinished(state):
                 if guard_blocks < PLAN_GUARD_CAP:

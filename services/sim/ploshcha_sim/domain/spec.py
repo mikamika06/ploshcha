@@ -6,7 +6,8 @@ from pydantic import BaseModel
 
 Mode = Literal["single", "loop", "gated"]
 Routing = Literal["hetero", "mamay", "lapa"]
-Toolset = Literal["default", "ua", "registry", "registry_agg", "docs", "docs_agg", "none"]
+Toolset = Literal["default", "ua", "registry", "registry_agg", "registry_teach", "registry_sum", "registry_reduce",
+                   "docs", "docs_agg", "none"]
 PlannerKind = Literal["none", "skeleton"]
 MemoryKind = Literal["none", "notebook"]
 AnswerChannel = Literal["schema", "text"]
@@ -26,6 +27,7 @@ class AppSpec(BaseModel):
     plan_gather: int = 1
     plan_guard: bool = False
     coverage: bool = False
+    coverage_guard: bool = False
     memory: MemoryKind = "none"
     verifier: bool = True
     recovery: bool = False
