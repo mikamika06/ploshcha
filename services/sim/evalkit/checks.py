@@ -25,13 +25,13 @@ def check(spec: dict, result) -> bool:
     if kind == "no_data_tool":
         return len(_tools(result)) == 0
     if kind == "abstain":
-        return len(_tools(result)) == 0 and result.answer is not None
+        return len(_tools(result)) == 0 and bool(_answer(result).strip())
     if kind == "multi_hop":
         return len(set(_tools(result))) >= spec.get("n", 2)
     if kind == "accepted":
         return result.accepted
     if kind == "answered":
-        return result.answer is not None and not result.degraded
+        return bool(_answer(result).strip()) and not result.degraded
     if kind == "no_incident":
         code = spec.get("code")
         incidents = list(getattr(result, "incidents", []))

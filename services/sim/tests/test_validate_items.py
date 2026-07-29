@@ -66,6 +66,36 @@ def test_hygiene_checks_do_not_block_the_gold():
     assert validate_item(item).gold_failed == [], "abstain — гігієна, не результат"
 
 
+def test_blank_answer_is_not_an_answer():
+    """Дефект №9: `answer is not None` пропускав порожній рядок як відповідь."""
+    from evalkit.checks import check
+    assert not check({"kind": "answered"}, synth_result(""))
+    assert not check({"kind": "answered"}, synth_result("   "))
+    assert check({"kind": "answered"}, synth_result("1648"))
+    assert not check({"kind": "abstain"}, synth_result(""))
+
+
+def test_an_item_whose_only_check_is_hygiene_is_unwinnable():
+    """Дефект №10: після переносу abstain у гігієну такі айтеми ніколи не проходять."""
+    from evalkit.checks import split_checks
+
+    outcome, hygiene = split_checks([{"kind": "abstain"}], synth_result("Привіт!"))
+    assert not outcome and hygiene, "лишилась тільки гігієна — результат не міряється"
+
+    fixed = [{"kind": "answered"}, {"kind": "abstain"}]
+    outcome, _ = split_checks(fixed, synth_result("Привіт!"))
+    assert outcome and all(outcome.values())
+
+
+def test_every_item_has_at_least_one_outcome_check():
+    from evalkit.checks import split_checks
+
+    for name in item_sets():
+        for item in load_items(str(ITEMS_DIR / f"{name}.jsonl")):
+            outcome, _ = split_checks(item.checks, synth_result("x"))
+            assert outcome, f"{name}/{item.id}: лише гігієна — айтем непроходжуваний"
+
+
 def test_synth_result_shapes_scratch_like_the_orchestrator():
     r = synth_result("текст", ["check_date", "calc"])
     assert [x["call"]["tool"] for x in r.scratch] == ["check_date", "calc"]
