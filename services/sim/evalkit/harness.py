@@ -17,6 +17,9 @@ class EvalItem(BaseModel):
     task: str
     checks: list[dict]
     solvable_by: list[str] = Field(default_factory=list)
+    gold: list[str] = Field(default_factory=list)
+    foil: list[str] = Field(default_factory=list)
+    gold_tools: list[str] = Field(default_factory=list)
 
 
 class EvalResult(BaseModel):
