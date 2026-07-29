@@ -74,6 +74,7 @@ COVER: dict[str, AppSpec] = {
     "docs-cover-text@16": DOC.with_(max_steps=16, coverage=True, answer_channel="text"),
     "chain-cover-schema@32": REG.with_(max_steps=32, coverage=True),
     "chain-schema@32": REG.with_(max_steps=32),
+    "chain-cover-rec@32": REG.with_(max_steps=32, coverage=True, recovery=True),
 }
 
 CONDITIONS.update(CHAIN)
@@ -104,7 +105,8 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("chain-schema@16", "chain-cover-schema@16"),
          ("chain-text@16", "chain-cover-text@16"),
          ("docs-schema@16", "docs-cover-schema@16"),
-         ("docs-text@16", "docs-cover-text@16"))
+         ("docs-text@16", "docs-cover-text@16"),
+         ("chain-cover-schema@32", "chain-cover-rec@32"))
 
 
 def _model(routing: str, *, lapa, mamay):

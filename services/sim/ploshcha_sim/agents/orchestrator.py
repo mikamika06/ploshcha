@@ -1,7 +1,12 @@
 import json
 from collections.abc import Callable
 
-from ..domain.coverage import collection_items, mark_fetched, render_pending
+from ..domain.coverage import (
+    collection_items,
+    mark_fetched,
+    render_pending,
+    targets_pending,
+)
 from ..domain.gate import FINAL_TOOL
 from ..domain.recovery import (
     CAPS,
@@ -39,6 +44,7 @@ VERBATIM_WINDOW = 2
 STEP_INSTRUCTION = "Наступний крок — один JSON (виклик інструмента або final_answer):"
 
 PREMATURE_FINAL = "premature_final"
+NO_FINAL = "no_final_answer"
 PLAN_GUARD_CAP = 2
 PLAN_GUARD_HINT = ("У плані ще лишились кроки збору даних. Не завершуй — виклич інструмент "
                    "для наступного елемента, який ще не здобутий.")
@@ -198,8 +204,9 @@ class Orchestrator:
 
             sig = signature(call.tool, call.args)
             duplicate = sig in seen
-            near = not duplicate and self.recovery and is_near_duplicate(
-                call.tool, call.args, history, succeeded=history_ok)
+            iterating = self.coverage and targets_pending(call.args, state.pending)
+            near = (not duplicate and self.recovery and not iterating
+                    and is_near_duplicate(call.tool, call.args, history, succeeded=history_ok))
             if duplicate or near:
                 code = classify(StepOutcome(raw_output=res.text, duplicate=duplicate,
                                             near_duplicate=near))
@@ -226,14 +233,18 @@ class Orchestrator:
                 text, sort = _note_text(entry["call"], result)
                 if notebook.note(text, state.budget.steps_used, sort=sort) is not None:
                     self._emit_memory(state, "mem_write", {"sort": sort, "text": text}, seed)
-            if self.recovery:
-                code = classify(StepOutcome(raw_output=res.text, tool_ok=result.ok,
-                                            tool_known=_tool_known(result)))
-                if code is not None:
-                    self._recover(state, code, cfg, kind, detail=result.error)
+            code = classify(StepOutcome(raw_output=res.text, tool_ok=result.ok,
+                                        tool_known=_tool_known(result)))
+            if code is not None:
+                self._note_incident(notebook, state, code, seed, detail=result.error)
+                self._recover(state, code, cfg, kind, detail=result.error)
 
         if not state.done:
             state.degraded = True
+            if not state.budget.can_continue():
+                self._record(state, "budget_exhausted")
+            elif NO_FINAL not in state.incidents:
+                state.incidents.append(NO_FINAL)
 
         accepted = False
         reason = None
@@ -333,10 +344,6 @@ class Orchestrator:
         state.attempts[key] = state.attempts.get(key, 0) + 1
         if not soft:
             state.recoveries += 1
-        if code in NOT_A_FAILURE:
-            state.notes.append(code)
-        else:
-            state.incidents.append(code)
         plan = build(code, rung, current_max_tokens=cfg.max_tokens, detail=detail)
         if rung == "partial":
             text = partial_answer(state.scratch)
@@ -356,7 +363,20 @@ class Orchestrator:
             state.plan = fresh_plan
         return True
 
+    def _record(self, state: TaskState, code, detail: str | None = None) -> None:
+        """Спостереження ≠ втручання (дефект 18).
+
+        Раніше інцидент фіксувався ВСЕРЕДИНІ `_recover`, який виходить одразу при `recovery=False` —
+        тому в усіх умовах без драбини `incidents` був порожній НЕ через відсутність збоїв, а через
+        відсутність запису. Класифікація тепер безумовна; драбина лише вирішує, чи діяти.
+        """
+        if code is None:
+            return
+        target = state.notes if code in NOT_A_FAILURE else state.incidents
+        target.append(f"{code}:{detail}" if detail and code in NOT_A_FAILURE else code)
+
     def _note_incident(self, notebook, state, code, seed, detail: str | None = None) -> None:
+        self._record(state, code, detail)
         if notebook is None or code is None:
             return
         text = f"збій {code}" + (f": {detail}" if detail else "")

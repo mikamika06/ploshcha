@@ -24,11 +24,17 @@ def _orch(responses, *, recovery, verifier=False, trace=None, strict=True):
     return orch, llm
 
 
-def test_duplicate_without_recovery_keeps_today_behaviour():
+def test_without_recovery_the_incident_is_still_RECORDED():
+    """Дефект 18: раніше тут стояло `incidents == []`, тобто тест ФІКСУВАВ сліпоту як норму.
+
+    Спостереження не залежить від втручання: без драбини збій усе одно видно, просто ніхто його
+    не лікує. Плюс тихий вихід із циклу тепер називає себе (`no_final_answer`).
+    """
     orch, llm = _orch([DUP, DUP], recovery=False)
     r = orch.run("хто такий Іван Мазепа", seed=1, budget=Budget(max_steps=5))
     assert r.answer is None and r.degraded and not r.partial
-    assert r.incidents == []
+    assert r.incidents == ["dup_call", "no_final_answer"]
+    assert r.notes == [], "нічого не лікували — драбина вимкнена"
     assert len(llm.calls) == 2
 
 
@@ -79,10 +85,11 @@ def test_parse_failure_retightens_schema_then_recovers():
     assert "oneOf" in str(llm.calls[1]["schema"])
 
 
-def test_parse_failure_without_recovery_breaks():
+def test_parse_failure_without_recovery_breaks_but_is_visible():
     orch, llm = _orch(["не json"], recovery=False)
     r = orch.run("t", seed=1, budget=Budget(max_steps=5))
-    assert r.degraded and r.answer is None and r.incidents == []
+    assert r.degraded and r.answer is None
+    assert r.incidents == ["not_json", "no_final_answer"]
 
 
 def test_empty_output_classified_not_as_parse_error():
@@ -194,7 +201,7 @@ def test_trace_identical_modulo_latency():
 def test_partial_guard_holds_on_empty_scratch():
     orch, llm = _orch(["не json", "теж не json", "і це не json"], recovery=True)
     r = orch.run("t", seed=1, budget=Budget(max_steps=6))
-    assert r.incidents == ["not_json", "not_json", "not_json"]
+    assert r.incidents == ["not_json", "not_json", "not_json", "no_final_answer"]
     assert r.partial is False and r.answer is None and r.degraded
 
 
@@ -217,7 +224,7 @@ def test_escalate_unavailable_falls_through_to_next_rung():
     orch = Orchestrator(ProfileRouter({"select": llm}), PresetEffort(), FakeToolbox(),
                         verifier=False, recovery=True)
     r = orch.run("t", seed=1, budget=Budget(max_steps=5))
-    assert r.incidents == ["not_json", "not_json"]
+    assert r.incidents == ["not_json", "not_json", "no_final_answer"]
     assert len(llm.calls) == 2
     assert r.degraded and r.answer is None
 

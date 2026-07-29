@@ -99,3 +99,27 @@ def test_runner_keeps_pending_out_of_the_next_run():
         budget=Budget(max_steps=5))
     first, second = runner("t1", 1), runner("t2", 1)
     assert first.steps == second.steps, "залишок не має протікати між прогонами"
+
+
+def test_iteration_is_not_near_duplication():
+    """Дефект 19: обхід колекції класифікувався як майже-дубль, і драбина його гасила."""
+    from ploshcha_sim.domain.coverage import targets_pending
+    from ploshcha_sim.domain.recovery import is_near_duplicate
+
+    history = [("запис", {"ідентифікатор": "зп-1893-01"})]
+    args = {"ідентифікатор": "зп-1893-02"}
+    assert is_near_duplicate("запис", args, history), "детектор справді вважає це майже-дублем"
+    assert targets_pending(args, ["зп-1893-02", "зп-1895-01"]), "але це наступний елемент переліку"
+    assert not targets_pending({"ідентифікатор": "зп-1893-01"}, ["зп-1893-02"]), "здобуте — не ітерація"
+
+
+def test_the_ladder_lets_iteration_through():
+    llm = FakeLlm([LIST_CALL, RECORD, '{"tool": "запис", "ідентифікатор": "зп-1893-02"}',
+                   '{"tool": "запис", "ідентифікатор": "зп-1895-01"}', FINAL])
+    orch = Orchestrator(single_model_router(llm), PresetEffort(),
+                        build_toolbox(AppSpec().with_(toolset="registry")),
+                        verifier=False, coverage=True, recovery=True)
+    result = orch.run("задача", seed=1, budget=Budget(max_steps=8))
+    calls = [x["call"]["tool"] for x in result.scratch]
+    assert calls.count("запис") == 3, f"усі три обходи мусять пройти: {calls}"
+    assert "near_dup_call" not in result.incidents, result.incidents

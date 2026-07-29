@@ -35,3 +35,16 @@ def render_pending(pending: list[str], limit: int = MAX_SHOWN) -> str | None:
     shown = pending[:limit]
     tail = "" if len(pending) <= limit else f" … ще {len(pending) - limit}"
     return f"{PENDING_LABEL} ({len(pending)}): {', '.join(shown)}{tail}"
+
+
+def targets_pending(args: dict, pending: list[str]) -> bool:
+    """Чи цей виклик — наступний елемент оголошеної колекції.
+
+    Дефект 19: `is_near_duplicate` вважає `запис(зп-1893-02)` після `запис(зп-1893-01)` майже тим
+    самим викликом — бо аргументи різняться на кілька символів. Тобто законний обхід колекції
+    класифікувався як збій, і драбина відштовхувала модель від нього (0.000, 1 виклик на прогін).
+    Відповідь дає стан покриття: якщо аргумент указує на елемент, що ЩЕ в залишку, це ітерація.
+    """
+    if not pending:
+        return False
+    return bool({str(v) for v in args.values()} & set(pending))

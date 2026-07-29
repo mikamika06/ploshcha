@@ -80,11 +80,32 @@ def _project(observed: dict, template: dict) -> dict:
             for k, v in template.items()}
 
 
+SANCTIONED = {
+    # Поле: чому його зміна дозволена. Фікстура лишається знятою ДО рефакторингу K4.5 — замість
+    # перезаморозки (яка вбила б цю властивість) навмисні зміни поведінки оголошуються тут.
+    "incidents": "K7f — інцидент фіксується без драбини; фікстура зняла стару сліпоту",
+}
+
+
+def _without_sanctioned(cell: dict) -> dict:
+    return {k: v for k, v in cell.items() if k not in SANCTIONED}
+
+
 def test_every_condition_reproduces_the_frozen_run(expected):
     observed = _observed(_frozen_names(expected))
     assert sorted(observed) == sorted(expected), "склад умов змінився"
-    diff = [k for k in expected if _project(observed[k], expected[k]) != expected[k]]
+    diff = [k for k in expected
+            if _project(_without_sanctioned(observed[k]), _without_sanctioned(expected[k]))
+            != _without_sanctioned(expected[k])]
     assert not diff, f"специфікація змінила поведінку в {len(diff)} клітинках: {diff[:5]}"
+
+
+def test_each_sanctioned_exemption_is_actually_used(expected):
+    """Виняток без розходження — мертвий виняток, який тихо приховує наступну зміну."""
+    observed = _observed(_frozen_names(expected))
+    for field, why in SANCTIONED.items():
+        changed = [k for k in expected if observed[k][field] != expected[k][field]]
+        assert changed, f"виняток «{field}» ({why}) більше не потрібен — прибрати"
 
 
 def test_parity_still_notices_a_dropped_or_changed_field(expected):
