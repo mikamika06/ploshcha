@@ -1,6 +1,7 @@
 from .adapters.memory_notebook import NotebookMemory
 from .adapters.planner_skeleton import SkeletonPlanner
 from .adapters.router_profile import PresetEffort, profile_router, single_model_router
+from .adapters.skills_declared import skillbox
 from .adapters.tools_fake import DEFAULT_TOOLS, FakeToolbox
 from .adapters.tools_registry import AGG_TOOLS, REGISTRY_TOOLS
 from .adapters.tools_ua import UA_TOOLS
@@ -16,6 +17,11 @@ TOOLSETS = {"default": DEFAULT_TOOLS, "ua": UA_TOOLS, "registry": REGISTRY_TOOLS
 
 def build_toolbox(spec: AppSpec) -> FakeToolbox:
     return FakeToolbox(tools=TOOLSETS[spec.toolset])
+
+
+def build_skillbox(spec: AppSpec):
+    """Той самий набір, але з декларацією форми даних (K7-SKILLS)."""
+    return skillbox(spec.toolset, tools=TOOLSETS[spec.toolset])
 
 
 def build_router(spec: AppSpec, *, lapa, mamay):

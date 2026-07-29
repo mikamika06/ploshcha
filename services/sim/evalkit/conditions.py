@@ -1,4 +1,10 @@
-from ploshcha_sim.compose import build_budget, build_orchestrator, build_toolbox
+from ploshcha_sim.compose import (
+    build_budget,
+    build_orchestrator,
+    build_skillbox,
+    build_toolbox,
+)
+from ploshcha_sim.domain.skill import shape_notes
 from ploshcha_sim.domain.spec import AppSpec
 
 from .harness import Runner, gated_runner, orchestrator_runner, single_call_runner
@@ -114,3 +120,19 @@ def prompt_ids(names=None) -> dict[str, str]:
 def spec_shas(names=None) -> dict[str, str]:
     chosen = list(names) if names else list(CONDITIONS)
     return {n: CONDITIONS[n].sha256 for n in chosen}
+
+
+def shape_warnings(names=None) -> dict[str, list[str]]:
+    """Причина, а не лише бал: умова, що дає плоскому циклу колекцію, позначена в звіті.
+
+    Це властивість КОНФІГУРАЦІЇ, не прогону, тому живе на рівні умови — інакше той самий рядок
+    повторювався б у кожній клітинці. Гучно, але не корективно (K7-SKILLS §2).
+    """
+    chosen = list(names) if names else list(CONDITIONS)
+    out = {}
+    for name in chosen:
+        spec = CONDITIONS[name]
+        notes = shape_notes(build_skillbox(spec).skill_specs())
+        if notes and spec.mode != "single":
+            out[name] = notes
+    return out

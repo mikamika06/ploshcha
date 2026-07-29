@@ -20,7 +20,14 @@ def load_env(path):
 
 load_env(ROOT / ".env")
 
-from evalkit.conditions import CONDITIONS, PAIRS, grid, prompt_ids, spec_shas
+from evalkit.conditions import (
+    CONDITIONS,
+    PAIRS,
+    grid,
+    prompt_ids,
+    shape_warnings,
+    spec_shas,
+)
 from evalkit.cost import format_cost
 from evalkit.harness import load_items, run_eval
 from evalkit.report import aggregate, format_report, paired
@@ -67,9 +74,11 @@ def main():
     if limit:
         items = items[:limit]
 
+    warnings = shape_warnings(runners)
     for name, spec in specs.items():
         print(f"{name:<24} spec={spec.sha256} промпт={spec.prompt_id} "
-              f"режим={spec.mode} routing={spec.routing} канал={spec.answer_channel}")
+              f"режим={spec.mode} routing={spec.routing} канал={spec.answer_channel}"
+              + (f"  ⚠ {' '.join(warnings[name])}" if name in warnings else ""))
     print(f"\n{len(items)} задач × {len(runners)} умов × {len(seeds)} seed = "
           f"{len(items) * len(runners) * len(seeds)} прогонів\n")
 
@@ -95,6 +104,7 @@ def main():
         json.dumps({"items": items_name, "seeds": seeds,
                     "specs": {n: s.model_dump(mode="json") | {"sha": s.sha256}
                               for n, s in specs.items()},
+                    "shape_warnings": warnings,
                     "aggregate": aggregate(results),
                     "paired": [paired(results, b, t) for b, t in PAIRS
                                if b in runners and t in runners],
