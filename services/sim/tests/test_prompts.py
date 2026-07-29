@@ -15,13 +15,29 @@ def registry():
 
 
 def test_registry_loads_and_ids_are_unique(registry):
-    assert len(registry) >= 7
-    assert all(pid.startswith("agent/") for pid in registry)
+    assert len(registry) >= 9
+    assert all("/" in pid for pid in registry), "id = slot-family/version"
+    slots = {v.slot for v in registry.values()}
+    assert {"orchestrator", "plain"} <= slots
 
 
 def test_every_sha_matches_its_text(registry):
     for pid, variant in registry.items():
         assert variant.sha256 == variant.digest(), f"{pid}: текст розійшовся зі sha"
+
+
+def test_slots_without_tools_must_not_carry_a_decision_table(registry):
+    plain = registry["lang/plain"]
+    assert plain.slot == "plain" and plain.table == []
+    assert plain.violations() == [], "таблиця досяжності не застосовна там, де немає інструментів"
+    with_table = plain.model_copy(update={"table": _full_table()})
+    assert any(p.startswith("table_on_slot_without_tools") for p in with_table.violations())
+
+
+def test_plain_prompt_never_mentions_tools(registry):
+    head = registry["lang/plain"].head
+    for word in ("інструмент", "final_answer", "check_date", "lookup_fact", "calc", "JSON"):
+        assert word not in head, f"мовний промпт не має згадувати {word}"
 
 
 def test_exactly_one_frozen_orchestrator_prompt(registry):

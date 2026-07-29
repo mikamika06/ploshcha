@@ -5,7 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-Slot = Literal["orchestrator", "verify", "act"]
+Slot = Literal["orchestrator", "verify", "act", "synthesize", "plain"]
+
+TABLE_REQUIRED: frozenset[str] = frozenset({"orchestrator"})
 Status = Literal["frozen", "candidate", "rejected"]
 Placement = Literal["head", "tail", "both"]
 
@@ -59,6 +61,10 @@ class PromptVariant(BaseModel):
 
     def violations(self) -> list[str]:
         found: list[str] = []
+        if self.slot not in TABLE_REQUIRED:
+            if self.table:
+                found.append(f"table_on_slot_without_tools:{self.slot}")
+            return found + self._tail_violations()
         if not self.table:
             found.append("empty_table")
         seen: set[tuple[bool, bool, bool]] = set()
@@ -81,6 +87,10 @@ class PromptVariant(BaseModel):
         for state in CANONICAL_STATES:
             if state not in seen:
                 found.append(f"uncovered_state:{state}")
+        return found + self._tail_violations()
+
+    def _tail_violations(self) -> list[str]:
+        found: list[str] = []
         if self.tail and self.tail_rule is None:
             found.append("tail_without_rule")
         if self.tail_rule is not None and self.tail_rule not in self.rules:
