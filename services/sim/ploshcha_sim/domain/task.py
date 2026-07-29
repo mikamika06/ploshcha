@@ -59,6 +59,7 @@ class TaskState(BaseModel):
     partial: bool = False
     budget: Budget = Field(default_factory=Budget)
     hints: list[str] = Field(default_factory=list)
+    pending: list[str] = Field(default_factory=list)
     overrides: dict = Field(default_factory=dict)
     route_as: str | None = None
     attempts: dict[str, int] = Field(default_factory=dict)

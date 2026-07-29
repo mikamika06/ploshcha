@@ -70,4 +70,5 @@ def build_orchestrator(spec: AppSpec, *, lapa, mamay, system: str | None = None,
         answer_channel=spec.answer_channel,
         answer_instruction=answer_instruction,
         plan_guard=spec.plan_guard,
+        coverage=spec.coverage,
     )

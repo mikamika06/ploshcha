@@ -1,6 +1,7 @@
 import json
 from collections.abc import Callable
 
+from ..domain.coverage import collection_items, mark_fetched, render_pending
 from ..domain.gate import FINAL_TOOL
 from ..domain.recovery import (
     CAPS,
@@ -54,6 +55,9 @@ def _render(state: TaskState, recall=None, verbatim: int | None = None,
     for item in scratch:
         lines.append(f"Виклик: {json.dumps(item['call'], ensure_ascii=False)}")
         lines.append(f"Результат: {json.dumps(item['result'], ensure_ascii=False)}")
+    left = render_pending(state.pending)
+    if left is not None:
+        lines.append(left)
     for hint in state.hints:
         lines.append(f"Підказка: {hint}")
     lines.append(instruction if instruction is not None else STEP_INSTRUCTION)
@@ -103,7 +107,7 @@ class Orchestrator:
                  notebook: Callable[[], Notebook] | None = None,
                  tail: str | None = None, prompt_id: str = "", prompt_sha: str = "",
                  answer_channel: str = "schema", answer_instruction: str | None = None,
-                 plan_guard: bool = False):
+                 plan_guard: bool = False, coverage: bool = False):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -121,6 +125,7 @@ class Orchestrator:
         self.answer_channel = answer_channel
         self.answer_instruction = answer_instruction
         self.plan_guard = plan_guard
+        self.coverage = coverage
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
         state = TaskState(task=task, budget=budget or Budget())
@@ -210,6 +215,8 @@ class Orchestrator:
             history_ok.append(result.ok and _tool_known(result) is not False)
             if result.ok and state.plan is not None:
                 state.plan.advance()
+            if self.coverage and result.ok:
+                self._track_coverage(state, call, result)
             entry = {
                 "call": {"tool": call.tool, **call.args},
                 "result": result.value if result.ok else {"error": result.error},
@@ -262,6 +269,18 @@ class Orchestrator:
                            res.usage.prompt_tokens)
         self._emit(state, "synthesize", llm.model, res, None, None, seed, prompt, "none")
         return res.text.strip()
+
+    def _track_coverage(self, state: TaskState, call, result) -> None:
+        """Залишок роботи як СТАН, а не як формулювання (K7e).
+
+        Колекційний скіл віддав перелік — беремо його як залишок; кожен наступний виклик прибирає
+        те, що запитали. Заміряна стеля 2 виклики (K7c/K7d) може бути наслідком того, що модель
+        бачить минулі виклики, але ніде не бачить, ЧОГО ЩЕ БРАКУЄ.
+        """
+        items = collection_items(result.value)
+        if items and not state.pending:
+            state.pending = items
+        state.pending = mark_fetched(state.pending, call.args)
 
     def _plan_unfinished(self, state: TaskState) -> bool:
         """Заборона відповідати, поки в плані лишились кроки збору (борг 28)."""

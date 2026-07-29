@@ -62,18 +62,34 @@ def test_declarations_reproduce_the_k7c_finding():
     assert collection_skills(aggregate) == []
     assert [s.name for s in aggregate_skills(aggregate)] == ["записи_села"]
 
-    assert iteration_load(collection) == 8, "найбільше село дає 8 записів"
-    assert needs_fanout(collection), "8 > заміряної стелі 2"
+    from ploshcha_sim.adapters.registry_kb import VILLAGES, ids_for
+    biggest = max(len(ids_for(v)) for v in VILLAGES)
+    assert iteration_load(collection) == biggest, "max_items беруться з КБ, не вписуються руками"
+    assert needs_fanout(collection), f"{biggest} > стелі без покриття (2)"
     assert not needs_fanout(aggregate)
-    assert shape_notes(collection) == ["skills:collection=список_записів×8"]
+    assert shape_notes(collection) == [f"skills:collection=список_записів×{biggest}"]
     assert shape_notes(aggregate) == []
 
 
 def test_the_ceiling_is_the_measured_one():
-    assert ITERATION_CEILING == 2, "стеля заміряна в K7c: 2 виклики в 72 прогонах з 72"
+    assert ITERATION_CEILING == 2, "без покриття: 2 виклики в 104 прогонах з 104 (K7c+K7d)"
     small = [SkillSpec(name="s", capability="c", shape="collection", max_items=2)]
     assert not needs_fanout(small), "рівно стеля — ще не потребує fan-out"
     assert needs_fanout([SkillSpec(name="s", capability="c", shape="collection", max_items=3)])
+
+
+def test_the_ceiling_depends_on_the_configuration():
+    """K7e виправив K7c: 2 — властивість циклу БЕЗ відстеження залишку, не системи."""
+    from ploshcha_sim.domain.skill import ITERATION_CEILING_COVERAGE, ceiling_for
+
+    assert ceiling_for() == 2 and ceiling_for(coverage=True) == ITERATION_CEILING_COVERAGE == 8
+    eight = [SkillSpec(name="s", capability="c", shape="collection", max_items=8)]
+    twenty = [SkillSpec(name="s", capability="c", shape="collection", max_items=20)]
+
+    assert needs_fanout(eight), "без покриття 8 елементів цикл не обходить"
+    assert not needs_fanout(eight, coverage=True), "з покриттям 8/8 викликів спостережено"
+    assert needs_fanout(twenty, coverage=True), "на 20 обходу не спостерігалось жодного"
+    assert shape_notes(eight, coverage=True) == [] and shape_notes(eight) != []
 
 
 def test_scoping_keeps_the_answer_capability():
@@ -116,4 +132,6 @@ def test_the_warning_is_loud_but_not_corrective():
     """Реєстр НЕ підміняє колекцію агрегатом: там, де колекція неминуча, підміна б це сховала."""
     box = _box("registry")
     assert [s.name for s in box.specs()] == [t.name for t in TOOLSETS["registry"]]
-    assert box.notes() == ["skills:collection=список_записів×8"]
+    from ploshcha_sim.adapters.registry_kb import VILLAGES, ids_for
+    biggest = max(len(ids_for(v)) for v in VILLAGES)
+    assert box.notes() == [f"skills:collection=список_записів×{biggest}"]

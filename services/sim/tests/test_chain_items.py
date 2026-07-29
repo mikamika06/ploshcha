@@ -12,6 +12,7 @@ VILLAGE_AS_WRITTEN = {
     "sum-03": "Сухому Яру", "max-03": "Сухому Яру", "craft-03": "Сухому Яру",
     "sum-04": "Гайворонці", "missing-04": "Гайворонці",
     "sum-08": "Вербівці", "max-08": "Вербівці", "count-08": "Вербівці",
+    "sum-20": "Великому Лузі",
 }
 
 
@@ -49,7 +50,7 @@ def test_the_toolbox_can_actually_produce_the_gold_answer(toolbox, items):
     """Дефект 6 з V6: еталон проходив предикати, але інструменти НЕ могли його дати."""
     by_id = {i.id: i for i in items}
 
-    for iid in ("sum-03", "sum-04", "sum-08"):
+    for iid in ("sum-03", "sum-04", "sum-08", "sum-20"):
         _, recs = _walk(toolbox, VILLAGE_AS_WRITTEN[iid])
         total = sum(r["сума"] for r in recs if r["сума"] != MISSING)
         outcome, _ = split_checks(by_id[iid].checks, synth_result(str(total),
@@ -94,7 +95,8 @@ def test_declared_chain_length_matches_the_registry(toolbox, items):
 
 def test_the_set_grades_chain_length(items):
     lengths = sorted({i.chain_len for i in items})
-    assert lengths == [6, 7, 11], f"сходинки довжини зникли: {lengths}"
+    assert lengths == [6, 7, 11, 23], f"сходинки довжини зникли: {lengths}"
+    assert lengths[-1] > 2 * lengths[-2], "потрібен набір, помітно довший за стелю з покриттям"
 
 
 def test_the_distractor_is_not_reachable_through_listing(toolbox):

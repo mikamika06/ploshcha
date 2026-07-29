@@ -67,8 +67,18 @@ DOCS: dict[str, AppSpec] = {
     "docs-agg-text@16": DOC.with_(max_steps=16, toolset="docs_agg",
                                   prompt_id="agent/v2-docs-agg", answer_channel="text"),
 }
+COVER: dict[str, AppSpec] = {
+    "chain-cover-schema@16": REG.with_(max_steps=16, coverage=True),
+    "chain-cover-text@16": REG.with_(max_steps=16, coverage=True, answer_channel="text"),
+    "docs-cover-schema@16": DOC.with_(max_steps=16, coverage=True),
+    "docs-cover-text@16": DOC.with_(max_steps=16, coverage=True, answer_channel="text"),
+    "chain-cover-schema@32": REG.with_(max_steps=32, coverage=True),
+    "chain-schema@32": REG.with_(max_steps=32),
+}
+
 CONDITIONS.update(CHAIN)
 CONDITIONS.update(DOCS)
+CONDITIONS.update(COVER)
 
 PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("hetero@8", "gate-notools-mamay"),
@@ -90,7 +100,11 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("chain-text-guard9@16", "chain-text-guard9rec@16"),
          ("docs-schema@16", "docs-text@16"),
          ("docs-text@16", "docs-agg-text@16"),
-         ("docs-agg-schema@16", "docs-agg-text@16"))
+         ("docs-agg-schema@16", "docs-agg-text@16"),
+         ("chain-schema@16", "chain-cover-schema@16"),
+         ("chain-text@16", "chain-cover-text@16"),
+         ("docs-schema@16", "docs-cover-schema@16"),
+         ("docs-text@16", "docs-cover-text@16"))
 
 
 def _model(routing: str, *, lapa, mamay):
@@ -146,7 +160,7 @@ def shape_warnings(names=None) -> dict[str, list[str]]:
     out = {}
     for name in chosen:
         spec = CONDITIONS[name]
-        notes = shape_notes(build_skillbox(spec).skill_specs())
+        notes = shape_notes(build_skillbox(spec).skill_specs(), coverage=spec.coverage)
         if notes and spec.mode != "single":
             out[name] = notes
     return out

@@ -25,6 +25,7 @@ class AppSpec(BaseModel):
     planner: PlannerKind = "none"
     plan_gather: int = 1
     plan_guard: bool = False
+    coverage: bool = False
     memory: MemoryKind = "none"
     verifier: bool = True
     recovery: bool = False
