@@ -8,6 +8,7 @@ from .adapters.router_profile import (
 )
 from .adapters.skills_declared import skillbox
 from .adapters.tools_fake import DEFAULT_TOOLS, FakeToolbox
+from .adapters.tools_lexis import LEXIS_TOOLS
 from .adapters.tools_docs import DOCS_AGG_TOOLS, DOCS_TOOLS, DOCS_YEARS_TOOLS
 from .adapters.tools_registry import (
     AGG_TOOLS,
@@ -34,6 +35,7 @@ TOOLSETS = {"default": DEFAULT_TOOLS, "ua": UA_TOOLS,
             "docs_years": DOCS_YEARS_TOOLS,
             "ua_norm": UA_NORM_TOOLS,
             "reference": REFERENCE_TOOLS,
+            "lexis": LEXIS_TOOLS,
             "none": NO_DATA_TOOLS}
 
 

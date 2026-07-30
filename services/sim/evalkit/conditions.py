@@ -129,6 +129,24 @@ CONDITIONS.update(CHAIN)
 CONDITIONS.update(DOCS)
 CONDITIONS.update(COVER)
 
+# UA3: клас скіла «довідка» на лексиці, якої модель НЕ знає (UA2b показав нуль на загальновідомому).
+# Пара `lex-loop` ↔ `lex-ref@8` різниться ЛИШЕ набором інструментів: та сама модель, той самий режим,
+# та сама стеля кроків. `lex-plain` існує окремо, щоб перевірити, що сама обгортка циклу нічого не
+# змінює, — це емпірична відповідь на питання про конфаунд, а не припущення.
+LEXIS: dict[str, AppSpec] = {
+    "lex-plain": BASE.with_(mode="single", routing="mamay", toolset="none",
+                            prompt_id="lexis/plain"),
+    "lex-loop": BASE.with_(max_steps=8, routing="mamay", toolset="none", prompt_id="lexis/plain"),
+    "lex-ref@8": BASE.with_(max_steps=8, routing="mamay", toolset="lexis",
+                            prompt_id="agent/v2-lexis", answer_channel="text"),
+    "lex-plain-lapa": BASE.with_(mode="single", routing="lapa", toolset="none",
+                                 prompt_id="lexis/plain"),
+    "lex-ref-lapa@8": BASE.with_(max_steps=8, routing="lapa", toolset="lexis",
+                                 prompt_id="agent/v2-lexis", answer_channel="text"),
+}
+CONDITIONS.update(LEXIS)
+
+
 PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("hetero@8", "gate-notools-mamay"),
          ("hetero@8", "gate-tools-hetero"),
@@ -139,6 +157,8 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("lang-mamay", "uanorm@8"),
          ("hetero@8", "ref@8"),
          ("mamay+rec@8", "ref-mamay-rec@8"),
+         ("lex-loop", "lex-ref@8"),
+         ("lex-plain-lapa", "lex-ref-lapa@8"),
          ("chain-schema@16", "chain-text@16"),
          ("chain-schema@8", "chain-text@8"),
          ("chain-text@8", "chain-text@16"),
