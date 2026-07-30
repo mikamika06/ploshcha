@@ -1,4 +1,4 @@
-import type { PloshchaEvent } from "@ploshcha/contract-ts";
+import type { ParsedEvent, RunOutcome, VerdictKind } from "@ploshcha/contract-ts";
 
 export interface VillagerState {
   id: string;
@@ -14,6 +14,13 @@ export interface VillagerState {
 
 export interface ViewState {
   runStatus: "idle" | "running" | "done" | "error";
+  /** Термінальний стан задачі. `abstain` — ЧЕСНА ВІДМОВА, і це не помилка: ядро розрізняє
+   *  «відповів» / «відмовився» / «зламався», тож UI не має права зливати друге з третім. */
+  outcome?: RunOutcome;
+  verdictKind?: VerdictKind;
+  verdictReason?: string;
+  /** Скільком подіям цей фронт не знає типу: контракт additive, тож це нормально, але видимо. */
+  unknownEvents: number;
   sceneName?: string;
   villagers: Map<string, VillagerState>;
   timeOfDay?: string;
@@ -22,19 +29,24 @@ export interface ViewState {
   narration?: string;
 }
 
-export type StoreListener = (ev: PloshchaEvent, state: ViewState) => void;
+export type StoreListener = (ev: ParsedEvent, state: ViewState) => void;
 
 /** Редьюсер подій контракту → queryable ViewState. Слухачі реагують імперативно й/або перечитують стан. */
 export class SimStore {
-  state: ViewState = { runStatus: "idle", villagers: new Map() };
+  state: ViewState = { runStatus: "idle", villagers: new Map(), unknownEvents: 0 };
   private listeners: StoreListener[] = [];
 
   on(l: StoreListener): void {
     this.listeners.push(l);
   }
 
-  apply(ev: PloshchaEvent): void {
+  apply(ev: ParsedEvent): void {
     const s = this.state;
+    if (!ev.known) {
+      s.unknownEvents++;
+      for (const l of this.listeners) l(ev, s);
+      return;
+    }
     switch (ev.type) {
       case "run.started":
         s.runStatus = "running";
@@ -82,6 +94,14 @@ export class SimStore {
         break;
       case "run.error":
         s.runStatus = "error";
+        break;
+      case "verify.verdict":
+        s.verdictKind = ev.payload.kind;
+        s.verdictReason = ev.payload.reason;
+        break;
+      case "task.outcome":
+        s.outcome = ev.payload.outcome;
+        if (ev.payload.verdictKind) s.verdictKind = ev.payload.verdictKind;
         break;
       default:
         break;

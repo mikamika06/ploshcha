@@ -256,6 +256,8 @@ async function boot(): Promise<void> {
   });
 
   store.on((ev) => {
+    // Невідомий тип доїжджає сюди сирим (контракт additive) — сцена свідомо його не малює.
+    if (!ev.known) return;
     switch (ev.type) {
       case "casting.done":
         director.spawn(ev.payload.cast);

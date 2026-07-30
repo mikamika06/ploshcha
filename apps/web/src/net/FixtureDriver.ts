@@ -1,4 +1,4 @@
-import type { PloshchaEvent } from "@ploshcha/contract-ts";
+import type { ParsedEvent } from "@ploshcha/contract-ts";
 import type { EventSourcePort } from "./types";
 import { parseEnvelope } from "./validate";
 
@@ -9,7 +9,7 @@ export class FixtureDriver implements EventSourcePort {
 
   constructor(private lines: string[], private delayMs: number) {}
 
-  subscribe(onEvent: (ev: PloshchaEvent) => void, onEnd?: () => void): () => void {
+  subscribe(onEvent: (ev: ParsedEvent) => void, onEnd?: () => void): () => void {
     let i = 0;
     const step = () => {
       if (this.stopped) return;

@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { PloshchaEvent, EVENT_TYPES } from "./events";
+import { EVENT_TYPES, COGNITION_TYPES, parseLine } from "./events";
 import { SceneSpec } from "./scene";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -14,6 +14,7 @@ const runsDir = join(root, "packages", "fixtures", "runs");
 const scenesDir = join(root, "packages", "fixtures", "scenes");
 
 let errors = 0;
+let unknown = 0;
 const seenTypes = new Set<string>();
 
 // --- scenes ---
@@ -44,16 +45,21 @@ for (const f of readdirSync(runsDir).filter((x) => x.endsWith(".jsonl"))) {
       console.error(`✖ ${f}:${lineNo} invalid JSON`);
       continue;
     }
-    const r = PloshchaEvent.safeParse(obj);
-    if (!r.success) {
+    const parsed = parseLine(line);
+    if (!parsed.ok) {
       errors++;
-      console.error(`✖ ${f}:${lineNo} (${(obj as { type?: string }).type}):`, JSON.stringify(r.error.issues.slice(0, 2)));
+      console.error(`✖ ${f}:${lineNo} (${(obj as { type?: string }).type}): ${parsed.reason} ${parsed.detail ?? ""}`);
       continue;
     }
-    seenTypes.add(r.data.type);
-    if (r.data.seq !== expectSeq) {
+    const e = parsed.event;
+    if (e.known) {
+      seenTypes.add(e.type);
+    } else {
+      unknown++;
+    }
+    if (e.seq !== expectSeq) {
       errors++;
-      console.error(`✖ ${f}:${lineNo} seq gap: expected ${expectSeq}, got ${r.data.seq}`);
+      console.error(`✖ ${f}:${lineNo} seq gap: expected ${expectSeq}, got ${e.seq}`);
     }
     expectSeq++;
     ok++;
@@ -63,6 +69,9 @@ for (const f of readdirSync(runsDir).filter((x) => x.endsWith(".jsonl"))) {
 
 // --- coverage ---
 const missing = EVENT_TYPES.filter((t) => !seenTypes.has(t));
+const cognition = COGNITION_TYPES.filter((t) => seenTypes.has(t));
 console.log(`\nПокриття типів: ${seenTypes.size}/${EVENT_TYPES.length}${missing.length ? ` (нема: ${missing.join(", ")})` : " — усі"}`);
+console.log(`Когнітивний ярус: ${cognition.length}/${COGNITION_TYPES.length}`);
+console.log(`Невідомих типів пережито: ${unknown} (двошаровий розбір: конверт валідний, payload сирий)`);
 console.log(errors ? `✖ ${errors} помилк(и)` : `✓ усі фікстури валідні`);
 process.exit(errors ? 1 : 0);
