@@ -3,6 +3,7 @@ from typing import Callable
 
 from pydantic import BaseModel
 
+from ..domain.arith import evaluate
 from ..ports.tool import ToolCall, ToolPort, ToolResult, ToolSpec
 
 EVENT_YEARS = {
@@ -84,9 +85,7 @@ def _lookup_fact(a: LookupFactArgs) -> dict:
 
 
 def _calc(a: CalcArgs) -> dict:
-    if not set(a.expr) <= set("0123456789+-*/(). "):
-        raise ValueError("disallowed characters")
-    return {"result": eval(a.expr, {"__builtins__": {}}, {})}
+    return {"result": evaluate(a.expr)}
 
 
 def _final_answer(a: FinalAnswerArgs) -> dict:

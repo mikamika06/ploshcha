@@ -17,6 +17,7 @@ from .adapters.tools_registry import (
     REGISTRY_TOOLS,
 )
 from .adapters.tools_ua import UA_TOOLS
+from .adapters.tools_ua_norm import UA_NORM_TOOLS
 from .agents import Orchestrator
 from .domain.gate import FINAL_TOOL
 from .domain.spec import AppSpec
@@ -30,6 +31,7 @@ TOOLSETS = {"default": DEFAULT_TOOLS, "ua": UA_TOOLS,
             "registry_reduce": REGISTRY_REDUCE_TOOLS,
             "docs": DOCS_TOOLS, "docs_agg": DOCS_AGG_TOOLS,
             "docs_years": DOCS_YEARS_TOOLS,
+            "ua_norm": UA_NORM_TOOLS,
             "none": NO_DATA_TOOLS}
 
 

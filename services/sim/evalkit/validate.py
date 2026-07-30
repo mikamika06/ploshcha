@@ -16,7 +16,7 @@ ITEM_SET_TOOLSETS: dict[str, tuple[str, ...]] = {
     "starter": ("default",),
     "recover": ("default",),
     "audit": ("default", "ua"),
-    "ua-lang": ("default", "none"),
+    "ua-lang": ("default", "none", "ua_norm"),
     "ua-extract": ("default", "none"),
     "chain": ("registry", "registry_agg", "registry_teach", "registry_sum", "registry_reduce"),
     "docs": ("docs", "docs_agg", "docs_years"),

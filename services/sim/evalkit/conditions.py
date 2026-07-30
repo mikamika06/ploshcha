@@ -23,8 +23,12 @@ CONDITIONS: dict[str, AppSpec] = {
     "hetero@8": BASE.with_(max_steps=8),
     "hetero+rec@8": BASE.with_(max_steps=8, recovery=True),
     "hetero-nov@8": BASE.with_(max_steps=8, verifier=False),
-    "gate-notools-mamay": BASE.with_(mode="gated", toolset="none", gate_direct="mamay", max_steps=8),
-    "gate-notools-lapa": BASE.with_(mode="gated", toolset="none", gate_direct="lapa", max_steps=8),
+    # `lang/plain`, бо в цих умовах інструментів даних НЕМА — тул-агентний промпт перелічував би
+    # інструменти, яких не існує. Саме так вони й міряні в K7 (0.846 → 0.923 на `ua-lang`).
+    "gate-notools-mamay": BASE.with_(mode="gated", toolset="none", gate_direct="mamay",
+                                     max_steps=8, prompt_id="lang/plain"),
+    "gate-notools-lapa": BASE.with_(mode="gated", toolset="none", gate_direct="lapa",
+                                    max_steps=8, prompt_id="lang/plain"),
     "gate-tools-hetero": BASE.with_(mode="gated", toolset="default", gate_direct="mamay", max_steps=8),
     "hetero-plan@8": BASE.with_(max_steps=8, planner="skeleton"),
     "hetero-textans@8": BASE.with_(max_steps=8, planner="skeleton", answer_channel="text"),
@@ -33,7 +37,24 @@ CONDITIONS: dict[str, AppSpec] = {
     "hetero-ua-tools@8": BASE.with_(max_steps=8, toolset="ua", prompt_id=UA),
     "hetero-ua-textans@8": BASE.with_(max_steps=8, toolset="ua", prompt_id=UA,
                                        answer_channel="text"),
+    "uanorm@8": BASE.with_(max_steps=8, toolset="ua_norm", prompt_id="agent/v2-uanorm",
+                           answer_channel="text"),
 }
+
+# Мовні набори не мають інструментів даних, тому потребують промпту слота `plain`.
+# K4.5 це втратив: решітка успадкувала `agent/v2` (тул-агентний) від starter-подібних умов,
+# і прогін `ua-lang` міряв 0.654 замість 0.923 — не регрес моделі, а не той промпт.
+PLAIN: dict[str, AppSpec] = {
+    "lang-mamay": BASE.with_(mode="single", routing="mamay", toolset="none",
+                             prompt_id="lang/plain"),
+    "lang-lapa": BASE.with_(mode="single", routing="lapa", toolset="none",
+                            prompt_id="lang/plain"),
+    "extract-mamay": BASE.with_(mode="single", routing="mamay", toolset="none",
+                                prompt_id="extract/plain"),
+    "extract-lapa": BASE.with_(mode="single", routing="lapa", toolset="none",
+                               prompt_id="extract/plain"),
+}
+CONDITIONS.update(PLAIN)
 
 REG = BASE.with_(toolset="registry", prompt_id="agent/v2-reg")
 CHAIN: dict[str, AppSpec] = {
@@ -108,6 +129,7 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("hetero@8", "hetero-textfull@8"),
          ("hetero-textans@8", "hetero-ua-textans@8"),
          ("hetero@8", "hetero-ua-tools@8"),
+         ("lang-mamay", "uanorm@8"),
          ("chain-schema@16", "chain-text@16"),
          ("chain-schema@8", "chain-text@8"),
          ("chain-text@8", "chain-text@16"),

@@ -87,6 +87,15 @@ SANCTIONED = {
 }
 
 
+SANCTIONED_CONDITIONS = {
+    # Умова була НЕПРАВИЛЬНО налаштована на момент заморозки: `toolset="none"` з тул-агентним
+    # промптом, який перелічує інструменти, яких немає. K7 міряв її під `lang/plain`; після K4.5
+    # решітка успадкувала `agent/v2`, і заголовкове число K7 перестало відтворюватись.
+    "gate-notools-mamay": "K7-repro — промпт повернуто на lang/plain (структурне правило слота)",
+    "gate-notools-lapa": "K7-repro — те саме",
+}
+
+
 def _without_sanctioned(cell: dict) -> dict:
     return {k: v for k, v in cell.items() if k not in SANCTIONED}
 
@@ -95,9 +104,20 @@ def test_every_condition_reproduces_the_frozen_run(expected):
     observed = _observed(_frozen_names(expected))
     assert sorted(observed) == sorted(expected), "склад умов змінився"
     diff = [k for k in expected
-            if _project(_without_sanctioned(observed[k]), _without_sanctioned(expected[k]))
+            if k.split("|", 1)[0] not in SANCTIONED_CONDITIONS
+            and _project(_without_sanctioned(observed[k]), _without_sanctioned(expected[k]))
             != _without_sanctioned(expected[k])]
     assert not diff, f"специфікація змінила поведінку в {len(diff)} клітинках: {diff[:5]}"
+
+
+def test_each_sanctioned_condition_really_diverges(expected):
+    """Виняток рівня умови мусить відповідати реальному розходженню, інакше він мертвий."""
+    observed = _observed(_frozen_names(expected))
+    for cond, why in SANCTIONED_CONDITIONS.items():
+        cells = [k for k in expected if k.startswith(cond + "|")]
+        assert cells, f"{cond} немає у фікстурі — виняток зайвий"
+        assert any(observed[k] != expected[k] for k in cells), (
+            f"виняток «{cond}» ({why}) більше не потрібен — прибрати")
 
 
 def test_each_sanctioned_exemption_is_actually_used(expected):

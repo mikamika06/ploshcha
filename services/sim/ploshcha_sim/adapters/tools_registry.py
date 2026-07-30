@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from ..domain.arith import ArithError, evaluate
+
 from .registry_kb import DISTRACTOR, FIELDS, MISSING, RECORDS, VILLAGES, ids_for
 from .tools_fake import FinalAnswerArgs, Tool, _final_answer, _lemma_set
 
@@ -54,9 +56,7 @@ def _запис(a: ЗаписArgs) -> dict:
 
 
 def _обчислити(a: ОбчисленняArgs) -> dict:
-    if not set(a.вираз) <= set("0123456789+-*/(). "):
-        raise ValueError("заборонені символи")
-    return {"результат": eval(a.вираз, {"__builtins__": {}}, {})}
+    return {"результат": evaluate(a.вираз)}
 
 
 def _записи_села(a: СписокArgs) -> dict:
@@ -80,13 +80,12 @@ def _обчислити_teach(a: ОбчисленняArgs) -> dict:
     ідентифікаторів, отримувала «заборонені символи» й повторювала те саме тричі, поки драбина
     не здавалась. Текст помилки не казав ні що дозволено, ні як виправити.
     """
-    bad = sorted(set(a.вираз) - set(ALLOWED_CHARS))
-    if bad:
+    try:
+        return {"результат": evaluate(a.вираз)}
+    except ArithError as exc:
         raise ValueError(
-            f"приймаю лише числа й {' '.join('+-*/().')} — наприклад «62+41+88». "
-            f"Заборонені символи: {''.join(bad)[:20]}. "
-            f"Спершу дістань числа з потрібних записів, потім передай їх як арифметичний вираз")
-    return {"результат": eval(a.вираз, {"__builtins__": {}}, {})}
+            f"{exc} — наприклад «62+41+88». Спершу дістань числа з потрібних записів, "
+            f"потім передай їх як арифметичний вираз") from exc
 
 
 def _запис_teach(a: ЗаписArgs) -> dict:

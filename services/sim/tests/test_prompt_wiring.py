@@ -121,7 +121,7 @@ def test_by_prompt_and_sensitivity_math():
     assert "spread=" in format_prompt_report(rows)
 
 
-CANDIDATE_ON_PURPOSE = {"agent/v2-ua", "agent/v2-reg", "agent/v2-iter", "agent/v2-agg", "agent/v2-docs", "agent/v2-docs-agg", "agent/v2-sum", "agent/v2-reduce", "agent/v2-docs-years", "answer/full"}
+CANDIDATE_ON_PURPOSE = {"agent/v2-ua", "agent/v2-reg", "agent/v2-iter", "agent/v2-agg", "agent/v2-docs", "agent/v2-docs-agg", "agent/v2-sum", "agent/v2-reduce", "agent/v2-docs-years", "agent/v2-uanorm", "answer/full"}
 
 
 def test_frozen_prompt_is_the_one_eval_uses():
@@ -139,3 +139,25 @@ def test_frozen_prompt_is_the_one_eval_uses():
             if variant.status != "frozen":
                 assert pid in CANDIDATE_ON_PURPOSE, (
                     f"{name} тихо взяв незаморожений промпт {pid} ({variant.status})")
+
+
+def test_the_prompt_slot_must_fit_the_toolset():
+    """K4.5 тихо втратив прив'язку промпту до набору: `ua-lang` міряли тул-агентним промптом.
+
+    Структурна перевірка замість покладання на уважність: якщо в наборі немає інструментів даних,
+    промпт мусить бути слота `plain` (він не перелічує інструментів); якщо є — `orchestrator`.
+    Це той самий клас, що дефект 7 із V6, лише на рівні решітки, а не окремої умови.
+    """
+    from evalkit.conditions import CONDITIONS
+    from ploshcha_sim.compose import build_toolbox
+    from ploshcha_sim.domain.gate import needs_loop
+
+    wrong = []
+    for name, spec in CONDITIONS.items():
+        slot = resolve(spec.prompt_id).slot
+        has_data = needs_loop(build_toolbox(spec).specs())
+        if has_data and slot != "orchestrator":
+            wrong.append(f"{name}: є інструменти, але промпт слота «{slot}»")
+        if not has_data and slot == "orchestrator":
+            wrong.append(f"{name}: немає інструментів, а промпт перелічує їх ({spec.prompt_id})")
+    assert not wrong, wrong

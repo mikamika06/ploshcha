@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from ..domain.arith import evaluate
+
 from .tools_fake import EVENT_YEARS, FACTS, FinalAnswerArgs, Tool, _final_answer, _match
 
 
@@ -27,9 +29,7 @@ def _знайти_факт(a: ПошукФактуArgs) -> dict:
 
 
 def _обчислити(a: ОбчисленняArgs) -> dict:
-    if not set(a.вираз) <= set("0123456789+-*/(). "):
-        raise ValueError("заборонені символи")
-    return {"результат": eval(a.вираз, {"__builtins__": {}}, {})}
+    return {"результат": evaluate(a.вираз)}
 
 
 UA_TOOLS = [

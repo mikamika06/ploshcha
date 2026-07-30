@@ -113,7 +113,9 @@ def test_tool_error_hint_carries_detail():
     orch, llm = _orch([bad, FINAL], recovery=True)
     r = orch.run("t", seed=1, budget=Budget(max_steps=5))
     assert r.incidents == ["tool_error"]
-    assert "disallowed characters" in llm.calls[1]["prompt"]
+    hint = llm.calls[1]["prompt"]
+    assert "не арифметичний вираз" in hint, "деталь помилки мусить доїхати в підказку"
+    assert "приймаю лише числа" in hint, "K10: помилка sandbox називає контракт, а не «disallowed»"
 
 
 def test_reasking_after_unknown_is_not_a_near_duplicate():

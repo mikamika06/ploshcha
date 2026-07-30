@@ -13,6 +13,7 @@ from .tools_registry import (
     REGISTRY_TOOLS,
 )
 from .tools_ua import UA_TOOLS
+from .tools_ua_norm import UA_NORM_TOOLS
 
 BIGGEST_VILLAGE = max(len(ids_for(v)) for v in VILLAGES)
 LONGEST_DOC = max(len(doc_ids(d)) for d in DOCUMENTS)
@@ -72,6 +73,15 @@ DOCS_YEARS_DECLARED = {
                                 shape="aggregate", cost_hint=3),
 }
 
+UA_NORM_DECLARED = {
+    "виправити_кальку": SkillSpec(name="виправити_кальку", capability="lang.calque",
+                                  shape="aggregate", cost_hint=1),
+    "кличний": SkillSpec(name="кличний", capability="lang.vocative", shape="scalar"),
+    "милозвучність": SkillSpec(name="милозвучність", capability="lang.euphony", shape="scalar"),
+    "фемінітив": SkillSpec(name="фемінітив", capability="lang.feminitive", shape="scalar"),
+    "правопис": SkillSpec(name="правопис", capability="lang.spelling2019", shape="scalar"),
+}
+
 DECLARED = {
     "default": (DEFAULT_TOOLS, DEFAULT_DECLARED),
     "ua": (UA_TOOLS, UA_DECLARED),
@@ -83,6 +93,7 @@ DECLARED = {
     "docs": (DOCS_TOOLS, DOCS_DECLARED),
     "docs_agg": (DOCS_AGG_TOOLS, DOCS_AGG_DECLARED),
     "docs_years": (DOCS_YEARS_TOOLS, DOCS_YEARS_DECLARED),
+    "ua_norm": (UA_NORM_TOOLS, UA_NORM_DECLARED),
 }
 
 
