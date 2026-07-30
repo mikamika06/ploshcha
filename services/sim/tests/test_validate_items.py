@@ -198,3 +198,22 @@ def test_report_names_the_defect():
     strict = _item([{"kind": "answer_contains", "value": "хибно"}])
     text = format_report("t", [validate_item(strict)])
     assert "еталон НЕ проходить" in text
+
+
+def test_every_refusal_item_uses_the_shared_vocabulary():
+    """Словник відмови розходився двічі: у `lexis` бракувало «немає тлумачення», у `audit` —
+    «немає інформації», і обидва рази ПРАВИЛЬНА відповідь читалась як провал. Один список на всі
+    набори, інакше наступне формулювання знову проґавимо."""
+    from evalkit.refusal import ADMIT
+
+    wrong = []
+    for name in item_sets():
+        for item in load_items(str(ITEMS_DIR / f"{name}.jsonl")):
+            if "absent" not in item.id and "abstain" not in item.id:
+                continue
+            for spec in item.checks:
+                if spec["kind"] != "answer_contains_any":
+                    continue
+                if any(v in ADMIT for v in spec["values"]) and spec["values"] != ADMIT:
+                    wrong.append(f"{name}/{item.id}: власний список замість спільного")
+    assert not wrong, wrong

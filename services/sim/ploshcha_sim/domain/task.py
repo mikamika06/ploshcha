@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from .evidence import Outcome
 
 
 class Budget(BaseModel):
@@ -73,6 +74,9 @@ class TaskResult(BaseModel):
     answer: str | None = None
     accepted: bool = False
     verdict_reason: str | None = None
+    verdict_kind: str | None = None
+    outcome: Outcome = "answer"
+    evidence: bool | None = None
     degraded: bool = False
     partial: bool = False
     steps: int = 0

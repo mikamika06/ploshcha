@@ -42,6 +42,9 @@ class EvalResult(BaseModel):
     tokens_by_lane: dict[str, int] = Field(default_factory=dict)
     prompt_by_lane: dict[str, int] = Field(default_factory=dict)
     accepted: bool = False
+    verdict_kind: str | None = None
+    outcome: str = "answer"
+    evidence: bool | None = None
     degraded: bool = False
     partial: bool = False
     incidents: list[str] = Field(default_factory=list)
@@ -118,6 +121,8 @@ def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int]
                     tokens_by_lane=dict(getattr(result, 'tokens_by_lane', {}) or {}),
                     prompt_by_lane=dict(getattr(result, 'prompt_by_lane', {}) or {}),
                     accepted=result.accepted, degraded=result.degraded, partial=result.partial,
+                    verdict_kind=result.verdict_kind, outcome=result.outcome,
+                    evidence=result.evidence,
                     incidents=list(result.incidents), notes=list(result.notes),
                     tools=[x["call"]["tool"] for x in result.scratch],
                     answer=result.answer,

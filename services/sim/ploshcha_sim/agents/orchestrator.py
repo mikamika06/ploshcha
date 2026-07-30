@@ -7,8 +7,10 @@ from ..domain.coverage import (
     render_pending,
     targets_pending,
 )
-from ..domain.gate import FINAL_TOOL
+from ..domain.evidence import evidence_state, found_in, outcome_of
+from ..domain.gate import FINAL_TOOL, needs_loop
 from ..domain.recovery import (
+    ABSENT_HINT,
     CAPS,
     NOT_A_FAILURE,
     attempt_key,
@@ -98,10 +100,10 @@ def _note_text(call: dict, result) -> tuple[str, str]:
 
 
 def _tool_known(result) -> bool | None:
-    if not result.ok or not isinstance(result.value, dict):
+    """Читаємо з контракту порту; payload лишається запасним шляхом для незмігрованих адаптерів."""
+    if not result.ok:
         return None
-    known = result.value.get("known", result.value.get("відомо"))
-    return known if isinstance(known, bool) else None
+    return result.found if result.found is not None else found_in(result.value)
 
 
 class LinearPlanner(Planner):
@@ -118,7 +120,7 @@ class Orchestrator:
                  tail: str | None = None, prompt_id: str = "", prompt_sha: str = "",
                  answer_channel: str = "schema", answer_instruction: str | None = None,
                  plan_guard: bool = False, coverage: bool = False,
-                 coverage_guard: bool = False):
+                 coverage_guard: bool = False, verify_mode: str = "basic"):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -138,6 +140,8 @@ class Orchestrator:
         self.plan_guard = plan_guard
         self.coverage = coverage
         self.coverage_guard = coverage_guard
+        self.verify_mode = verify_mode
+        self.has_data_tools = needs_loop(tools.specs())
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
         state = TaskState(task=task, budget=budget or Budget())
@@ -250,6 +254,8 @@ class Orchestrator:
                 text, sort = _note_text(entry["call"], result)
                 if notebook.note(text, state.budget.steps_used, sort=sort) is not None:
                     self._emit_memory(state, "mem_write", {"sort": sort, "text": text}, seed)
+            if _tool_known(result) is False and ABSENT_HINT not in state.hints:
+                state.hints.append(ABSENT_HINT)
             code = classify(StepOutcome(raw_output=res.text, tool_ok=result.ok,
                                         tool_known=_tool_known(result)))
             if code is not None:
@@ -263,21 +269,26 @@ class Orchestrator:
             elif NO_FINAL not in state.incidents:
                 state.incidents.append(NO_FINAL)
 
+        evidence = evidence_state(state.scratch)
+        grounding = "required" if self.has_data_tools else "optional"
         accepted = False
         reason = None
+        kind = None
         if state.done and not state.partial and self.verifier:
             verdict = run_verify(task, state.answer, self.router, self.effort,
-                                 evidence=state.scratch, seed=seed, trace=self.trace, run_id=self.run_id)
+                                 evidence=state.scratch, seed=seed, trace=self.trace,
+                                 run_id=self.run_id, mode=self.verify_mode,
+                                 grounding=grounding, absent=evidence is False)
             state.budget.spend_aux(verdict.tokens, self.router.lane("judge"))
-            accepted = verdict.accepted
-            reason = verdict.reason
-            if not accepted:
-                state.degraded = True
+            accepted, reason, kind = verdict.accepted, verdict.reason, verdict.kind
         elif state.done and not state.partial:
             accepted = True
 
         return TaskResult(
             answer=state.answer, accepted=accepted, verdict_reason=reason,
+            verdict_kind=kind, evidence=evidence,
+            outcome=outcome_of(state.answer, degraded=state.degraded, partial=state.partial,
+                               evidence=evidence),
             degraded=state.degraded, partial=state.partial, steps=state.budget.steps_used,
             tokens=state.budget.tokens_used, aux_tokens=state.budget.aux_tokens,
             tokens_by_lane=dict(sorted(state.budget.tokens_by_lane.items())),

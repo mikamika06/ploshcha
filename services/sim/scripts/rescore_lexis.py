@@ -53,7 +53,8 @@ def main() -> int:
             old[row["condition"]][row["item_id"]] = bool(row["success"])
             tokens[row["condition"]].append(row["tokens"])
             if items[row["item_id"]]["category"] == "lexis_absent":
-                verdict[row["condition"]].append(not row["degraded"])
+                verdict[row["condition"]].append((bool(row.get("accepted")),
+                                                  row.get("verdict_kind"), ok))
             if ok != bool(row["success"]):
                 flips.append((row["condition"], row["item_id"], bool(row["success"]), ok))
 
@@ -68,9 +69,16 @@ def main() -> int:
         avg = sum(tokens[name]) / len(tokens[name])
         print(f"{name:<20}{parts[0]:>14}{parts[1]:>12}{parts[2]:>14}{parts[3]:>14}{avg:>9.0f}")
 
-    print("\nвердикт верифікатора на страті «поза довідником» (окрема вісь: чи прийняв ВІН відмову):")
+    print("\nвісь СУДДІ на страті «поза довідником» (згода з правдою, а не сам вердикт):")
     for name, votes in verdict.items():
-        print(f"  {name:<20} прийнято {sum(votes)}/{len(votes)}")
+        agree = sum(1 for acc, _, ok in votes if acc == ok)
+        fa = sum(1 for acc, _, ok in votes if acc and not ok)
+        fr = sum(1 for acc, _, ok in votes if ok and not acc)
+        kinds = {}
+        for _, kind, _ in votes:
+            kinds[kind or "—"] = kinds.get(kind or "—", 0) + 1
+        print(f"  {name:<20} згода {agree}/{len(votes)}  хибно прийняв {fa}  "
+              f"хибно відкинув {fr}  {kinds}")
 
     if flips:
         print("\nкорекція оцінювання (було -> стало):")

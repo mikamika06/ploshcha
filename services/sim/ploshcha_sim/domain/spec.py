@@ -12,6 +12,7 @@ Toolset = Literal["default", "ua", "registry", "registry_agg", "registry_teach",
 PlannerKind = Literal["none", "skeleton"]
 MemoryKind = Literal["none", "notebook"]
 AnswerChannel = Literal["schema", "text"]
+VerifyMode = Literal["basic", "grounded", "auto"]
 
 
 class AppSpec(BaseModel):
@@ -31,6 +32,7 @@ class AppSpec(BaseModel):
     coverage_guard: bool = False
     memory: MemoryKind = "none"
     verifier: bool = True
+    verify_mode: VerifyMode = "basic"
     recovery: bool = False
     max_steps: int = 5
     max_tokens: int = 512

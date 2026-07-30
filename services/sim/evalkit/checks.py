@@ -46,6 +46,12 @@ def check(spec: dict, result) -> bool:
         return len(_tools(result)) == 0
     if kind == "abstain":
         return len(_tools(result)) == 0 and bool(_answer(result).strip())
+    if kind == "outcome_is":
+        return getattr(result, "outcome", "answer") == spec["value"]
+    if kind == "not_rejected":
+        return bool(getattr(result, "accepted", False))
+    if kind == "verdict_kind_in":
+        return getattr(result, "verdict_kind", None) in set(spec["kinds"])
     if kind == "multi_hop":
         return len(set(_tools(result))) >= spec.get("n", 2)
     if kind == "accepted":
@@ -74,9 +80,11 @@ def check(spec: dict, result) -> bool:
     raise ValueError(f"unknown check kind: {kind}")
 
 
+# `not_rejected` і `verdict_kind_in` — гігієна СВІДОМО: це думка верифікатора, а не результат задачі.
+# Змішавши їх з результатом, ми знову міряли б суддю замість моделі (K9: страта чесних відмов 0/8).
 HYGIENE_KINDS = frozenset({
     "no_incident", "tool_calls_at_most", "tool_calls_at_least", "not_partial", "steps_between",
-    "abstain", "no_data_tool",
+    "abstain", "no_data_tool", "not_rejected", "verdict_kind_in",
 })
 
 

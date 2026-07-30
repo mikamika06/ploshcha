@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from ..domain.arith import evaluate
 from ..ports.tool import ToolCall, ToolPort, ToolResult, ToolSpec
+from ..domain.evidence import found_in
 
 EVENT_YEARS = {
     "початок Хмельниччини": 1648,
@@ -119,6 +120,6 @@ class FakeToolbox(ToolPort):
         except Exception as e:
             value, ok, err = None, False, f"{type(e).__name__}: {e}"
         return ToolResult(
-            tool=request.tool, ok=ok, value=value, error=err,
+            tool=request.tool, ok=ok, value=value, error=err, found=found_in(value),
             latency_ms=int((time.perf_counter() - t0) * 1000),
         )

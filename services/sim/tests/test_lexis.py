@@ -92,11 +92,14 @@ def test_the_held_out_words_are_really_missing_from_the_reference():
 
 def test_the_abstain_items_never_accept_a_definition(items):
     """Еталон тут — визнання незнання, тому жоден ключ не має бути тлумаченням."""
+    from evalkit.refusal import ADMIT
+
     for item in items:
         if item["category"] != "lexis_absent":
             continue
         values = next(c["values"] for c in item["checks"] if c["kind"] == "answer_contains_any")
-        assert all(v.startswith(("не", "нема", "відсутн")) for v in values), item["id"]
+        assert values == ADMIT, item["id"]
+    assert all(v.startswith(("не", "нема", "відсутн", "null")) for v in ADMIT)
 
 
 def test_no_accepted_key_is_present_in_the_task_sentence(items):

@@ -161,6 +161,13 @@ def overrides_for(rung: Rung, current_max_tokens: int) -> dict:
 
 _FINISH_FIRST = "Заверши через final_answer, або зроби ІНШИЙ виклик"
 
+# Відсутність даних доходить до моделі НЕЗАЛЕЖНО від драбини: драбина лікує збої, а «нема статті» —
+# це нормальний результат пошуку. Доки цей текст жив лише в рунзі `nudge`, при вимкненому відновленні
+# модель не дізнавалась про відсутність, повторювала виклик і вмирала на `dup_call`.
+ABSENT_HINT = ("Інструмент відпрацював і повідомив, що даних НЕМА. Це нормальний результат: не "
+               "повторюй той самий виклик і не вигадуй відповідь — заверши через final_answer, "
+               "чесно написавши, що потрібних даних у джерелі немає.")
+
 HINTS: dict[IncidentCode, str] = {
     "dup_call": f"{_FINISH_FIRST}: цей самий виклик уже зроблено, його результат вище.",
     "near_dup_call": f"{_FINISH_FIRST}: подібний виклик уже зроблено, перефразування не додасть нового.",
@@ -191,12 +198,26 @@ def build(code: IncidentCode, rung: Rung, *, current_max_tokens: int = 256,
 
 
 def partial_answer(scratch: list[dict]) -> str | None:
+    """Часткова відповідь — це текст для людини, а НЕ дамп payload.
+
+    Досі рунга вивалювала сирий JSON інструментів, і тоді будь-який змістовий чек проходив
+    тривіально (потрібне значення лежало всередині дампа), а на страті чесної відмови дамп ще й
+    видавав службову структуру замість відповіді. Тепер віддаємо перелік того, ЩО питали і чи
+    знайшлось, без самих даних; самі дані лишаються в трасі.
+    """
     if not scratch:
         return None
+    from .evidence import found_in
+
     lines = []
     for entry in scratch:
         call = entry.get("call", {})
-        result = entry.get("result")
         tool = call.get("tool", "?")
-        lines.append(f"{tool}: {json.dumps(result, ensure_ascii=False)}")
-    return "Часткова відповідь на основі здобутого:\n" + "\n".join(lines)
+        args = ", ".join(f"{k}={v}" for k, v in call.items() if k != "tool")
+        flag = entry.get("found")
+        if flag is None:
+            flag = found_in(entry.get("result"))
+        state = {True: "знайдено", False: "не знайдено"}.get(flag, "виконано")
+        lines.append(f"— {tool}({args}): {state}" if args else f"— {tool}: {state}")
+    return ("Завершити не вдалося. Ось що встиг зробити (самі дані — у трасі):\n"
+            + "\n".join(lines))

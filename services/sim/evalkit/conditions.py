@@ -150,7 +150,23 @@ LEXIS: dict[str, AppSpec] = {
     "lex-ref-lapa-rec@8": BASE.with_(max_steps=8, routing="lapa", toolset="lexis",
                                      prompt_id="agent/v2-lexis", answer_channel="text",
                                      recovery=True),
+    # K9: той самий прогін із заземленим суддею. Пара різниться ЛИШЕ режимом верифікатора, тому
+    # різниця — це саме він, а не інша модель чи інший набір інструментів.
+    "lex-ref-vg@8": BASE.with_(max_steps=8, routing="mamay", toolset="lexis",
+                               prompt_id="agent/v2-lexis", answer_channel="text",
+                               verify_mode="grounded"),
+    "lex-ref-lapa-vg@8": BASE.with_(max_steps=8, routing="lapa", toolset="lexis",
+                                    prompt_id="agent/v2-lexis", answer_channel="text",
+                                    verify_mode="grounded"),
+    "lex-loop-vg": BASE.with_(max_steps=8, routing="mamay", toolset="none",
+                              prompt_id="lexis/plain", verify_mode="grounded"),
+    "lex-ref-auto@8": BASE.with_(max_steps=8, routing="mamay", toolset="lexis",
+                                 prompt_id="agent/v2-lexis", answer_channel="text",
+                                 verify_mode="auto"),
 }
+# Регресія поза `lexis`: одне джерело доказів не доводить, що суддя полагоджений загалом.
+CONDITIONS["hetero-vg@8"] = BASE.with_(max_steps=8, verify_mode="grounded")
+CONDITIONS["hetero-auto@8"] = BASE.with_(max_steps=8, verify_mode="auto")
 CONDITIONS.update(LEXIS)
 
 
@@ -168,6 +184,10 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("lex-plain-lapa", "lex-ref-lapa@8"),
          ("lex-ref@8", "lex-ref-rec@8"),
          ("lex-ref-lapa@8", "lex-ref-lapa-rec@8"),
+         ("lex-ref@8", "lex-ref-vg@8"),
+         ("lex-ref-lapa@8", "lex-ref-lapa-vg@8"),
+         ("lex-loop", "lex-loop-vg"),
+         ("hetero@8", "hetero-vg@8"),
          ("chain-schema@16", "chain-text@16"),
          ("chain-schema@8", "chain-text@8"),
          ("chain-text@8", "chain-text@16"),

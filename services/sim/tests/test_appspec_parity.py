@@ -76,8 +76,18 @@ def _project(observed: dict, template: dict) -> dict:
     будь-яке ДОДАВАННЯ поля (ADR-0004 дозволяє лише додавати) ламало б фікстуру, і її довелось би
     перезнімати — тобто втратити властивість «знято ДО рефакторингу». Зникнення поля тут дає KeyError.
     """
-    return {k: _project(observed[k], v) if isinstance(v, dict) else observed[k]
+    return {k: _project(observed[k], v) if isinstance(v, dict)
+            else _project_list(observed[k], v) if isinstance(v, list)
+            else observed[k]
             for k, v in template.items()}
+
+
+def _project_list(observed: list, template: list) -> list:
+    """Списки теж проєктуються поелементно: інакше додане поле ВСЕРЕДИНІ елемента (напр. у `scratch`)
+    ламає паритет, хоч ADR-0004 саме додавання й дозволяє."""
+    if len(observed) != len(template):
+        return observed
+    return [_project(o, t) if isinstance(t, dict) else o for o, t in zip(observed, template, strict=True)]
 
 
 SANCTIONED = {
@@ -85,6 +95,37 @@ SANCTIONED = {
     # перезаморозки (яка вбила б цю властивість) навмисні зміни поведінки оголошуються тут.
     "incidents": "K7f — інцидент фіксується без драбини; фікстура зняла стару сліпоту",
 }
+
+# Оптовий виняток на `degraded` зняв би сторожа з поля, від якого залежить половина інваріантів.
+# Тому дозволено РІВНО одне розходження: відкидання верифікатором більше не є збоєм машинерії
+# (K9 — через `degraded` предикат `answered` міряв думку судді, і страта чесних відмов читалась 0/8).
+def _verifier_reject_no_longer_degrades(observed: dict, expected: dict) -> bool:
+    return (expected.get("degraded") is True and observed.get("degraded") is False
+            and observed.get("accepted") is False and observed.get("verdict_kind") is not None)
+
+
+OLD_PARTIAL = "Часткова відповідь на основі здобутого:"
+NEW_PARTIAL = "Завершити не вдалося."
+
+
+def _partial_rung_no_longer_dumps(observed: dict, expected: dict) -> bool:
+    """Рунга `partial` більше не вивалює сирий payload; текст змінився лише в ній (K9/борг 45)."""
+    was, now = expected.get("answer") or "", observed.get("answer") or ""
+    return was.startswith(OLD_PARTIAL) and now.startswith(NEW_PARTIAL)
+
+
+SANCTIONED_WHEN = {
+    "degraded": _verifier_reject_no_longer_degrades,
+    "answer": _partial_rung_no_longer_dumps,
+}
+
+
+def _apply_sanctioned_when(observed: dict, expected: dict) -> dict:
+    out = dict(observed)
+    for field, allowed in SANCTIONED_WHEN.items():
+        if out.get(field) != expected.get(field) and allowed(observed, expected):
+            out[field] = expected[field]
+    return out
 
 
 SANCTIONED_CONDITIONS = {
@@ -105,7 +146,8 @@ def test_every_condition_reproduces_the_frozen_run(expected):
     assert sorted(observed) == sorted(expected), "склад умов змінився"
     diff = [k for k in expected
             if k.split("|", 1)[0] not in SANCTIONED_CONDITIONS
-            and _project(_without_sanctioned(observed[k]), _without_sanctioned(expected[k]))
+            and _project(_without_sanctioned(_apply_sanctioned_when(observed[k], expected[k])),
+                         _without_sanctioned(expected[k]))
             != _without_sanctioned(expected[k])]
     assert not diff, f"специфікація змінила поведінку в {len(diff)} клітинках: {diff[:5]}"
 
@@ -214,3 +256,24 @@ def test_cost_ranks_lapa_below_mamay():
     assert cost["single-lapa"][1] < cost["single-mamay"][0]
     per = usd_per_success(rows, CONDITIONS)
     assert per["single-lapa"][0] < per["single-mamay"][0]
+
+
+def test_the_conditional_exemption_is_really_used(expected):
+    """Умовний виняток без реального розходження — мертвий сторож, який приховає наступну зміну."""
+    observed = _observed(_frozen_names(expected))
+    for field, allowed in SANCTIONED_WHEN.items():
+        hit = [k for k in expected if allowed(observed[k], expected[k])]
+        assert hit, f"умовний виняток «{field}» більше не потрібен — прибрати"
+
+
+def test_the_partial_exemption_does_not_hide_a_real_answer_change(expected):
+    assert not _partial_rung_no_longer_dumps({"answer": "1918"}, {"answer": "1919"})
+    assert not _partial_rung_no_longer_dumps({"answer": NEW_PARTIAL}, {"answer": "1918"})
+
+
+def test_the_conditional_exemption_does_not_hide_other_flips(expected):
+    """Дозволено лише перевертання True→False під відкиданням судді; решта мусить падати."""
+    assert not _verifier_reject_no_longer_degrades(
+        {"degraded": True, "accepted": True, "verdict_kind": "supported"}, {"degraded": False})
+    assert not _verifier_reject_no_longer_degrades(
+        {"degraded": False, "accepted": False, "verdict_kind": None}, {"degraded": True})

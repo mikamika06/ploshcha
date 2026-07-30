@@ -168,13 +168,25 @@ def test_partial_answer_requires_scratch():
     assert partial_answer([]) is None
 
 
-def test_partial_answer_summarizes_scratch():
+def test_partial_answer_names_the_calls_without_dumping_the_data():
+    """Рунга `partial` мусить бути текстом для людини: сирий payload у відповіді робив будь-який
+    змістовий чек тривіальним (значення лежало в дампі) і видавав службову структуру замість
+    відповіді. Дані лишаються в трасі, у тексті — лише що питали й чи знайшлось."""
     text = partial_answer([
         {"call": {"tool": "lookup_fact", "entity": "Іван Мазепа"},
          "result": {"fact": "Гетьман", "known": True}},
     ])
     assert text is not None
-    assert "lookup_fact" in text and "Гетьман" in text
+    assert "lookup_fact" in text and "Іван Мазепа" in text and "знайдено" in text
+    assert "Гетьман" not in text and "{" not in text
+
+
+def test_partial_answer_reports_absence_as_absence():
+    text = partial_answer([
+        {"call": {"tool": "словник", "слово": "бардина"},
+         "result": {"відомо": False, "стаття": "слова немає в довіднику"}},
+    ])
+    assert "не знайдено" in text and "немає в довіднику" not in text
 
 
 def test_hard_ladders_end_with_partial_soft_never_terminate():

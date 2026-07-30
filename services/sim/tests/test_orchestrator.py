@@ -35,10 +35,16 @@ def test_multistep_chain_accumulates_scratch():
     assert len(r.scratch) == 2 and r.answer == "1918"
 
 
-def test_verifier_reject_marks_degraded():
+def test_verifier_reject_is_not_a_machinery_failure():
+    """Думка верифікатора і збій машинерії — різні осі.
+
+    Доки відкидання ставило `degraded`, предикат `answered` (непорожньо І не деградовано) міряв
+    верифікатора замість моделі, і ціла страта правильних відмов читалась як 0/8.
+    """
     o = orch([tc("final_answer", text="хибне"), json.dumps({"accepted": False, "reason": "анахронізм"})])
     r = o.run("питання")
-    assert r.accepted is False and r.degraded is True and r.verdict_reason == "анахронізм"
+    assert r.accepted is False and r.verdict_reason == "анахронізм"
+    assert r.degraded is False and r.outcome == "answer"
 
 
 def test_verifier_off_accepts_without_judge():
