@@ -9,6 +9,19 @@ from ploshcha_sim.compose import TOOLSETS
 
 ITEMS = Path(__file__).resolve().parents[1] / "evalkit" / "items" / "lexis.jsonl"
 
+KEY_KINDS = ("answer_stem_any", "answer_contains_any")
+
+
+def _keys(item: dict) -> list[str]:
+    """Ключі живуть у двох предикатах: ручні айтеми — підрядкові, авто — за спільним префіксом."""
+    return next(c["values"] for c in item["checks"] if c["kind"] in KEY_KINDS)
+
+
+def _result(answer: str):
+    from ploshcha_sim.domain.task import TaskResult
+
+    return TaskResult(answer=answer, accepted=True, steps=1)
+
 
 @pytest.fixture(scope="module")
 def payload() -> dict:
@@ -110,8 +123,7 @@ def test_the_abstain_items_never_accept_a_definition(items):
     for item in items:
         if item["category"] != "lexis_absent":
             continue
-        values = next(c["values"] for c in item["checks"] if c["kind"] == "answer_contains_any")
-        assert values == ADMIT, item["id"]
+        assert _keys(item) == ADMIT, item["id"]
     assert all(v.startswith(("не", "нема", "відсутн", "null")) for v in ADMIT)
 
 
@@ -119,9 +131,8 @@ def test_no_accepted_key_is_present_in_the_task_sentence(items):
     """Ехо-ключ дає прохід простим копіюванням речення — саме так «колодязь» ламав цямрину."""
     bad = []
     for item in items:
-        values = next(c["values"] for c in item["checks"] if c["kind"] == "answer_contains_any")
         task = item["task"].casefold()
-        bad += [f"{item['id']}:{v}" for v in values if v.casefold() in task]
+        bad += [f"{item['id']}:{v}" for v in _keys(item) if v.casefold() in task]
     assert not bad, bad
 
 
@@ -137,7 +148,7 @@ def test_every_accepted_key_is_grounded_in_the_source(payload, items):
         if item["category"] == "lexis_absent":
             continue
         word = item["id"].split("-", 2)[2]
-        values = next(c["values"] for c in item["checks"] if c["kind"] == "answer_contains_any")
+        values = _keys(item)
         if word in PLAN:
             stems, extra = PLAN[word][1], ALSO.get(word, [])
             assert values == stems + extra, item["id"]
@@ -148,10 +159,17 @@ def test_every_accepted_key_is_grounded_in_the_source(payload, items):
 
 
 def test_the_answer_check_rejects_the_foil(items):
+    """Перевіряємо ТИМ САМИМ предикатом, яким оцінюємо: підрядкова перевірка пропускала «безпритульний»
+    проти ключа «безперспективний»."""
+    from evalkit.checks import check
+
     for item in items:
-        values = next(c["values"] for c in item["checks"] if c["kind"] == "answer_contains_any")
+        spec = next(c for c in item["checks"] if c["kind"].startswith("answer_"))
         for foil in item["foil"]:
-            assert not any(v.casefold() in foil.casefold() for v in values), item["id"]
+            for chk in item["checks"]:
+                if chk["kind"] in ("answer_stem_any", "answer_contains_any"):
+                    assert not check(chk, _result(foil)), f"{item['id']}: {foil[:50]}"
+        assert spec
 
 
 def test_the_set_declares_the_paired_toolsets(items):

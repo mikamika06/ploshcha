@@ -1,4 +1,5 @@
 import json
+import re
 
 DUMP_MIN_LEN = 24
 JSON_SIGNS = ('{"', '":')
@@ -22,6 +23,43 @@ def _dumped(result, min_len: int = DUMP_MIN_LEN) -> bool:
     return False
 
 
+MIN_PREFIX = 4
+WORD = re.compile(r"[а-яїієґА-ЯЇІЄҐ'\u2019]+")
+
+
+def _stem_hit(answer: str, values: list[str], min_prefix: int) -> bool:
+    """Збіг ПОВНИХ слів за спільним префіксом, а не підрядком обрізаного стема.
+
+    Підрядковий чек вісім разів давав хибні провали на відмінюванні: «лайка» не міститься в «лайку»,
+    «діти» — в «дітей», «бажати» — в «бажання». Лематизація не ліки (`pymorphy3`: «різці» → «різка»),
+    тому міряємо спільний префікс двох повних слів.
+
+    `len(want) - 1` дозволяє РІВНО одну літеру розходження в короткому ключі («діти» ↔ «дітей»,
+    спільне лише «діт»). Більше послаблення почало б приймати чужі слова: «вівця» проти «жінка» і
+    «засуджувати» проти «лаяти» мусять лишатись провалами, і лишаються.
+
+    Токен КОРОТШИЙ за поріг не рахується: інакше службове «до» задовольняло б ключ «доглядати», і
+    чуже значення проходило б — гейт V6 зловив це на чотирьох айтемах одразу.
+    """
+    tokens = [w.casefold() for w in WORD.findall(answer)]
+    for value in values:
+        want = value.casefold()
+        need = min(min_prefix, len(want) - 1)
+        if need < 3:
+            continue
+        for token in tokens:
+            if len(token) < need:
+                continue
+            shared = 0
+            for a, b in zip(want, token, strict=False):
+                if a != b:
+                    break
+                shared += 1
+            if shared >= need:
+                return True
+    return False
+
+
 def _tools(result) -> list[str]:
     return [x["call"]["tool"] for x in result.scratch]
 
@@ -32,6 +70,8 @@ def check(spec: dict, result) -> bool:
         return spec["value"].casefold() in _answer(result).casefold()
     if kind == "answer_not_contains":
         return spec["value"].casefold() not in _answer(result).casefold()
+    if kind == "answer_stem_any":
+        return _stem_hit(_answer(result), spec["values"], spec.get("min_prefix", MIN_PREFIX))
     if kind == "answer_contains_any":
         text = _answer(result).casefold()
         return any(v.casefold() in text for v in spec["values"])

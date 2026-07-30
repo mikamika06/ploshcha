@@ -107,8 +107,7 @@ STOP = {"і", "й", "та", "або", "чи", "що", "який", "яка", "я�
         "якого", "нього", "неї", "них", "має", "мати", "бути", "робити", "означає", "предметів"}
 
 MIN_WORD = 4
-STEM_LEN = 5
-MAX_KEYS = 3
+MAX_KEYS = 6
 MIN_CONTENT = 2
 FUNCTIONAL = ("живається", "підсилення", "виражає", "спонукання")
 
@@ -124,8 +123,13 @@ GENERIC = {"велик", "невел", "багат", "мален", "різни",
            "котри", "щось", "хтось", "місце", "предм", "люди", "людей"}
 
 
+CROSSREF = re.compile(r"\(\s*(?:в|у)?\s*\d+[^)]*знач[^)]*\)|\bзнач\.")
+
+
 def _strip_labels(sense: str) -> str:
-    out = sense
+    """Знімаємо не лише помітки, а й перехресні відсилки «(в 2 знач.)»: «знач» ставало ключем, а воно
+    ще й міститься в самому питанні («що означає слово»), тобто чек проходив би зі старту."""
+    out = CROSSREF.sub(" ", sense)
     for label in LABELS:
         out = out.replace(label, " ")
     return out.strip(" ,.;:—-")
@@ -161,22 +165,33 @@ def derive_keys(word: str, senses: list[str]) -> tuple[list[str], str | None]:
         body = re.sub(r"\d+", " ", body)
         words = [w for w in _content_words(body)
                  if len(w) >= MIN_WORD and "-" not in w and "\u2019" not in w and "'" not in w]
-        stems = list(dict.fromkeys(w[:STEM_LEN] if len(w) > STEM_LEN else w for w in words))
-        stems = [k for k in stems if not _self_reference(word, k) and k not in GENERIC]
-        if len(stems) >= MIN_CONTENT:
-            return sorted(stems, key=len, reverse=True)[:MAX_KEYS], None
+        keys = [w for w in dict.fromkeys(words)
+                if not _self_reference(word, w) and w[:5] not in GENERIC and w not in GENERIC]
+        if len(keys) >= MIN_CONTENT:
+            return keys[:MAX_KEYS], None
     return [], (f"ПЕРШЕ значення не дає {MIN_CONTENT}+ змістових слів; провалюватись у наступне "
                 f"нельзя — приклад ілюструє саме перше")
 
 
-def swap_foil(word: str, entries: dict[str, dict]) -> str | None:
-    """Хибна відповідь — СПРАВЖНЄ значення іншого слова. Нічого не вигадуємо, гейт V6 однаково перевіряє."""
+def swap_foil(word: str, entries: dict[str, dict], keys: list[str]) -> str | None:
+    """Хибна відповідь — СПРАВЖНЄ значення іншого слова. Нічого не вигадуємо.
+
+    Перевіряємо кандидата ТИМ САМИМ предикатом, яким потім оцінюємо: «безпритульний» проти ключа
+    «безперспективний» ділить «безп», тобто чуже значення проходило б. Гейт V6 це зловив, але
+    правильне місце для перевірки — тут, і з перебором, а не з єдиним вибором.
+    """
+    from evalkit.checks import _stem_hit
+
     others = [w for w in sorted(entries) if w != word and entries[w]["значення"]]
-    if not others:
-        return None
-    pick = others[sum(map(ord, word)) % len(others)]
-    body = _strip_labels(entries[pick]["значення"][0])
-    return f"{word.capitalize()} — це {body}." if body else None
+    start = sum(map(ord, word)) % len(others) if others else 0
+    for shift in range(len(others)):
+        body = _strip_labels(entries[others[(start + shift) % len(others)]]["значення"][0])
+        if not body:
+            continue
+        text = f"{word.capitalize()} — це {body}."
+        if not _stem_hit(text, keys, 4):
+            return text
+    return None
 
 
 def _grounded(word: str, senses: list[str], stems: list[str]) -> None:
@@ -259,9 +274,9 @@ def main() -> None:
         if len(clean) < 1:
             auto_skipped.append(f"{word}: усі ключі — ехо з речення")
             continue
-        foil = swap_foil(word, entries)
-        if foil is None or any(k.casefold() in foil.casefold() for k in clean):
-            auto_skipped.append(f"{word}: чуже значення перетинається з ключами")
+        foil = swap_foil(word, entries, clean)
+        if foil is None:
+            auto_skipped.append(f"{word}: жодне чуже значення не вільне від ключів")
             continue
         _grounded(word, entry["значення"], clean)
         stratum = entry["страт"]
@@ -274,7 +289,7 @@ def main() -> None:
                 {"kind": "answered"},
                 {"kind": "answer_no_json"},
                 {"kind": "answer_not_dumped"},
-                {"kind": "answer_contains_any", "values": clean},
+                {"kind": "answer_stem_any", "values": clean},
             ],
             "solvable_by": ["словник", "final_answer"],
             "gold": [f"{word} — {_sense_for(entry['значення'], clean[0])}.",
