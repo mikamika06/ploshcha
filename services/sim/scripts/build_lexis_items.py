@@ -12,6 +12,7 @@
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -86,6 +87,98 @@ ALSO: dict[str, list[str]] = {
 # обидва рази правильна відповідь читалась як провал.
 
 
+# ── Автовиведення ключів для розширення набору (U5-SCALE) ──────────────────────────────────────
+# 40 нових слів руками означали б 40 моїх суб'єктивних рішень. Тому ключі виводяться З ТЕКСТУ
+# ЗДОБУТОГО ЗНАЧЕННЯ за оголошеними правилами, а не пишуться. Запобіжники ті самі: `_no_echo`
+# відкидає ключ, що вже є в реченні (для авто-слів — тихо, з обліком), а хибна відповідь береться
+# як ЧУЖЕ СПРАВЖНЄ значення (swap-foil), тобто не вигадується взагалі.
+
+LABELS = ("тільки мн.", "діал.", "заст.", "зах.", "рідк.", "етн.", "кул.", "муз.", "перен.",
+          "техн.", "рел.", "лайл.", "розм.", "недок.", "жін. ім. до", "зменш.-пестл. до",
+          "вживається в множині", "без додатка і за ким, чим",
+          "з інфін.", "кого-небудь", "чого-небудь", "що-небудь", "ким-небудь", "чим-небудь")
+
+SAME_AS = ("те ж саме, що", "те саме, що")
+
+STOP = {"і", "й", "та", "або", "чи", "що", "який", "яка", "яке", "які", "яким", "яку", "якої",
+        "для", "з", "із", "зі", "на", "у", "в", "до", "по", "при", "від", "над", "під", "між",
+        "як", "так", "теж", "саме", "щось", "чого", "небудь", "кого", "чим", "ким", "це", "цей",
+        "того", "тощо", "ін", "т", "п", "також", "дуже", "переважно", "зазвичай", "різних",
+        "якого", "нього", "неї", "них", "має", "мати", "бути", "робити", "означає", "предметів"}
+
+MIN_WORD = 4
+STEM_LEN = 5
+MAX_KEYS = 3
+MIN_CONTENT = 2
+FUNCTIONAL = ("живається", "підсилення", "виражає", "спонукання")
+
+# Метавизначення описують не зміст, а граматику («абстрактний іменник до бачний»). Питати про них
+# «що означає слово в реченні» безглуздо.
+META = ("за значенням", "іменник до", "прикметник до", "дієслово до", "прислівник до",
+        "абстрактний іменник", "дія за", "властивість за", "стан за")
+
+# Ключ-модифікатор пропускає будь-яку відповідь: `contains_any` з ключем «велик» приймає «великий
+# будинок». Такі стеми несуть нуль інформації про референт і мусять відпадати.
+GENERIC = {"велик", "невел", "багат", "мален", "різни", "деяки", "певни", "окрем", "добри",
+           "поган", "силь", "слаб", "будь", "інший", "такий", "самий", "звича", "зроби", "яких",
+           "котри", "щось", "хтось", "місце", "предм", "люди", "людей"}
+
+
+def _strip_labels(sense: str) -> str:
+    out = sense
+    for label in LABELS:
+        out = out.replace(label, " ")
+    return out.strip(" ,.;:—-")
+
+
+def _content_words(text: str) -> list[str]:
+    words = re.findall(r"[а-яїієґА-ЯЇІЄҐ'\u2019-]{3,}", text)
+    return [w.casefold() for w in words if w.casefold() not in STOP]
+
+
+def _self_reference(word: str, key: str) -> bool:
+    """Ключ-префікс самого слова («анцибол» → «анциб») проходив би простим повторенням слова."""
+    a, b = word.casefold(), key.casefold()
+    return a.startswith(b[:4]) or b.startswith(a[:4])
+
+
+def derive_keys(word: str, senses: list[str]) -> tuple[list[str], str | None]:
+    """Ключі виводяться з тексту значення за оголошеними правилами. Відхилення — з причиною.
+
+    Свідомо відкидаємо: службові слова (значення описує ВЖИВАННЯ, не зміст), голі відсилання
+    «те ж саме, що X» без власного змісту, і однослівні тлумачення — на них один стем ловить надто
+    багато. Краще менший, але чистий набір.
+    """
+    body = next((_strip_labels(x) for x in senses if _strip_labels(x)), "")
+    if body:
+        if any(mark in body for mark in FUNCTIONAL):
+            return [], "службове слово: значення описує вживання, не зміст"
+        if any(mark in body for mark in META):
+            return [], "метавизначення: описує граматику, не зміст"
+        for marker in SAME_AS:
+            if marker in body:
+                body = body.split(marker, 1)[1]
+        body = re.sub(r"\d+", " ", body)
+        words = [w for w in _content_words(body)
+                 if len(w) >= MIN_WORD and "-" not in w and "\u2019" not in w and "'" not in w]
+        stems = list(dict.fromkeys(w[:STEM_LEN] if len(w) > STEM_LEN else w for w in words))
+        stems = [k for k in stems if not _self_reference(word, k) and k not in GENERIC]
+        if len(stems) >= MIN_CONTENT:
+            return sorted(stems, key=len, reverse=True)[:MAX_KEYS], None
+    return [], (f"ПЕРШЕ значення не дає {MIN_CONTENT}+ змістових слів; провалюватись у наступне "
+                f"нельзя — приклад ілюструє саме перше")
+
+
+def swap_foil(word: str, entries: dict[str, dict]) -> str | None:
+    """Хибна відповідь — СПРАВЖНЄ значення іншого слова. Нічого не вигадуємо, гейт V6 однаково перевіряє."""
+    others = [w for w in sorted(entries) if w != word and entries[w]["значення"]]
+    if not others:
+        return None
+    pick = others[sum(map(ord, word)) % len(others)]
+    body = _strip_labels(entries[pick]["значення"][0])
+    return f"{word.capitalize()} — це {body}." if body else None
+
+
 def _grounded(word: str, senses: list[str], stems: list[str]) -> None:
     text = " ".join(senses).casefold()
     for stem in stems:
@@ -120,9 +213,11 @@ def main() -> None:
     if missing:
         raise SystemExit(f"у даних немає слів: {missing} — спершу scripts/fetch_lexis.py")
     unused = sorted(w for w, e in entries.items()
-                    if w not in PLAN and e["страт"] != "absent")
+                    if w not in PLAN and e["страт"] != "absent"
+                    and e.get("поділ") != "за поміткою")
 
     items, by_stratum = [], {"rare": 0, "common": 0, "absent": 0}
+    auto_skipped: list[str] = []
     for word, (index, stems, foil) in PLAN.items():
         entry = entries[word]
         _grounded(word, entry["значення"], stems)
@@ -149,8 +244,55 @@ def main() -> None:
             "toolsets": ["none", "lexis"],
         })
 
+    # Розширення: ключі виведені з тексту, хибна відповідь — чуже справжнє значення. Ехо-ключ тут
+    # відкидається ТИХО (з обліком), бо це автогенерація: падати на кожному шумному слові означало б
+    # блокувати весь набір через одне.
+    for word, entry in sorted(entries.items()):
+        if entry.get("поділ") != "за поміткою":
+            continue
+        stems, why = derive_keys(word, entry["значення"])
+        if not stems:
+            auto_skipped.append(f"{word}: {why}")
+            continue
+        example = entry["приклади"][0]
+        clean = [k for k in stems if k.casefold() not in example.casefold()]
+        if len(clean) < 1:
+            auto_skipped.append(f"{word}: усі ключі — ехо з речення")
+            continue
+        foil = swap_foil(word, entries)
+        if foil is None or any(k.casefold() in foil.casefold() for k in clean):
+            auto_skipped.append(f"{word}: чуже значення перетинається з ключами")
+            continue
+        _grounded(word, entry["значення"], clean)
+        stratum = entry["страт"]
+        by_stratum[stratum] += 1
+        items.append({
+            "id": f"lex-{stratum[0]}-{word}",
+            "category": f"lexis_{stratum}",
+            "task": TASK.format(приклад=example, слово=word),
+            "checks": [
+                {"kind": "answered"},
+                {"kind": "answer_no_json"},
+                {"kind": "answer_not_dumped"},
+                {"kind": "answer_contains_any", "values": clean},
+            ],
+            "solvable_by": ["словник", "final_answer"],
+            "gold": [f"{word} — {_sense_for(entry['значення'], clean[0])}.",
+                     f"У цьому реченні «{word}» означає {clean[0]}."],
+            "foil": [foil],
+            "gold_tools": [],
+            "toolsets": ["none", "lexis"],
+        })
+
+    from ploshcha_sim.adapters.lexicon_kb import article
+
     for word, entry in sorted(entries.items()):
         if entry["страт"] != "absent":
+            continue
+        # Held-out мусить бути held-out КОНСТРУКТИВНО: розширення пулу додало «барда», і слово
+        # «бардина» («те саме, що барда») перестало бути відсутнім. Питаємо сам довідник.
+        if (hit := article(word)) is not None:
+            auto_skipped.append(f"{word}: довідник таки знає це через «{hit.split(' —')[0]}»")
             continue
         by_stratum["absent"] += 1
         items.append({
@@ -181,6 +323,10 @@ def main() -> None:
           f"absent {by_stratum['absent']}) -> {OUT}")
     if unused:
         print(f"у даних є, але в наборі не використані: {unused}")
+    if auto_skipped:
+        print(f"авто-слів відкинуто {len(auto_skipped)}:")
+        for line in auto_skipped:
+            print(f"  ✘ {line}")
 
 
 if __name__ == "__main__":

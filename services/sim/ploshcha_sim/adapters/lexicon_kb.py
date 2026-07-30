@@ -15,6 +15,9 @@ from pathlib import Path
 DATA = Path(__file__).resolve().parents[2] / "evalkit" / "data" / "lexis-uk.json"
 NOT_FOUND = "слова немає в довіднику"
 STEM = 4
+# Відмінювання не змінює довжину слова більш ніж на кілька літер. Без цієї межі запит
+# «бакай» тягнув «бакаюватий» — інша лема, тобто довідник тихо віддавав не те.
+MAX_LEN_DELTA = 3
 
 
 ABSENT_STRATUM = "absent"
@@ -42,7 +45,7 @@ def _resolve(query: str) -> str | None:
     words = _entries()
     if q in words:
         return q
-    same = [w for w in words if w[:STEM] == q[:STEM]]
+    same = [w for w in words if w[:STEM] == q[:STEM] and abs(len(w) - len(q)) <= MAX_LEN_DELTA]
     if not same:
         return None
 

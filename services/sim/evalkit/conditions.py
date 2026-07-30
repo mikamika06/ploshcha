@@ -163,6 +163,16 @@ LEXIS: dict[str, AppSpec] = {
     "lex-ref-auto@8": BASE.with_(max_steps=8, routing="mamay", toolset="lexis",
                                  prompt_id="agent/v2-lexis", answer_channel="text",
                                  verify_mode="auto"),
+    # U5-SCALE: t>0 робить `pass^k` справжнім. При t=0 greedy-декодування робить seed-и тождественними,
+    # тому всі попередні `pass^k` на цьому наборі були тавтологією.
+    "lex-loop-t7": BASE.with_(max_steps=8, routing="mamay", toolset="none",
+                              prompt_id="lexis/plain", temperature=0.7, verify_mode="auto"),
+    "lex-ref-t7@8": BASE.with_(max_steps=8, routing="mamay", toolset="lexis",
+                               prompt_id="agent/v2-lexis", answer_channel="text",
+                               temperature=0.7, verify_mode="grounded"),
+    "lex-ref-lapa-t7@8": BASE.with_(max_steps=8, routing="lapa", toolset="lexis",
+                                    prompt_id="agent/v2-lexis", answer_channel="text",
+                                    temperature=0.7, verify_mode="grounded"),
 }
 # Регресія поза `lexis`: одне джерело доказів не доводить, що суддя полагоджений загалом.
 CONDITIONS["hetero-vg@8"] = BASE.with_(max_steps=8, verify_mode="grounded")
@@ -187,6 +197,7 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("lex-ref@8", "lex-ref-vg@8"),
          ("lex-ref-lapa@8", "lex-ref-lapa-vg@8"),
          ("lex-loop", "lex-loop-vg"),
+         ("lex-loop-t7", "lex-ref-t7@8"),
          ("hetero@8", "hetero-vg@8"),
          ("chain-schema@16", "chain-text@16"),
          ("chain-schema@8", "chain-text@8"),

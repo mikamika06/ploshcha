@@ -61,6 +61,15 @@ def test_an_inflected_form_resolves_to_the_nearest_word_not_the_first_match():
     assert article("ВАТРА").startswith("ватра —")
 
 
+def test_a_different_lemma_is_not_a_match_even_with_a_shared_stem():
+    """Розширення пулу додало «бакаюватий», і запит «бакай» почав тягнути його — інша лема.
+
+    Межа на різницю довжин: відмінювання не подовжує слово вдвічі, а спільний стем — не тотожність.
+    """
+    assert article("бакай") is None
+    assert article("ватри").startswith("ватра —")
+
+
 def test_both_strata_are_present_and_the_rare_one_is_bigger():
     rare, common = words("rare"), words("common")
     assert len(rare) >= 16 and len(common) >= 8
@@ -73,16 +82,20 @@ def test_the_toolset_is_wired_with_exactly_the_reference_tool():
 
 
 def test_the_item_set_has_all_three_strata_and_stable_ids(items):
-    assert len(items) == 32
+    assert len(items) >= 70, "U5-SCALE: набір мусить бути ≥70 айтемів для оцінки величини ефекту"
     strata = {i["category"] for i in items}
     assert strata == {"lexis_rare", "lexis_common", "lexis_absent"}
     assert len({i["id"] for i in items}) == len(items)
 
 
-def test_the_held_out_words_are_really_missing_from_the_reference():
-    """Страт `absent` існує лише якщо довідник його справді НЕ знає — інакше він міряє не те."""
-    held = words("absent")
-    assert len(held) == 8
+def test_the_held_out_words_are_really_missing_from_the_reference(items):
+    """Страт `absent` існує лише якщо довідник його справді НЕ знає — інакше він міряє не те.
+
+    Перевіряємо слова з НАБОРУ, а не зі страту в даних: білдер свідомо викидає ті, які довідник
+    таки знає через синонім («бардина» → «барда» після розширення пулу).
+    """
+    held = [i["id"].split("-", 2)[2] for i in items if i["category"] == "lexis_absent"]
+    assert len(held) >= 5
     for word in held:
         assert article(word) is None, word
         out = _словник(СловникArgs(слово=word))
@@ -125,8 +138,11 @@ def test_every_accepted_key_is_grounded_in_the_source(payload, items):
             continue
         word = item["id"].split("-", 2)[2]
         values = next(c["values"] for c in item["checks"] if c["kind"] == "answer_contains_any")
-        stems, extra = PLAN[word][1], ALSO.get(word, [])
-        assert values == stems + extra, item["id"]
+        if word in PLAN:
+            stems, extra = PLAN[word][1], ALSO.get(word, [])
+            assert values == stems + extra, item["id"]
+        else:
+            stems = values
         for stem in stems:
             assert stem.casefold() in senses[word], f"{word}: «{stem}» немає у значенні"
 
@@ -148,3 +164,40 @@ def test_no_item_demands_a_tool_because_the_baseline_has_none(items):
     for item in items:
         kinds = {c["kind"] for c in item["checks"]}
         assert not kinds & {"used_tool", "used_tool_any", "tool_calls_at_least"}, item["id"]
+
+
+def test_the_auto_derived_keys_carry_no_generic_modifier():
+    """`contains_any` з ключем «велик» приймає «великий будинок» — нуль інформації про референт."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from build_lexis_items import GENERIC, derive_keys
+
+    payload = json.loads(DATA.read_text(encoding="utf-8"))
+    for entry in payload["статті"]:
+        if entry.get("поділ") != "за поміткою":
+            continue
+        keys, _ = derive_keys(entry["слово"], entry["значення"])
+        assert not (set(keys) & GENERIC), entry["слово"]
+
+
+def test_auto_derivation_refuses_meta_and_functional_entries():
+    """Метавизначення («абстрактний іменник до бачний») і службові слова не мають змісту для питання."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from build_lexis_items import derive_keys
+
+    assert derive_keys("бачність", ["діал. абстрактний іменник до бачний"])[0] == []
+    assert derive_keys("ажень", ["діал. аж (уживається для підсилення ознаки)"])[0] == []
+
+
+def test_auto_derivation_never_takes_keys_from_a_later_sense():
+    """«банити» має першим значенням «мити», другим «лаяти», а приклад — про мити голову."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from build_lexis_items import derive_keys
+
+    keys, why = derive_keys("банити", ["діал. мити", "діал. лаяти, бити"])
+    assert keys == [] and "провалюватись" in why
