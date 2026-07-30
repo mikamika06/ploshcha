@@ -31,7 +31,7 @@ def test_every_entry_has_a_sense_an_example_and_a_source(payload):
     for entry in payload["статті"]:
         assert entry["значення"], entry["слово"]
         assert entry["приклади"], entry["слово"]
-        assert entry["страт"] in ("rare", "common"), entry["слово"]
+        assert entry["страт"] in ("rare", "common", "absent"), entry["слово"]
 
 
 def test_the_example_actually_contains_the_word(payload):
@@ -72,11 +72,31 @@ def test_the_toolset_is_wired_with_exactly_the_reference_tool():
     assert {t.name for t in LEXIS_TOOLS} == {"словник", "final_answer"}
 
 
-def test_the_item_set_has_both_strata_and_stable_ids(items):
-    assert len(items) == 24
+def test_the_item_set_has_all_three_strata_and_stable_ids(items):
+    assert len(items) == 32
     strata = {i["category"] for i in items}
-    assert strata == {"lexis_rare", "lexis_common"}
+    assert strata == {"lexis_rare", "lexis_common", "lexis_absent"}
     assert len({i["id"] for i in items}) == len(items)
+
+
+def test_the_held_out_words_are_really_missing_from_the_reference():
+    """Страт `absent` існує лише якщо довідник його справді НЕ знає — інакше він міряє не те."""
+    held = words("absent")
+    assert len(held) == 8
+    for word in held:
+        assert article(word) is None, word
+        out = _словник(СловникArgs(слово=word))
+        assert out["відомо"] is False and out["стаття"] == NOT_FOUND, word
+    assert not set(held) & set(words("rare")) and not set(held) & set(words("common"))
+
+
+def test_the_abstain_items_never_accept_a_definition(items):
+    """Еталон тут — визнання незнання, тому жоден ключ не має бути тлумаченням."""
+    for item in items:
+        if item["category"] != "lexis_absent":
+            continue
+        values = next(c["values"] for c in item["checks"] if c["kind"] == "answer_contains_any")
+        assert all(v.startswith(("не", "нема", "відсутн")) for v in values), item["id"]
 
 
 def test_no_accepted_key_is_present_in_the_task_sentence(items):
@@ -98,6 +118,8 @@ def test_every_accepted_key_is_grounded_in_the_source(payload, items):
 
     senses = {e["слово"]: " ".join(e["значення"]).casefold() for e in payload["статті"]}
     for item in items:
+        if item["category"] == "lexis_absent":
+            continue
         word = item["id"].split("-", 2)[2]
         values = next(c["values"] for c in item["checks"] if c["kind"] == "answer_contains_any")
         stems, extra = PLAN[word][1], ALSO.get(word, [])

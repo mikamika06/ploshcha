@@ -17,10 +17,20 @@ NOT_FOUND = "слова немає в довіднику"
 STEM = 4
 
 
+ABSENT_STRATUM = "absent"
+
+
 @lru_cache(maxsize=1)
 def _entries() -> dict[str, dict]:
+    """Страт `absent` НЕ потрапляє в довідник: на цих словах міряється чесна відмова."""
     payload = json.loads(DATA.read_text(encoding="utf-8"))
-    return {e["слово"]: e for e in payload["статті"]}
+    return {e["слово"]: e for e in payload["статті"] if e["страт"] != ABSENT_STRATUM}
+
+
+@lru_cache(maxsize=1)
+def _held_out() -> dict[str, dict]:
+    payload = json.loads(DATA.read_text(encoding="utf-8"))
+    return {e["слово"]: e for e in payload["статті"] if e["страт"] == ABSENT_STRATUM}
 
 
 def _resolve(query: str) -> str | None:
@@ -57,4 +67,5 @@ def article(query: str) -> str | None:
 
 
 def words(stratum: str | None = None) -> list[str]:
-    return sorted(w for w, e in _entries().items() if stratum is None or e["страт"] == stratum)
+    table = _held_out() if stratum == ABSENT_STRATUM else _entries()
+    return sorted(w for w, e in table.items() if stratum is None or e["страт"] == stratum)

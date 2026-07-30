@@ -143,6 +143,13 @@ LEXIS: dict[str, AppSpec] = {
                                  prompt_id="lexis/plain"),
     "lex-ref-lapa@8": BASE.with_(max_steps=8, routing="lapa", toolset="lexis",
                                  prompt_id="agent/v2-lexis", answer_channel="text"),
+    # Страт «поза довідником» показав, що на відповіді «немає» цикл вмирає з `dup_call` +
+    # `no_final_answer` (5 із 8 порожніх). Драбина K5 існує рівно для цього — це її замір.
+    "lex-ref-rec@8": BASE.with_(max_steps=8, routing="mamay", toolset="lexis",
+                                prompt_id="agent/v2-lexis", answer_channel="text", recovery=True),
+    "lex-ref-lapa-rec@8": BASE.with_(max_steps=8, routing="lapa", toolset="lexis",
+                                     prompt_id="agent/v2-lexis", answer_channel="text",
+                                     recovery=True),
 }
 CONDITIONS.update(LEXIS)
 
@@ -159,6 +166,8 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("mamay+rec@8", "ref-mamay-rec@8"),
          ("lex-loop", "lex-ref@8"),
          ("lex-plain-lapa", "lex-ref-lapa@8"),
+         ("lex-ref@8", "lex-ref-rec@8"),
+         ("lex-ref-lapa@8", "lex-ref-lapa-rec@8"),
          ("chain-schema@16", "chain-text@16"),
          ("chain-schema@8", "chain-text@8"),
          ("chain-text@8", "chain-text@16"),

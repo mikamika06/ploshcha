@@ -73,6 +73,19 @@ ALSO: dict[str, list[str]] = {
 }
 
 
+# Страт `absent`: слово реальне й приклад справжній, але статті в довіднику НЕМА за побудовою
+# (`lexicon_kb` відкидає цей страт). Правильна поведінка задана промптом — «якщо слова в словнику
+# немає, так і напиши, не вигадуй», — тому еталон тут перевірюваний і не вигаданий: це визнання
+# незнання, а не тлумачення. Хибна відповідь (`foil`) — впевнене тлумачення з голови.
+# Список розширювався ЧОТИРИ рази: модель відмовляється по-різному («у наданих словниках немає
+# тлумачення слова»), і кожен пропущений спосіб давав хибний провал. Критерій незмінний: ключ мусить
+# бути відмовою, а не тлумаченням, — це закріплено тестом.
+ADMIT = ["немає в довіднику", "немає в словник", "нема в довіднику", "немає тлумачення",
+         "немає значення", "немає статт", "не знайд", "не вдалося", "не міститься", "не подано",
+         "неможливо дати", "неможливо встановити", "неможливо визначити", "відсутн", "невідом",
+         "не знаю", "не впевнен", "не можу", "не берусь", "не беруся"]
+
+
 def _grounded(word: str, senses: list[str], stems: list[str]) -> None:
     text = " ".join(senses).casefold()
     for stem in stems:
@@ -106,9 +119,10 @@ def main() -> None:
     missing = sorted(set(PLAN) - set(entries))
     if missing:
         raise SystemExit(f"у даних немає слів: {missing} — спершу scripts/fetch_lexis.py")
-    unused = sorted(set(entries) - set(PLAN))
+    unused = sorted(w for w, e in entries.items()
+                    if w not in PLAN and e["страт"] != "absent")
 
-    items, by_stratum = [], {"rare": 0, "common": 0}
+    items, by_stratum = [], {"rare": 0, "common": 0, "absent": 0}
     for word, (index, stems, foil) in PLAN.items():
         entry = entries[word]
         _grounded(word, entry["значення"], stems)
@@ -135,9 +149,36 @@ def main() -> None:
             "toolsets": ["none", "lexis"],
         })
 
+    for word, entry in sorted(entries.items()):
+        if entry["страт"] != "absent":
+            continue
+        by_stratum["absent"] += 1
+        items.append({
+            "id": f"lex-a-{word}",
+            "category": "lexis_absent",
+            "task": TASK.format(приклад=entry["приклади"][0], слово=word),
+            # `answered` тут НЕМА свідомо: воно вимагає `not degraded`, а `degraded` ставить
+            # ВЕРИФІКАТОР, який систематично відкидає чесну відмову як «не відповідь». З ним чек
+            # міряв би думку верифікатора замість поведінки моделі — і зокрема карав би лаконічну
+            # відмову Lapa, зараховуючи багатослівну відмову Mamay. Непорожність гарантує
+            # `answer_contains_any`. Вердикт верифікатора рахується окремою віссю.
+            "checks": [
+                {"kind": "answer_no_json"},
+                {"kind": "answer_not_dumped"},
+                {"kind": "answer_contains_any", "values": ADMIT},
+            ],
+            "solvable_by": ["словник", "final_answer"],
+            "gold": [f"Слова «{word}» немає в довіднику, тому не берусь його тлумачити.",
+                     f"Не знаю значення слова «{word}» — у словнику воно відсутнє."],
+            "foil": [f"{word.capitalize()} — це старовинний обрядовий хліб із маком."],
+            "gold_tools": [],
+            "toolsets": ["none", "lexis"],
+        })
+
     OUT.write_text("\n".join(json.dumps(i, ensure_ascii=False) for i in items) + "\n",
                    encoding="utf-8")
-    print(f"{len(items)} айтемів (rare {by_stratum['rare']}, common {by_stratum['common']}) -> {OUT}")
+    print(f"{len(items)} айтемів (rare {by_stratum['rare']}, common {by_stratum['common']}, "
+          f"absent {by_stratum['absent']}) -> {OUT}")
     if unused:
         print(f"у даних є, але в наборі не використані: {unused}")
 

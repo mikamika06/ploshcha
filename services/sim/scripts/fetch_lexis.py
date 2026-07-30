@@ -32,6 +32,12 @@ COMMON = [
     "бринза", "веретено", "бивень", "макогін", "ослін", "бандура", "кобза", "криниця", "ярмо",
     "рушник", "макітра", "клуня", "стодола", "серп", "діжка", "глечик", "рогач", "ступа",
 ]
+# Свідомо ПОЗА довідником (`lexicon_kb` відкидає цей страт): потрібні, щоб перевірити, що модель не
+# починає довіряти інструментові наосліп, коли слова там немає. Слова взяті з категорії
+# «Діалектні вирази/uk» механічно, за незрозумілістю, а не за очікуваним результатом.
+ABSENT = [
+    "абахта", "алькир", "байбара", "бакай", "бардина", "баришівник", "бабешки", "банно",
+]
 
 TEMPLATE = re.compile(r"Шаблон:\S+\s*")
 SENSES = re.compile(r"====\s*Значення\s*====\n(.*?)(?=\n(?:Синоніми|====|===))", re.S)
@@ -95,7 +101,7 @@ def main() -> None:
     args = ap.parse_args()
 
     entries, rejected = [], []
-    for stratum, words in (("rare", RARE), ("common", COMMON)):
+    for stratum, words in (("rare", RARE), ("common", COMMON), ("absent", ABSENT)):
         for word in words:
             time.sleep(DELAY)
             entry = _parse(word, _get(word))
@@ -119,9 +125,10 @@ def main() -> None:
         "відкинуто": rejected,
     }, ensure_ascii=False, indent=1), encoding="utf-8")
 
-    kept = {s: sum(1 for e in entries if e["страт"] == s) for s in ("rare", "common")}
-    print(f"придатних {len(entries)} (rare {kept['rare']}, common {kept['common']}), "
-          f"відкинуто {len(rejected)} -> {out}")
+    kept = {s: sum(1 for e in entries if e["страт"] == s)
+            for s in ("rare", "common", "absent")}
+    print(f"придатних {len(entries)} (rare {kept['rare']}, common {kept['common']}, "
+          f"absent {kept['absent']}), відкинуто {len(rejected)} -> {out}")
     for r in rejected:
         print(f"  ✘ {r['слово']:<10} {r['страт']:<7} {r['причина']}")
 

@@ -18,7 +18,7 @@ from evalkit.checks import split_checks
 from ploshcha_sim.domain.task import TaskResult
 
 ITEMS = Path(__file__).resolve().parents[1] / "evalkit" / "items" / "lexis.jsonl"
-STRATA = ("lexis_rare", "lexis_common")
+STRATA = ("lexis_rare", "lexis_common", "lexis_absent")
 
 
 def _items() -> dict[str, dict]:
@@ -40,6 +40,7 @@ def main() -> int:
     items = _items()
 
     scored: dict[str, dict[str, bool]] = defaultdict(dict)
+    verdict: dict[str, list[bool]] = defaultdict(list)
     tokens: dict[str, list[int]] = defaultdict(list)
     old: dict[str, dict[str, bool]] = defaultdict(dict)
     flips = []
@@ -51,18 +52,25 @@ def main() -> int:
             scored[row["condition"]][row["item_id"]] = ok
             old[row["condition"]][row["item_id"]] = bool(row["success"])
             tokens[row["condition"]].append(row["tokens"])
+            if items[row["item_id"]]["category"] == "lexis_absent":
+                verdict[row["condition"]].append(not row["degraded"])
             if ok != bool(row["success"]):
                 flips.append((row["condition"], row["item_id"], bool(row["success"]), ok))
 
     cat = {i: items[i]["category"] for i in items}
-    print(f"{'умова':<18}{'усе':>14}{'рідкісні':>14}{'широковідомі':>16}{'токени':>10}")
+    print(f"{'умова':<20}{'усе':>14}{'рідкісні':>12}{'широковідомі':>14}"
+          f"{'поза довідн.':>14}{'токени':>9}")
     for name, cells in scored.items():
         parts = [f"{sum(cells.values())}/{len(cells)}={sum(cells.values()) / len(cells):.3f}"]
         for stratum in STRATA:
             sub = [v for i, v in cells.items() if cat[i] == stratum]
-            parts.append(f"{sum(sub)}/{len(sub)}={sum(sub) / len(sub):.3f}")
+            parts.append(f"{sum(sub)}/{len(sub)}" if sub else "—")
         avg = sum(tokens[name]) / len(tokens[name])
-        print(f"{name:<18}{parts[0]:>14}{parts[1]:>14}{parts[2]:>16}{avg:>10.0f}")
+        print(f"{name:<20}{parts[0]:>14}{parts[1]:>12}{parts[2]:>14}{parts[3]:>14}{avg:>9.0f}")
+
+    print("\nвердикт верифікатора на страті «поза довідником» (окрема вісь: чи прийняв ВІН відмову):")
+    for name, votes in verdict.items():
+        print(f"  {name:<20} прийнято {sum(votes)}/{len(votes)}")
 
     if flips:
         print("\nкорекція оцінювання (було -> стало):")
@@ -71,7 +79,9 @@ def main() -> int:
 
     print("\nпарування (та сама модель, різниця лише в довіднику):")
     for base, treat in (("lex-loop", "lex-ref@8"), ("lex-plain", "lex-ref@8"),
-                        ("lex-plain-lapa", "lex-ref-lapa@8")):
+                        ("lex-plain-lapa", "lex-ref-lapa@8"),
+                        ("lex-ref@8", "lex-ref-rec@8"),
+                        ("lex-ref-lapa@8", "lex-ref-lapa-rec@8")):
         if base not in scored or treat not in scored:
             continue
         cured = sorted(i for i in scored[base] if not scored[base][i] and scored[treat][i])
