@@ -16,6 +16,7 @@ from .adapters.tools_registry import (
     REGISTRY_TEACH_TOOLS,
     REGISTRY_TOOLS,
 )
+from .adapters.tools_reference import REFERENCE_TOOLS
 from .adapters.tools_ua import UA_TOOLS
 from .adapters.tools_ua_norm import UA_NORM_TOOLS
 from .agents import Orchestrator
@@ -32,6 +33,7 @@ TOOLSETS = {"default": DEFAULT_TOOLS, "ua": UA_TOOLS,
             "docs": DOCS_TOOLS, "docs_agg": DOCS_AGG_TOOLS,
             "docs_years": DOCS_YEARS_TOOLS,
             "ua_norm": UA_NORM_TOOLS,
+            "reference": REFERENCE_TOOLS,
             "none": NO_DATA_TOOLS}
 
 

@@ -37,6 +37,13 @@ CONDITIONS: dict[str, AppSpec] = {
     "hetero-ua-tools@8": BASE.with_(max_steps=8, toolset="ua", prompt_id=UA),
     "hetero-ua-textans@8": BASE.with_(max_steps=8, toolset="ua", prompt_id=UA,
                                        answer_channel="text"),
+    "ref@8": BASE.with_(max_steps=8, toolset="reference", prompt_id="agent/v2-ref"),
+    "ref-rec@8": BASE.with_(max_steps=8, toolset="reference", prompt_id="agent/v2-ref",
+                            recovery=True),
+    # routing="mamay" — щоб пара з `mamay+rec@8` різнилась ЛИШЕ набором інструментів.
+    # Перша версія порівнювала hetero-довідку з mamay-відповідями, тобто дві осі одразу.
+    "ref-mamay-rec@8": BASE.with_(max_steps=8, toolset="reference", prompt_id="agent/v2-ref",
+                                  routing="mamay", recovery=True),
     "uanorm@8": BASE.with_(max_steps=8, toolset="ua_norm", prompt_id="agent/v2-uanorm",
                            answer_channel="text"),
 }
@@ -130,6 +137,8 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("hetero-textans@8", "hetero-ua-textans@8"),
          ("hetero@8", "hetero-ua-tools@8"),
          ("lang-mamay", "uanorm@8"),
+         ("hetero@8", "ref@8"),
+         ("mamay+rec@8", "ref-mamay-rec@8"),
          ("chain-schema@16", "chain-text@16"),
          ("chain-schema@8", "chain-text@8"),
          ("chain-text@8", "chain-text@16"),

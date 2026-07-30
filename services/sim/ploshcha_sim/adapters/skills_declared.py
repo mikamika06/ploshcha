@@ -13,6 +13,7 @@ from .tools_registry import (
     REGISTRY_TOOLS,
 )
 from .tools_ua import UA_TOOLS
+from .tools_reference import REFERENCE_TOOLS
 from .tools_ua_norm import UA_NORM_TOOLS
 
 BIGGEST_VILLAGE = max(len(ids_for(v)) for v in VILLAGES)
@@ -82,6 +83,12 @@ UA_NORM_DECLARED = {
     "правопис": SkillSpec(name="правопис", capability="lang.spelling2019", shape="scalar"),
 }
 
+REFERENCE_DECLARED = {
+    "довідка": SkillSpec(name="довідка", capability="history.article", shape="aggregate",
+                         cost_hint=2),
+    "обчислити": SkillSpec(name="обчислити", capability="math.eval", shape="scalar"),
+}
+
 DECLARED = {
     "default": (DEFAULT_TOOLS, DEFAULT_DECLARED),
     "ua": (UA_TOOLS, UA_DECLARED),
@@ -94,6 +101,7 @@ DECLARED = {
     "docs_agg": (DOCS_AGG_TOOLS, DOCS_AGG_DECLARED),
     "docs_years": (DOCS_YEARS_TOOLS, DOCS_YEARS_DECLARED),
     "ua_norm": (UA_NORM_TOOLS, UA_NORM_DECLARED),
+    "reference": (REFERENCE_TOOLS, REFERENCE_DECLARED),
 }
 
 

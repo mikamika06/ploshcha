@@ -135,3 +135,30 @@ def test_the_warning_is_loud_but_not_corrective():
     from ploshcha_sim.adapters.registry_kb import VILLAGES, ids_for
     biggest = max(len(ids_for(v)) for v in VILLAGES)
     assert box.notes() == [f"skills:collection=список_записів×{biggest}"]
+
+
+def test_reference_and_answer_toolsets_cover_the_same_entities():
+    """Інакше A/B «довідка проти відповіді» міряв би ОБСЯГ ДАНИХ, а не форму інструмента.
+
+    Плюс Орлик і Переяславська рада мусять бути відсутні в обох: на них стоять айтеми про чесну
+    відмову, і одностороннє додавання тихо змінило б те, що набір міряє.
+    """
+    from ploshcha_sim.adapters.reference_kb import ARTICLES
+    from ploshcha_sim.adapters.tools_fake import EVENT_YEARS, FACTS
+
+    answerable = set(EVENT_YEARS) | set(FACTS)
+    assert set(ARTICLES) == answerable, {
+        "лише в довідці": set(ARTICLES) - answerable,
+        "лише у відповідях": answerable - set(ARTICLES),
+    }
+    for absent in ("Пилип Орлик", "Переяславська рада"):
+        assert absent not in ARTICLES and absent not in answerable
+
+
+def test_a_reference_article_hides_no_answer_field():
+    """Стаття мусить бути суцільним текстом: поле «рік» перетворило б довідку на відповідь."""
+    from ploshcha_sim.adapters.reference_kb import ARTICLES
+
+    for name, text in ARTICLES.items():
+        assert isinstance(text, str) and len(text) > 80, name
+        assert "рік" not in text.split(":")[0][:20], name

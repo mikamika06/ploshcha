@@ -8,7 +8,7 @@ Mode = Literal["single", "loop", "gated"]
 Routing = Literal["hetero", "mamay", "lapa"]
 Toolset = Literal["default", "ua", "registry", "registry_agg", "registry_teach", "registry_sum", "registry_reduce",
                    "docs", "docs_agg", "docs_years",
-                   "ua_norm", "none"]
+                   "ua_norm", "reference", "none"]
 PlannerKind = Literal["none", "skeleton"]
 MemoryKind = Literal["none", "notebook"]
 AnswerChannel = Literal["schema", "text"]
