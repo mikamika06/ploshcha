@@ -9,6 +9,10 @@ from .llm import LlmUsage
 
 class StepRecord(BaseModel):
     run_id: str
+    # Ієрархія траси: без `parent_run_id` вивід N дітей злипається в одну плоску стрічку, і
+    # незрозуміло, чий саме крок дав результат. `span` відрізняє дітей одного батька.
+    parent_run_id: str | None = None
+    span: str | None = None
     tick: int
     agent: str
     stage: str = Field(description="act | plan | reflect")

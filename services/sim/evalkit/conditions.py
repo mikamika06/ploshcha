@@ -1,4 +1,5 @@
 from ploshcha_sim.compose import (
+    build_graph,
     build_budget,
     build_orchestrator,
     build_skillbox,
@@ -195,6 +196,12 @@ CONDITIONS["hetero-auto@8"] = BASE.with_(max_steps=8, verify_mode="auto")
 CONDITIONS.update(LEXIS)
 # ABSTAIN-STABILITY: чесна відмова має `pass^k` = 0.000 при t=0.7 — модель уміє її дати, але не
 # надійно. Гіпотеза K7g: детермінований крок треба віддати КОДУ. Пара різниться лише цим прапорцем.
+# K6: та сама задача одним циклом і графом. Стеля кроків ОДНАКОВА (16), тож граф не має переваги в
+# бюджеті — він лише інакше його ділить: 16 на один цикл проти 4 на кожну з чотирьох дітей.
+FAN = BASE.with_(max_steps=16, routing="mamay", toolset="lexis", prompt_id="agent/v2-lexis",
+                 answer_channel="text", verify_mode="auto")
+CONDITIONS["fan-single@16"] = FAN
+CONDITIONS["fan-graph@16"] = FAN.with_(graph=True)
 CONDITIONS["lex-am-jm-contrast"] = CONDITIONS["lex-am-jm"].with_(verify_mode="contrast")
 CONDITIONS["lex-ref-abs-t7@8"] = CONDITIONS["lex-ref-t7@8"].with_(absent_answer=True)
 
@@ -218,6 +225,7 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("lex-loop", "lex-loop-vg"),
          ("lex-loop-t7", "lex-ref-t7@8"),
          ("lex-ref-t7@8", "lex-ref-abs-t7@8"),
+         ("fan-single@16", "fan-graph@16"),
          ("lex-am-jm", "lex-am-jl"),
          ("lex-al-jl", "lex-al-jm"),
          ("hetero@8", "hetero-vg@8"),
@@ -270,6 +278,17 @@ def runner_for(spec: AppSpec, *, lapa, mamay) -> Runner:
                                   tail=variant.tail or None, prompt_id=variant.id,
                                   prompt_sha=variant.sha256,
                                   answer_instruction=answer_instruction)
+
+    if spec.graph:
+        # Граф іде тим самим шляхом, що й цикл: дитина — звичайний оркестратор, зібраний тим самим
+        # коренем. Інакше «суб-агенти» були б окремим застосунком, а не конфігурацією ядра.
+        def make_graph():
+            return build_graph(spec, lapa=lapa, mamay=mamay, system=system,
+                               tail=variant.tail or None, prompt_id=variant.id,
+                               prompt_sha=variant.sha256,
+                               answer_instruction=answer_instruction)
+
+        return orchestrator_runner(make_graph, budget=build_budget(spec))
 
     loop = orchestrator_runner(make_orch, budget=build_budget(spec))
     if spec.mode == "gated":

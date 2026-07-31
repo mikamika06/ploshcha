@@ -21,6 +21,7 @@ from .adapters.tools_reference import REFERENCE_TOOLS
 from .adapters.tools_ua import UA_TOOLS
 from .adapters.tools_ua_norm import UA_NORM_TOOLS
 from .agents import Orchestrator
+from .agents.graph import AgentGraph
 from .domain.gate import FINAL_TOOL
 from .domain.spec import AppSpec
 from .domain.task import Budget
@@ -80,6 +81,18 @@ def build_notebook(spec: AppSpec):
 
 def build_budget(spec: AppSpec) -> Budget:
     return Budget(max_steps=spec.max_steps)
+
+
+def build_graph(spec: AppSpec, *, lapa, mamay, **kw):
+    """Граф — це КОНФІГ, не окремий застосунок: дитина збирається тим самим коренем.
+
+    `budget` дитини приходить від графа (поділений), тому тут його не задаємо.
+    """
+    def child(budget):
+        return build_orchestrator(spec, lapa=lapa, mamay=mamay, **kw)
+
+    return AgentGraph(child, max_depth=spec.max_depth, max_width=spec.max_width,
+                      trace=kw.get("trace"), run_id=kw.get("run_id", "graph"))
 
 
 def build_orchestrator(spec: AppSpec, *, lapa, mamay, system: str | None = None,

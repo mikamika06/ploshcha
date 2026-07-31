@@ -21,6 +21,7 @@ ITEM_SET_TOOLSETS: dict[str, tuple[str, ...]] = {
     "chain": ("registry", "registry_agg", "registry_teach", "registry_sum", "registry_reduce"),
     "docs": ("docs", "docs_agg", "docs_years"),
     "lexis": ("none", "lexis"),
+    "fanout": ("lexis",),
 }
 
 

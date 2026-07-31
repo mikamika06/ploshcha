@@ -135,6 +135,13 @@ def _strip_labels(sense: str) -> str:
     return out.strip(" ,.;:—-")
 
 
+def _resolve_same_as(sense: str) -> str:
+    for marker in SAME_AS:
+        if marker in sense:
+            return sense.split(marker, 1)[1]
+    return sense
+
+
 def _content_words(text: str) -> list[str]:
     words = re.findall(r"[а-яїієґА-ЯЇІЄҐ'\u2019-]{3,}", text)
     return [w.casefold() for w in words if w.casefold() not in STOP]
@@ -154,15 +161,15 @@ def derive_keys(word: str, senses: list[str]) -> tuple[list[str], str | None]:
     багато. Краще менший, але чистий набір.
     """
     first = next((_strip_labels(x) for x in senses if _strip_labels(x)), "")
-    body = " ; ".join(b for b in (_strip_labels(x) for x in senses) if b)
+    # `те ж саме, що X` розвʼязується В МЕЖАХ значення. Раніше це робилось на склеєному тексті, і
+    # четверте значення «те ж саме, що пасовисько» у «царина» відрізало перші три разом із «околиця» —
+    # тобто головні ключі гинули, а правильна відповідь читалась як провал.
+    body = " ; ".join(b for b in (_resolve_same_as(_strip_labels(x)) for x in senses) if b)
     if first:
         if any(mark in first for mark in FUNCTIONAL):
             return [], "службове слово: значення описує вживання, не зміст"
         if any(mark in first for mark in META):
             return [], "метавизначення: описує граматику, не зміст"
-        for marker in SAME_AS:
-            if marker in body:
-                body = body.split(marker, 1)[1]
         body = re.sub(r"\d+", " ", body)
         words = [w for w in _content_words(body)
                  if len(w) >= MIN_WORD and "-" not in w and "\u2019" not in w and "'" not in w]

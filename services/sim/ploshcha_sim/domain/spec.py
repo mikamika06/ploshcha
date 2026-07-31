@@ -36,6 +36,9 @@ class AppSpec(BaseModel):
     verify_mode: VerifyMode = "basic"
     judge_lane: JudgeLane = "auto"
     absent_answer: bool = False
+    graph: bool = False
+    max_depth: int = 2
+    max_width: int = 6
     recovery: bool = False
     max_steps: int = 5
     max_tokens: int = 512
