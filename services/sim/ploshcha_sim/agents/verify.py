@@ -114,6 +114,7 @@ def verify(task, answer, router: ModelRouter, effort: EffortPolicy, *,
     if trace is not None:
         trace.emit(StepRecord(
             run_id=run_id, tick=0, agent="verifier", stage="judge", model=llm.model,
+            lane=router.lane("judge"),
             prompt=prompt, raw_output=res.text, parsed=verdict.model_dump(),
             schema_valid=ok, world_valid=ok, reject_reason=None if ok else "verify_parse_fail",
             usage=res.usage, latency_ms=res.latency_ms, finish_reason=res.finish_reason, seed=seed,

@@ -439,7 +439,8 @@ class Orchestrator:
             return
         self.trace.emit(StepRecord(
             run_id=self.run_id, tick=state.budget.steps_used, agent="orchestrator", stage=kind,
-            model=model, prompt=prompt if prompt is not None else _render(state), raw_output=res.text,
+            model=model, lane=self.router.lane(kind),
+            prompt=prompt if prompt is not None else _render(state), raw_output=res.text,
             parsed={"tool": call.tool, **call.args} if call else None,
             schema_valid=call is not None, world_valid=call is not None,
             reject_reason=reason, usage=res.usage, latency_ms=res.latency_ms,

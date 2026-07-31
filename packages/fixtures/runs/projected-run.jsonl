@@ -1,0 +1,8 @@
+{"protocol": "1.1.0", "runId": "projected-lexis", "seq": 0, "ts": "2026-07-31T09:00:00Z", "tick": 0, "type": "run.started", "payload": {"config": {"maxTicks": 4, "castingMode": "library"}, "scene": {"id": "ploshcha", "name": "Площа"}, "startedAt": "2026-07-31T09:00:00Z"}}
+{"protocol": "1.1.0", "runId": "projected-lexis", "seq": 1, "ts": "2026-07-31T09:00:00Z", "tick": 1, "type": "route.decided", "payload": {"stage": "select", "lane": "lapa", "model": "fixture", "tier": "strict"}}
+{"protocol": "1.1.0", "runId": "projected-lexis", "seq": 2, "ts": "2026-07-31T09:00:00Z", "tick": 1, "type": "tool.called", "payload": {"tool": "словник", "args": {"слово": "ботей"}}}
+{"protocol": "1.1.0", "runId": "projected-lexis", "seq": 3, "ts": "2026-07-31T09:00:00Z", "tick": 1, "type": "tool.result", "payload": {"tool": "словник", "ok": true, "found": true}}
+{"protocol": "1.1.0", "runId": "projected-lexis", "seq": 4, "ts": "2026-07-31T09:00:00Z", "tick": 2, "type": "route.decided", "payload": {"stage": "select", "lane": "lapa", "model": "fixture", "tier": "strict"}}
+{"protocol": "1.1.0", "runId": "projected-lexis", "seq": 5, "ts": "2026-07-31T09:00:00Z", "tick": 3, "type": "route.decided", "payload": {"stage": "synthesize", "lane": "mamay", "model": "fixture", "tier": "none"}}
+{"protocol": "1.1.0", "runId": "projected-lexis", "seq": 6, "ts": "2026-07-31T09:00:00Z", "tick": 0, "type": "verify.verdict", "payload": {"kind": "supported", "accepted": true, "reason": "стаття підтверджує"}}
+{"protocol": "1.1.0", "runId": "projected-lexis", "seq": 7, "ts": "2026-07-31T09:00:00Z", "tick": 0, "type": "task.outcome", "payload": {"outcome": "answer", "evidence": true, "verdictKind": "supported"}}

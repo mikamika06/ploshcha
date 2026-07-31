@@ -13,6 +13,7 @@ class StepRecord(BaseModel):
     agent: str
     stage: str = Field(description="act | plan | reflect")
     model: str
+    lane: str = "unknown"
     prompt: str
     raw_output: str
     parsed: dict | None = None
