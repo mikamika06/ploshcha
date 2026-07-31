@@ -40,3 +40,8 @@ docs/
 
 # === траси прогонів ===
 eval/traces/
+# черга — робочий стан, не артефакт репо
+services/sim/evalkit/data/*.db
+services/sim/evalkit/data/*.db-wal
+services/sim/evalkit/data/*.db-shm
+services/sim/evalkit/data/STOP
