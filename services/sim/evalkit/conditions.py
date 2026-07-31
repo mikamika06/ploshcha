@@ -206,6 +206,9 @@ CONDITIONS["fan-graph@16"] = FAN.with_(graph=True)
 # ширині, а один цикл дістає ТУ САМУ загальну стелю. Інакше при ширині 12 діти отримали б 1 крок і
 # «граф гірший» означало б лише «граф голодний».
 for _w in (8, 12, 16):
+    # 4d: чи лікується рання термінація циклу підказкою залишку (K7e). Якщо так — межа для
+    # суб-агентів зсувається далі, і K6 потрібен ще пізніше, ніж показав K6-WIDTH.
+    CONDITIONS[f"fan-cov@w{_w}"] = FAN.with_(max_steps=4 * _w, coverage=True)
     CONDITIONS[f"fan-single@w{_w}"] = FAN.with_(max_steps=4 * _w)
     CONDITIONS[f"fan-graph@w{_w}"] = FAN.with_(max_steps=4 * _w, graph=True, max_width=_w)
 CONDITIONS["lex-am-jm-contrast"] = CONDITIONS["lex-am-jm"].with_(verify_mode="contrast")
