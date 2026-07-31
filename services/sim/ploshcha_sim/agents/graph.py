@@ -21,6 +21,12 @@ from ..ports.trace import StepRecord, TracePort
 
 CHILD_TEMPLATE = "{task}\n\nЗосередься ЛИШЕ на «{item}»: поясни саме його."
 
+# Задача для групи, яку ще можна різати: елементи в лапках, тому наступний рівень побачить їх тим
+# самим детермінованим розбором.
+GROUP_TEMPLATE = "Поясни, що означає кожне з цих слів: {items}.\nПо одному короткому реченню на кожне."
+
+DEPTH_CAP_NOTE = "depth_cap_group"
+
 SYNTHESIS_HEADER = "Зведення підзадач:"
 MISSING_HEADER = "Даних не знайдено для:"
 
@@ -32,8 +38,9 @@ class AgentGraph(AgentPort):
     """Супервізор над фабрикою дітей. Сам моделі не викликає — уся мова живе в дітях."""
 
     def __init__(self, child: Callable[[Budget], AgentPort], *, trace: TracePort | None = None,
-                 run_id: str = "graph", max_depth: int = 2, max_width: int = 6,
-                 workers: int = 4, template: str = CHILD_TEMPLATE):
+                 run_id: str = "graph", max_depth: int = 3, max_width: int = 6,
+                 workers: int = 4, template: str = CHILD_TEMPLATE,
+                 group_template: str = GROUP_TEMPLATE):
         self.child = child
         self.trace = trace
         self.run_id = run_id
@@ -41,28 +48,40 @@ class AgentGraph(AgentPort):
         self.max_width = max_width
         self.workers = workers
         self.template = template
+        self.group_template = group_template
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None,
             depth: int = 1) -> TaskResult:
         budget = budget or Budget()
         split = plan_split(task, budget, template=self.template, depth=depth,
-                           max_depth=self.max_depth)
-        if split is None or split.width > self.max_width:
-            # Фан-аут не виправданий — це найчастіший випадок, і він мусить бути ДЕШЕВИМ:
+                           max_depth=self.max_depth, max_width=self.max_width,
+                           many_template=self.group_template)
+        if split is None:
+            # Фан-аут не виправданий — найчастіший випадок, і він мусить бути ДЕШЕВИМ:
             # ніякого зайвого виклику, просто одна дитина на всю задачу.
             result = self.child(budget).run(task, seed=seed, budget=budget)
             result.notes.append(NO_FANOUT_NOTE)
             return result
 
-        findings = self._fan_out(split, seed)
+        findings = self._fan_out(split, seed, depth)
         return self._synthesize(task, findings, budget, split)
 
-    def _fan_out(self, split: Split, seed: int) -> list[Finding]:
+    def _fan_out(self, split: Split, seed: int, depth: int) -> list[Finding]:
         def one(index: int) -> Finding:
             subtask = split.tasks[index]
-            child = self.child(split.child_budget.model_copy(deep=True))
+            group = split.groups[index]
             span = f"{self.run_id}/{index}"
-            result = child.run(subtask, seed=seed, budget=split.child_budget.model_copy(deep=True))
+            child_budget = split.child_budget.model_copy(deep=True)
+            if len(group) > 1 and depth < self.max_depth:
+                # Група ще широка — ріжемо її НАСТУПНИМ рівнем, а не вкидаємо в один цикл. Саме тут
+                # N стає необмеженим: ширина вузла лишається ≤ max_width на будь-якій глибині.
+                result = self.run(subtask, seed=seed, budget=child_budget, depth=depth + 1)
+            else:
+                child = self.child(child_budget)
+                result = child.run(subtask, seed=seed, budget=child_budget)
+                if len(group) > 1:
+                    # Глибина вичерпана, а група ще широка: віддаємо циклу, але ГУЧНО.
+                    result.notes.append(DEPTH_CAP_NOTE)
             self._emit(span, subtask, result, split.depth)
             return Finding(task=subtask, claim=result.answer, kind=result.outcome,
                            evidence=result.evidence, provenance=span,

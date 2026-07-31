@@ -208,6 +208,9 @@ CONDITIONS["fan-graph@16"] = FAN.with_(graph=True)
 for _w in (8, 12, 16):
     # 4d: чи лікується рання термінація циклу підказкою залишку (K7e). Якщо так — межа для
     # суб-агентів зсувається далі, і K6 потрібен ще пізніше, ніж показав K6-WIDTH.
+    # Різана рекурсія: ширина вузла 6 при будь-якому N, глибина росте. Це конфіг, який працює для
+    # НЕОБМЕЖЕНОГО N, тоді як плоский фан-аут вимагає max_width ≥ N.
+    CONDITIONS[f"fan-tree@w{_w}"] = FAN.with_(max_steps=4 * _w, graph=True, max_width=6, max_depth=3)
     CONDITIONS[f"fan-cov@w{_w}"] = FAN.with_(max_steps=4 * _w, coverage=True)
     CONDITIONS[f"fan-single@w{_w}"] = FAN.with_(max_steps=4 * _w)
     CONDITIONS[f"fan-graph@w{_w}"] = FAN.with_(max_steps=4 * _w, graph=True, max_width=_w)

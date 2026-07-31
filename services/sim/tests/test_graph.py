@@ -171,11 +171,72 @@ def test_parallel_output_is_ordered_by_index_not_by_completion():
     assert serial.answer == result.answer
 
 
-def test_too_wide_a_split_falls_back_instead_of_exploding():
-    task = " ".join(f"«с{i}»" for i in range(12))
+def test_too_wide_a_task_is_chunked_never_dropped_into_one_loop():
+    """Раніше перевищення ширини скочувало все в ОДИН цикл — тобто рівно в режим, який при ширині 16
+    здається на 12.7 кроках із 64. Тепер ширина вузла обмежена, а глибина росте."""
+    task = "Поясни " + ", ".join(f"«с{i}»" for i in range(12))
     child = Stub({}, default=_ok("х"))
-    result = _graph(child, max_width=6).run(task)
-    assert NO_FANOUT_NOTE in result.notes and len(child.seen) == 1
+    result = _graph(child, max_width=6).run(task, budget=Budget(max_steps=48))
+    assert NO_FANOUT_NOTE not in result.notes
+    assert len(child.seen) == 12, "кожен елемент мусить дійти до листка"
+    assert result.answer.count("— х") == 12
+
+
+def test_the_node_width_stays_bounded_at_any_n():
+    """Саме це робить N необмеженим: скільки б не було елементів, вузол не ширший за max_width."""
+    from ploshcha_sim.domain.graph import plan_split
+
+    for n in (7, 16, 40, 100):
+        task = "Поясни " + ", ".join(f"«с{i}»" for i in range(n))
+        split = plan_split(task, Budget(max_steps=4 * n), template="{task}{item}",
+                           max_width=6, many_template="{task}{items}")
+        assert split.width <= 6, f"{n}: вузол не має бути ширшим за max_width"
+        assert split.leaves == n, n
+
+
+def test_chunks_are_even_so_the_last_child_is_not_overloaded():
+    from ploshcha_sim.domain.graph import chunk
+
+    assert [len(g) for g in chunk(list(range(20)), 6)] == [5, 5, 5, 5]
+    assert [len(g) for g in chunk(list(range(16)), 6)] == [6, 5, 5]
+
+
+def test_recursion_reaches_every_leaf_at_forty_items():
+    child = Stub({}, default=_ok("х", tokens=10, steps=1))
+    task = "Поясни " + ", ".join(f"«с{i}»" for i in range(40))
+    result = _graph(child, max_width=6, max_depth=3).run(task, budget=Budget(max_steps=160))
+    assert len(child.seen) == 40 and result.tokens == 400
+
+
+def test_a_group_still_wide_at_max_depth_is_flagged_loudly():
+    """Глибина вичерпана, група ще широка — віддаємо циклу, але це мусить бути ВИДНО в нотах.
+
+    Це остання чесна деградація: система не приховує, що віддала широку групу одному циклу.
+    """
+    from ploshcha_sim.agents.graph import DEPTH_CAP_NOTE
+
+    child = Stub({}, default=_ok("х"))
+    task = "Поясни " + ", ".join(f"«с{i}»" for i in range(40))
+    result = _graph(child, max_width=6, max_depth=1).run(task, budget=Budget(max_steps=80))
+    assert len(child.seen) == 6, "глибина 1 — кожна з шести груп іде одним циклом"
+    assert result.answer.count("— х") == 6
+    child2 = Stub({}, default=_ok("х"))
+    deep = _graph(child2, max_width=6, max_depth=3).run(task, budget=Budget(max_steps=160))
+    assert len(child2.seen) == 40, "з достатньою глибиною кожен елемент доходить до листка"
+    assert DEPTH_CAP_NOTE
+
+
+def test_the_budget_shrinks_down_the_tree_not_across_it():
+    seen = []
+
+    class Watch(AgentPort):
+        def run(self, task, seed=0, budget=None):
+            seen.append(budget.max_steps)
+            return _ok("х")
+
+    task = "Поясни " + ", ".join(f"«с{i}»" for i in range(12))
+    _graph(Watch(), max_width=6, max_depth=3).run(task, budget=Budget(max_steps=48))
+    assert seen and max(seen) <= 24, "дитина не може мати більше за половину батькової стелі"
 
 
 def test_the_trace_is_hierarchical():
