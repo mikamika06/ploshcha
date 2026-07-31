@@ -50,6 +50,8 @@ class EvalResult(BaseModel):
     incidents: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     tools: list[str] = Field(default_factory=list)
+    # Докази потрібні, щоб переграти СУДДЮ без повторного прогону: один виклик замість трьох кроків.
+    scratch: list[dict] = Field(default_factory=list)
     answer: str | None = None
 
 
@@ -122,7 +124,7 @@ def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int]
                     prompt_by_lane=dict(getattr(result, 'prompt_by_lane', {}) or {}),
                     accepted=result.accepted, degraded=result.degraded, partial=result.partial,
                     verdict_kind=result.verdict_kind, outcome=result.outcome,
-                    evidence=result.evidence,
+                    evidence=result.evidence, scratch=result.scratch,
                     incidents=list(result.incidents), notes=list(result.notes),
                     tools=[x["call"]["tool"] for x in result.scratch],
                     answer=result.answer,

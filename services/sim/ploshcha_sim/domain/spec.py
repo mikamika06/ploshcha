@@ -12,7 +12,7 @@ Toolset = Literal["default", "ua", "registry", "registry_agg", "registry_teach",
 PlannerKind = Literal["none", "skeleton"]
 MemoryKind = Literal["none", "notebook"]
 AnswerChannel = Literal["schema", "text"]
-VerifyMode = Literal["basic", "grounded", "auto"]
+VerifyMode = Literal["basic", "grounded", "auto", "contrast"]
 JudgeLane = Literal["auto", "mamay", "lapa"]
 
 

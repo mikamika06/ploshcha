@@ -107,7 +107,7 @@ STOP = {"і", "й", "та", "або", "чи", "що", "який", "яка", "я�
         "якого", "нього", "неї", "них", "має", "мати", "бути", "робити", "означає", "предметів"}
 
 MIN_WORD = 4
-MAX_KEYS = 6
+MAX_KEYS = 10
 MIN_CONTENT = 2
 FUNCTIONAL = ("живається", "підсилення", "виражає", "спонукання")
 
@@ -123,7 +123,7 @@ GENERIC = {"велик", "невел", "багат", "мален", "різни",
            "котри", "щось", "хтось", "місце", "предм", "люди", "людей"}
 
 
-CROSSREF = re.compile(r"\(\s*(?:в|у)?\s*\d+[^)]*знач[^)]*\)|\bзнач\.")
+CROSSREF = re.compile(r"\([^)]*знач[^)]*\)|\bзнач\w*\.?")
 
 
 def _strip_labels(sense: str) -> str:
@@ -153,11 +153,12 @@ def derive_keys(word: str, senses: list[str]) -> tuple[list[str], str | None]:
     «те ж саме, що X» без власного змісту, і однослівні тлумачення — на них один стем ловить надто
     багато. Краще менший, але чистий набір.
     """
-    body = next((_strip_labels(x) for x in senses if _strip_labels(x)), "")
-    if body:
-        if any(mark in body for mark in FUNCTIONAL):
+    first = next((_strip_labels(x) for x in senses if _strip_labels(x)), "")
+    body = " ; ".join(b for b in (_strip_labels(x) for x in senses) if b)
+    if first:
+        if any(mark in first for mark in FUNCTIONAL):
             return [], "службове слово: значення описує вживання, не зміст"
-        if any(mark in body for mark in META):
+        if any(mark in first for mark in META):
             return [], "метавизначення: описує граматику, не зміст"
         for marker in SAME_AS:
             if marker in body:
@@ -169,8 +170,7 @@ def derive_keys(word: str, senses: list[str]) -> tuple[list[str], str | None]:
                 if not _self_reference(word, w) and w[:5] not in GENERIC and w not in GENERIC]
         if len(keys) >= MIN_CONTENT:
             return keys[:MAX_KEYS], None
-    return [], (f"ПЕРШЕ значення не дає {MIN_CONTENT}+ змістових слів; провалюватись у наступне "
-                f"нельзя — приклад ілюструє саме перше")
+    return [], f"жодне значення не дає {MIN_CONTENT}+ змістових слів"
 
 
 def swap_foil(word: str, entries: dict[str, dict], keys: list[str]) -> str | None:
@@ -270,7 +270,10 @@ def main() -> None:
             auto_skipped.append(f"{word}: {why}")
             continue
         example = entry["приклади"][0]
-        clean = [k for k in stems if k.casefold() not in example.casefold()]
+        # Фільтруємо проти ВСЬОГО тексту задачі, не лише проти прикладу: шаблон питання містить
+        # «означає», і ключ «знач» проходив би зі старту.
+        task_text = TASK.format(приклад=example, слово=word).casefold()
+        clean = [k for k in stems if k.casefold() not in task_text]
         if len(clean) < 1:
             auto_skipped.append(f"{word}: усі ключі — ехо з речення")
             continue

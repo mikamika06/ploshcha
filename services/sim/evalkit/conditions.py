@@ -195,6 +195,7 @@ CONDITIONS["hetero-auto@8"] = BASE.with_(max_steps=8, verify_mode="auto")
 CONDITIONS.update(LEXIS)
 # ABSTAIN-STABILITY: чесна відмова має `pass^k` = 0.000 при t=0.7 — модель уміє її дати, але не
 # надійно. Гіпотеза K7g: детермінований крок треба віддати КОДУ. Пара різниться лише цим прапорцем.
+CONDITIONS["lex-am-jm-contrast"] = CONDITIONS["lex-am-jm"].with_(verify_mode="contrast")
 CONDITIONS["lex-ref-abs-t7@8"] = CONDITIONS["lex-ref-t7@8"].with_(absent_answer=True)
 
 
