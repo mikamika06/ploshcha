@@ -29,6 +29,9 @@ LICENSE = "тексти переважно PD; вікірозмітка CC BY-SA
 DELAY = 1.2
 MIN_CHARS = 250
 CHUNK_CHARS = 2000
+# Хвіст коротший за це приклеюється до попередньої частини: частина на 56 символів — це не документ,
+# а шум, який у замірі важить стільки ж, скільки повний абзац.
+MIN_TAIL = 200
 
 DATA = Path(__file__).resolve().parents[1] / "evalkit" / "data"
 FOOTER = re.compile(r"\n==\s*(Джерела|Примітки|Посилання)\s*==.*", re.S)
@@ -36,6 +39,10 @@ FOOTER = re.compile(r"\n==\s*(Джерела|Примітки|Посилання
 # Текст беремо через `action=parse`, бо він РОЗКРИВАЄ трансклюзію: на Вікіджерелах сторінка часто
 # лише навігаційний шаблон, а зміст лежить у сканах (`Сторінка:…djvu/NNN`). Спроба чистити вікітекст
 # самотужки давала 12 символів зі 458 — інгест «працював» і приносив порожнечу.
+# Межі абзаців треба перетворити в переноси ДО зняття теґів. Інакше `re.sub(r"\s+", " ")` знищує
+# всі переноси, `_chunks` (ріже по \n) не знаходить нічого, і замість частин по 2000 символів у
+# чергу лягає одна на 45 549. Тобто різалка «працювала» й не різала ніколи.
+BREAK = re.compile(r"</(?:p|div|li|h[1-6]|tr|blockquote)\s*>|<br\s*/?>", re.I)
 HTML_TAG = re.compile(r"<[^>]+>")
 ENTITY = re.compile(r"&#?\w+;")
 NAV = re.compile(r"^[◀▶\s]*|[◀▶]")
@@ -44,10 +51,12 @@ SUBLINK = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
 
 
 def _plain(html: str) -> str:
-    text = HTML_TAG.sub(" ", html)
+    text = BREAK.sub("\n", html)
+    text = HTML_TAG.sub(" ", text)
     text = ENTITY.sub(" ", text)
     text = NAV.sub(" ", text)
-    return re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[ \t\u00a0]+", " ", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _subpages(title: str, wikitext: str) -> list[str]:
@@ -93,6 +102,12 @@ def _chunks(text: str) -> list[str]:
             current = f"{current}\n{para}" if current else para
     if current:
         out.append(current)
+    if len(out) > 1 and len(out[-1]) < MIN_TAIL:
+        # `pop()` спершу, і лише тоді присвоєння: у виразі `out[-2] = f"…{out.pop()}"` правий бік
+        # виконується першим, список коротшає, і `out[-2]` уже вказує не туди — IndexError на двох
+        # частинах.
+        tail = out.pop()
+        out[-1] = f"{out[-1]}\n{tail}"
     return out
 
 
