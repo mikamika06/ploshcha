@@ -24,6 +24,7 @@ from evalkit.conditions import (
     CONDITIONS,
     PAIRS,
     grid,
+    judge_warnings,
     prompt_ids,
     shape_warnings,
     spec_shas,
@@ -75,6 +76,9 @@ def main():
         items = items[:limit]
 
     warnings = shape_warnings(runners)
+    judges = judge_warnings(runners)
+    for name, why in judges.items():
+        print(f"  ⚠ {name}: {why}")
     for name, spec in specs.items():
         print(f"{name:<24} spec={spec.sha256} промпт={spec.prompt_id} "
               f"режим={spec.mode} routing={spec.routing} канал={spec.answer_channel}"

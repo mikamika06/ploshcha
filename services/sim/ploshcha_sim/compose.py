@@ -49,11 +49,20 @@ def build_skillbox(spec: AppSpec):
 
 
 def build_router(spec: AppSpec, *, lapa, mamay):
+    """Ярус СУДДІ — окрема вісь від яруса відповіді.
+
+    Доти `routing` керував усім одразу, тому `routing="lapa"` означало «Lapa судить Lapa» — прямо
+    проти оголошеного інваріанта. Порушення було невидиме, бо осі не існувало.
+    """
     if spec.routing == "hetero":
-        return profile_router(lapa, mamay)
-    if spec.routing == "mamay":
-        return single_model_router(mamay, lane="mamay")
-    return single_model_router(lapa, lane="lapa")
+        router = profile_router(lapa, mamay)
+    elif spec.routing == "mamay":
+        router = single_model_router(mamay, lane="mamay")
+    else:
+        router = single_model_router(lapa, lane="lapa")
+    if spec.judge_lane != "auto":
+        router.set_judge(mamay if spec.judge_lane == "mamay" else lapa, spec.judge_lane)
+    return router
 
 
 def build_effort(spec: AppSpec):
@@ -88,6 +97,7 @@ def build_orchestrator(spec: AppSpec, *, lapa, mamay, system: str | None = None,
         planner=build_planner(spec),
         verifier=spec.verifier,
         verify_mode=spec.verify_mode,
+        absent_answer=spec.absent_answer,
         system=system,
         tail=tail,
         prompt_id=prompt_id,

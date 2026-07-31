@@ -13,6 +13,7 @@ PlannerKind = Literal["none", "skeleton"]
 MemoryKind = Literal["none", "notebook"]
 AnswerChannel = Literal["schema", "text"]
 VerifyMode = Literal["basic", "grounded", "auto"]
+JudgeLane = Literal["auto", "mamay", "lapa"]
 
 
 class AppSpec(BaseModel):
@@ -33,6 +34,8 @@ class AppSpec(BaseModel):
     memory: MemoryKind = "none"
     verifier: bool = True
     verify_mode: VerifyMode = "basic"
+    judge_lane: JudgeLane = "auto"
+    absent_answer: bool = False
     recovery: bool = False
     max_steps: int = 5
     max_tokens: int = 512

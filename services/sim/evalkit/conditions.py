@@ -174,10 +174,28 @@ LEXIS: dict[str, AppSpec] = {
                                     prompt_id="agent/v2-lexis", answer_channel="text",
                                     temperature=0.7, verify_mode="grounded"),
 }
+
+# JUDGE-LANE: ярус судді як ОКРЕМА вісь. Доти `routing` керував усім, тому числа K9 отримані в
+# режимі самосуду, а `routing="lapa"` ще й порушував інваріант «ніколи Lapa-судить-Lapa» — невидимо,
+# бо осі не існувало. t=0 навмисно: відповіді детерміновані, тож дві умови бачать ТІ САМІ відповіді,
+# і різниця — це чисто суддя.
+JUDGE = BASE.with_(max_steps=8, toolset="lexis", prompt_id="agent/v2-lexis",
+                   answer_channel="text", verify_mode="grounded")
+JUDGE_LANE: dict[str, AppSpec] = {
+    "lex-am-jm": JUDGE.with_(routing="mamay", judge_lane="mamay"),
+    "lex-am-jl": JUDGE.with_(routing="mamay", judge_lane="lapa"),
+    "lex-al-jl": JUDGE.with_(routing="lapa", judge_lane="lapa"),
+    "lex-al-jm": JUDGE.with_(routing="lapa", judge_lane="mamay"),
+}
+CONDITIONS.update(JUDGE_LANE)
+
 # Регресія поза `lexis`: одне джерело доказів не доводить, що суддя полагоджений загалом.
 CONDITIONS["hetero-vg@8"] = BASE.with_(max_steps=8, verify_mode="grounded")
 CONDITIONS["hetero-auto@8"] = BASE.with_(max_steps=8, verify_mode="auto")
 CONDITIONS.update(LEXIS)
+# ABSTAIN-STABILITY: чесна відмова має `pass^k` = 0.000 при t=0.7 — модель уміє її дати, але не
+# надійно. Гіпотеза K7g: детермінований крок треба віддати КОДУ. Пара різниться лише цим прапорцем.
+CONDITIONS["lex-ref-abs-t7@8"] = CONDITIONS["lex-ref-t7@8"].with_(absent_answer=True)
 
 
 PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
@@ -198,6 +216,9 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("lex-ref-lapa@8", "lex-ref-lapa-vg@8"),
          ("lex-loop", "lex-loop-vg"),
          ("lex-loop-t7", "lex-ref-t7@8"),
+         ("lex-ref-t7@8", "lex-ref-abs-t7@8"),
+         ("lex-am-jm", "lex-am-jl"),
+         ("lex-al-jl", "lex-al-jm"),
          ("hetero@8", "hetero-vg@8"),
          ("chain-schema@16", "chain-text@16"),
          ("chain-schema@8", "chain-text@8"),
@@ -285,4 +306,29 @@ def shape_warnings(names=None) -> dict[str, list[str]]:
         notes = shape_notes(build_skillbox(spec).skill_specs(), coverage=spec.coverage)
         if notes and spec.mode != "single":
             out[name] = notes
+    return out
+
+
+def judge_warnings(names=None) -> dict[str, str]:
+    """Самосуд — властивість КОНФІГУРАЦІЇ, тож видно її має бути в звіті, а не в чиїйсь памʼяті.
+
+    Інваріант проєкту забороняє «Lapa судить Lapa»; решта самосуду дозволена, але мусить бути
+    підписана, бо модель, що оцінює власний вивід, — це відома системна упередженість.
+    """
+    from ploshcha_sim.compose import build_router
+
+    class _Stub:
+        def __init__(self, name):
+            self.model = name
+
+    chosen = list(names) if names else list(CONDITIONS)
+    out = {}
+    for name in chosen:
+        spec = CONDITIONS[name]
+        router = build_router(spec, lapa=_Stub("lapa"), mamay=_Stub("mamay"))
+        if not spec.verifier or not router.self_judging():
+            continue
+        lane = router.lane("judge")
+        out[name] = ("ПОРУШЕННЯ ІНВАРІАНТА: Lapa судить Lapa" if lane == "lapa"
+                     else f"самосуд: {lane} оцінює власний вивід")
     return out

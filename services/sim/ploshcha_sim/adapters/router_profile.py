@@ -31,6 +31,15 @@ class ProfileRouter(ModelRouter):
     def lane(self, kind: StepKind) -> ModelLane:
         return self._lanes.get(kind, "unknown")
 
+    def set_judge(self, llm: LlmPort, lane: ModelLane) -> None:
+        self._map["judge"] = llm
+        self._lanes["judge"] = lane
+
+    def self_judging(self) -> bool:
+        """Суддя й той, хто відповідає, — один ярус. Інваріант проєкту забороняє це для Lapa."""
+        answering = {self._lanes.get(k) for k in ("generate", "synthesize", "decide")}
+        return self._lanes.get("judge") in answering
+
 
 def profile_router(lapa: LlmPort, mamay: LlmPort) -> ProfileRouter:
     mapping: dict[StepKind, LlmPort] = {}

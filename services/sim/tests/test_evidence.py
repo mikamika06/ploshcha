@@ -200,3 +200,53 @@ def test_no_evidence_is_not_a_silent_pass_of_a_wrong_answer():
     verdict = verify("задача", "вигадка", None, None, mode="auto", grounding="optional")
     assert verdict.accepted is True and verdict.kind == "no_evidence"
     assert verdict.kind != "supported"
+
+
+def test_the_refusal_is_composed_by_code_and_names_what_was_asked():
+    """K7g: детермінований крок треба віддати коду. Зміст відмови повністю визначений станом
+    доказів, а модель на ньому нестабільна (`pass^k` = 0.000 при t=0.7)."""
+    from ploshcha_sim.domain.evidence import absent_answer, failed_queries
+
+    scratch = [{"call": {"tool": "словник", "слово": "бардина"}, "result": MISSING}]
+    text = absent_answer(scratch)
+    assert "бардина" in text and "немає статті" in text
+    assert failed_queries(scratch) == ["бардина"]
+
+
+def test_no_refusal_is_composed_when_something_was_found():
+    from ploshcha_sim.domain.evidence import absent_answer
+
+    assert absent_answer([{"result": FOUND}]) is None
+    assert absent_answer([{"result": MISSING}, {"result": FOUND}]) is None
+    assert absent_answer([]) is None
+
+
+def test_the_composed_refusal_is_identical_across_calls():
+    """Сенс усієї зміни: детермінованість. Однаковий стан доказів — байт-у-байт та сама відмова."""
+    from ploshcha_sim.domain.evidence import absent_answer
+
+    scratch = [{"call": {"tool": "словник", "слово": "абахта"}, "result": MISSING}]
+    assert absent_answer(scratch) == absent_answer(list(scratch))
+
+
+def test_the_composed_refusal_passes_the_shared_refusal_vocabulary():
+    """Якщо код складає відмову словами, яких не знає словник відмов, набір читатиме її як провал."""
+    from evalkit.refusal import ADMIT
+    from ploshcha_sim.domain.evidence import absent_answer
+
+    text = absent_answer([{"call": {"tool": "словник", "слово": "х"}, "result": MISSING}]).casefold()
+    assert any(v in text for v in ADMIT)
+
+
+def test_the_orchestrator_replaces_a_fabrication_with_the_composed_refusal():
+    o = _orch([_call("lookup_fact", entity="Хтось"), _call("final_answer", text="це стародавній обряд")],
+              verifier=False, recovery=False, absent_answer=True)
+    result = o.run("питання", seed=1)
+    assert "Хтось" in result.answer and "не подаю" in result.answer
+    assert result.outcome == "abstain" and "absent_answer_composed" in result.notes
+
+
+def test_the_orchestrator_leaves_a_grounded_answer_alone():
+    o = _orch([_call("lookup_fact", entity="Тарас Шевченко"), _call("final_answer", text="гетьман")],
+              verifier=False, recovery=False, absent_answer=True)
+    assert o.run("питання", seed=1).answer == "гетьман"

@@ -7,7 +7,13 @@ from ..domain.coverage import (
     render_pending,
     targets_pending,
 )
-from ..domain.evidence import evidence_state, found_in, outcome_of
+from ..domain.evidence import (
+    ABSENT_COMPOSED,
+    absent_answer,
+    evidence_state,
+    found_in,
+    outcome_of,
+)
 from ..domain.gate import FINAL_TOOL, needs_loop
 from ..domain.recovery import (
     ABSENT_HINT,
@@ -120,7 +126,8 @@ class Orchestrator:
                  tail: str | None = None, prompt_id: str = "", prompt_sha: str = "",
                  answer_channel: str = "schema", answer_instruction: str | None = None,
                  plan_guard: bool = False, coverage: bool = False,
-                 coverage_guard: bool = False, verify_mode: str = "basic"):
+                 coverage_guard: bool = False, verify_mode: str = "basic",
+                 absent_answer: bool = False):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -141,6 +148,7 @@ class Orchestrator:
         self.coverage = coverage
         self.coverage_guard = coverage_guard
         self.verify_mode = verify_mode
+        self.absent_answer = absent_answer
         self.has_data_tools = needs_loop(tools.specs())
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
@@ -270,6 +278,12 @@ class Orchestrator:
                 state.incidents.append(NO_FINAL)
 
         evidence = evidence_state(state.scratch)
+        if self.absent_answer and (composed := absent_answer(state.scratch)) is not None:
+            if state.answer != composed:
+                # Не інцидент, а ДІЯ системи: `_record` поклав би це в `incidents` і зіпсував
+                # профіль збоїв, за яким читають надійність.
+                state.notes.append(ABSENT_COMPOSED)
+            state.answer, state.done, state.degraded = composed, True, False
         grounding = "required" if self.has_data_tools else "optional"
         accepted = False
         reason = None
