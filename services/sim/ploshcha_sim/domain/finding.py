@@ -28,6 +28,11 @@ class Finding(BaseModel):
     provenance: str = ""
     tokens: int = 0
     steps: int = 0
+    # Ярусна розкладка дитини піднімається як є. Вигаданий ярус «child» тарифікувався за
+    # UNKNOWN_PRICE (найдорожча ставка) і з нульовою часткою промпту, тому гроші графа були
+    # завищені: при ширині 4 відношення в токенах 2.16×, а в «доларах» виходило 2.59×.
+    tokens_by_lane: dict[str, int] = Field(default_factory=dict)
+    prompt_by_lane: dict[str, int] = Field(default_factory=dict)
     incidents: list[str] = Field(default_factory=list)
 
     @property

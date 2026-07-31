@@ -86,6 +86,8 @@ class AgentGraph(AgentPort):
             return Finding(task=subtask, claim=result.answer, kind=result.outcome,
                            evidence=result.evidence, provenance=span,
                            tokens=result.tokens + result.aux_tokens, steps=result.steps,
+                           tokens_by_lane=dict(result.tokens_by_lane),
+                           prompt_by_lane=dict(result.prompt_by_lane),
                            incidents=list(result.incidents))
 
         if self.workers <= 1 or split.width == 1:
@@ -112,8 +114,13 @@ class AgentGraph(AgentPort):
         merged = Budget(max_steps=budget.max_steps, max_tokens=budget.max_tokens)
         merged.steps_used = sum(f.steps for f in findings)
         merged.tokens_used = sum(f.tokens for f in findings)
+        # Ярусна розкладка складається з ДИТЯЧОЇ, а не зводиться до вигаданого ярусу: інакше облік
+        # грошей іде за UNKNOWN_PRICE із нульовою часткою промпту, і ціна графа завищується.
         for finding in findings:
-            merged.tokens_by_lane["child"] = merged.tokens_by_lane.get("child", 0) + finding.tokens
+            for lane, count in finding.tokens_by_lane.items():
+                merged.tokens_by_lane[lane] = merged.tokens_by_lane.get(lane, 0) + count
+            for lane, count in finding.prompt_by_lane.items():
+                merged.prompt_by_lane[lane] = merged.prompt_by_lane.get(lane, 0) + count
 
         outcome = merge_outcome(findings)
         return TaskResult(
@@ -125,6 +132,7 @@ class AgentGraph(AgentPort):
             steps=merged.steps_used,
             tokens=merged.tokens_used,
             tokens_by_lane=dict(sorted(merged.tokens_by_lane.items())),
+            prompt_by_lane=dict(sorted(merged.prompt_by_lane.items())),
             incidents=[i for f in findings for i in f.incidents],
             notes=[FANOUT_NOTE, f"width={split.width}", f"depth={split.depth}"]
             + [f"missing={m}" for m in missing],

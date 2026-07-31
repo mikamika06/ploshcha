@@ -36,9 +36,10 @@ class Stub(AgentPort):
         return self.default.model_copy(deep=True)
 
 
-def _ok(text, evidence=True, steps=3, tokens=100):
+def _ok(text, evidence=True, steps=3, tokens=100, lane="mamay"):
     return TaskResult(answer=text, accepted=True, outcome="answer", evidence=evidence,
-                      steps=steps, tokens=tokens)
+                      steps=steps, tokens=tokens, tokens_by_lane={lane: tokens},
+                      prompt_by_lane={lane: tokens // 2})
 
 
 def _absent(steps=3, tokens=80):
@@ -152,7 +153,17 @@ def test_children_costs_are_summed_not_lost():
     child = Stub({}, default=_ok("х", steps=2, tokens=50))
     result = _graph(child).run(TASK4, budget=Budget(max_steps=16))
     assert result.steps == 8 and result.tokens == 200
-    assert result.tokens_by_lane == {"child": 200}
+    # Ярус береться ДИТЯЧИЙ, не вигаданий: інакше гроші рахуються за UNKNOWN_PRICE і завищуються.
+    assert result.tokens_by_lane == {"mamay": 200}
+    assert result.prompt_by_lane == {"mamay": 100}
+
+
+def test_lane_attribution_survives_recursion():
+    """Через два рівні розкладка мусить лишитись справжньою, а не злитись у щось безіменне."""
+    child = Stub({}, default=_ok("х", tokens=10, lane="lapa"))
+    task = "Поясни " + ", ".join(f"«с{i}»" for i in range(12))
+    result = _graph(child, max_width=6, max_depth=3).run(task, budget=Budget(max_steps=48))
+    assert result.tokens_by_lane == {"lapa": 120}, result.tokens_by_lane
 
 
 def test_parallel_output_is_ordered_by_index_not_by_completion():
