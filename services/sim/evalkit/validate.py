@@ -25,6 +25,7 @@ ITEM_SET_TOOLSETS: dict[str, tuple[str, ...]] = {
     "fanout8": ("lexis",),
     "fanout12": ("lexis",),
     "fanout16": ("lexis",),
+    "inject": ("none", "lexis"),
 }
 
 

@@ -1,3 +1,5 @@
+from .adapters.guard_rules import RuleGuard
+from .ports.guard import Policy
 from .adapters.memory_notebook import NotebookMemory
 from .adapters.planner_skeleton import SkeletonPlanner
 from .adapters.router_profile import (
@@ -111,6 +113,8 @@ def build_orchestrator(spec: AppSpec, *, lapa, mamay, system: str | None = None,
         verifier=spec.verifier,
         verify_mode=spec.verify_mode,
         absent_answer=spec.absent_answer,
+        guard=RuleGuard(Policy(on_threat="strip" if spec.guard_strip else "note"))
+        if spec.guard else None,
         system=system,
         tail=tail,
         prompt_id=prompt_id,

@@ -15,6 +15,7 @@ from ..domain.evidence import (
     outcome_of,
 )
 from ..domain.gate import FINAL_TOOL, needs_loop
+from ..domain.injection import tag_for
 from ..domain.recovery import (
     ABSENT_HINT,
     CAPS,
@@ -54,6 +55,8 @@ STEP_INSTRUCTION = "Наступний крок — один JSON (виклик 
 PREMATURE_FINAL = "premature_final"
 NO_FINAL = "no_final_answer"
 PREMATURE_COVER = "premature_final_pending"
+# Виявлена інʼєкція — НЕ інцидент виконання: система відпрацювала правильно, тому в `notes`.
+ATTACK_NOTE = "attack_detected"
 COVER_GUARD_CAP = 2
 COVER_GUARD_HINT = ("Перелік ще не обійдений — лишились елементи зі списку вище. "
                    "Не завершуй: дістань наступний елемент.")
@@ -127,7 +130,7 @@ class Orchestrator:
                  answer_channel: str = "schema", answer_instruction: str | None = None,
                  plan_guard: bool = False, coverage: bool = False,
                  coverage_guard: bool = False, verify_mode: str = "basic",
-                 absent_answer: bool = False):
+                 absent_answer: bool = False, guard=None):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -149,10 +152,21 @@ class Orchestrator:
         self.coverage_guard = coverage_guard
         self.verify_mode = verify_mode
         self.absent_answer = absent_answer
+        self.guard = guard
         self.has_data_tools = needs_loop(tools.specs())
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
+        if self.guard is not None:
+            # Чужий текст іде в промпт ОБГОРНУТИМ, а виявлені накази — в `notes`. Обгортка перед
+            # усім іншим: після склеювання з завданням відрізнити дані від наказу вже нічим.
+            screening = self.guard.screen(task, tag=tag_for(self.run_id))
+            task = self.guard.prepare(task, tag=tag_for(self.run_id))
+            if not screening.clean:
+                self._threats = [ATTACK_NOTE + ":" + k for k in screening.kinds]
+            else:
+                self._threats = []
         state = TaskState(task=task, budget=budget or Budget())
+        state.notes.extend(getattr(self, "_threats", []))
         state.plan = self.planner.plan(task, self.tools)
         notebook = self.notebook() if self.notebook is not None else None
         seen: list[str] = []

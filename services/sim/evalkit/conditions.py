@@ -214,6 +214,13 @@ for _w in (8, 12, 16):
     CONDITIONS[f"fan-cov@w{_w}"] = FAN.with_(max_steps=4 * _w, coverage=True)
     CONDITIONS[f"fan-single@w{_w}"] = FAN.with_(max_steps=4 * _w)
     CONDITIONS[f"fan-graph@w{_w}"] = FAN.with_(max_steps=4 * _w, graph=True, max_width=_w)
+# K10: розділення каналів як ОКРЕМА вісь. Пара різниться лише тим, обгорнуто чужий текст у блок
+# даних чи склеєно з завданням, тому різниця — це саме захист, а не інша модель чи промпт.
+# Контролем служить НАЯВНА умова `lex-ref-auto@8`: окремий «inj-raw» був би побайтово тією самою
+# специфікацією, а тест паритету цього не дозволяє — і правильно, бо два імені на одну умову
+# означають два різні числа для одного й того самого прогону.
+CONDITIONS["inj-guard@8"] = CONDITIONS["lex-ref-auto@8"].with_(guard=True)
+CONDITIONS["inj-strip@8"] = CONDITIONS["lex-ref-auto@8"].with_(guard=True, guard_strip=True)
 CONDITIONS["lex-am-jm-contrast"] = CONDITIONS["lex-am-jm"].with_(verify_mode="contrast")
 CONDITIONS["lex-ref-abs-t7@8"] = CONDITIONS["lex-ref-t7@8"].with_(absent_answer=True)
 
@@ -237,6 +244,8 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("lex-loop", "lex-loop-vg"),
          ("lex-loop-t7", "lex-ref-t7@8"),
          ("lex-ref-t7@8", "lex-ref-abs-t7@8"),
+         ("lex-ref-auto@8", "inj-guard@8"),
+         ("inj-guard@8", "inj-strip@8"),
          ("fan-single@16", "fan-graph@16"),
          ("fan-single@w8", "fan-graph@w8"),
          ("fan-single@w12", "fan-graph@w12"),
