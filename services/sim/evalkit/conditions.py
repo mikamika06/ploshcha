@@ -202,6 +202,12 @@ FAN = BASE.with_(max_steps=16, routing="mamay", toolset="lexis", prompt_id="agen
                  answer_channel="text", verify_mode="auto")
 CONDITIONS["fan-single@16"] = FAN
 CONDITIONS["fan-graph@16"] = FAN.with_(graph=True)
+# K6-WIDTH: стеля кроків масштабується як 4×ширина, тому кожна дитина має однакові 4 кроки на будь-якій
+# ширині, а один цикл дістає ТУ САМУ загальну стелю. Інакше при ширині 12 діти отримали б 1 крок і
+# «граф гірший» означало б лише «граф голодний».
+for _w in (8, 12, 16):
+    CONDITIONS[f"fan-single@w{_w}"] = FAN.with_(max_steps=4 * _w)
+    CONDITIONS[f"fan-graph@w{_w}"] = FAN.with_(max_steps=4 * _w, graph=True, max_width=_w)
 CONDITIONS["lex-am-jm-contrast"] = CONDITIONS["lex-am-jm"].with_(verify_mode="contrast")
 CONDITIONS["lex-ref-abs-t7@8"] = CONDITIONS["lex-ref-t7@8"].with_(absent_answer=True)
 
@@ -226,6 +232,8 @@ PAIRS = (("mamay@8", "mamay+rec@8"), ("hetero@8", "hetero+rec@8"),
          ("lex-loop-t7", "lex-ref-t7@8"),
          ("lex-ref-t7@8", "lex-ref-abs-t7@8"),
          ("fan-single@16", "fan-graph@16"),
+         ("fan-single@w8", "fan-graph@w8"),
+         ("fan-single@w12", "fan-graph@w12"),
          ("lex-am-jm", "lex-am-jl"),
          ("lex-al-jl", "lex-al-jm"),
          ("hetero@8", "hetero-vg@8"),

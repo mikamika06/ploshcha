@@ -22,6 +22,9 @@ ITEM_SET_TOOLSETS: dict[str, tuple[str, ...]] = {
     "docs": ("docs", "docs_agg", "docs_years"),
     "lexis": ("none", "lexis"),
     "fanout": ("lexis",),
+    "fanout8": ("lexis",),
+    "fanout12": ("lexis",),
+    "fanout16": ("lexis",),
 }
 
 

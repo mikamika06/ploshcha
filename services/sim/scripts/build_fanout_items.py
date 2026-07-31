@@ -10,6 +10,7 @@
 Запуск: uv run python scripts/build_fanout_items.py
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -19,14 +20,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from build_lexis_items import derive_keys  # noqa: E402
 
 DATA = Path(__file__).resolve().parents[1] / "evalkit" / "data" / "lexis-uk.json"
-OUT = Path(__file__).resolve().parents[1] / "evalkit" / "items" / "fanout.jsonl"
-
-WIDTH = 4
+ITEMS = Path(__file__).resolve().parents[1] / "evalkit" / "items"
 TASK = ("Поясни, що означає кожне з цих рідкісних українських слів: {words}.\n"
         "Дай по одному короткому реченню на кожне слово, без JSON.")
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--width", type=int, default=4)
+    args = ap.parse_args()
+    WIDTH = args.width
+    OUT = ITEMS / ("fanout.jsonl" if WIDTH == 4 else f"fanout{WIDTH}.jsonl")
     payload = json.loads(DATA.read_text(encoding="utf-8"))
     pool = []
     for entry in payload["статті"]:
