@@ -5,6 +5,8 @@ export interface VillagerState {
   name: string;
   role: string;
   bio: string;
+  /** Виражені ознаки норову — з них сцена рахує вигляд, а інспектор показує людину. */
+  traits: string[];
   activity?: string;
   location?: string; // поточний POI (з agent.moved) → зайнятість локацій
   plan?: { summary: string; steps: string[] };
@@ -99,7 +101,8 @@ export class SimStore {
         break;
       case "casting.done":
         for (const v of ev.payload.cast) {
-          s.villagers.set(v.id, { id: v.id, name: v.name, role: v.role, bio: v.bio, thoughts: [], said: [] });
+          s.villagers.set(v.id, { id: v.id, name: v.name, role: v.role, bio: v.bio,
+                                  traits: v.traits ?? [], thoughts: [], said: [] });
         }
         break;
       case "agent.moved": {

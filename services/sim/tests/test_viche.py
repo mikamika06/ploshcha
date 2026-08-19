@@ -761,3 +761,106 @@ def test_one_person_stands_in_one_place(tmp_path):
     standing = store.standing()
     assert len(standing) == 1
     assert standing[0]["poi"] == "dzvin", "чинне ОСТАННЄ доручення"
+
+
+# ── Ш3: породження людей ──────────────────────────────────────────────────────
+
+def test_a_trait_names_the_pole_not_the_axis():
+    """★ Найгірший клас: вісь «старий» описує і старого, і молодого. Ядро слало НАЗВУ ОСІ, тож
+    дівчина з віком 0.00 приїжджала на сцену з міткою «старий» і фарбувалась сивиною."""
+    from ploshcha_sim.domain.people import Person
+
+    young = Person(role="parubok", traits={"старий": 0.02, "гарячий": 0.9})
+    keys = [t.key for t in young.marked]
+    assert "молодий" in keys and "старий" not in keys
+    assert "гарячий" in keys
+
+
+def test_the_role_bends_the_dice_but_does_not_fix_it():
+    """Кубик без ролі дав молодого діда — село перестало читатись. Але діапазон мусить лишитись."""
+    import statistics
+
+    from ploshcha_sim.domain.people import roll_traits
+
+    old = statistics.mean(roll_traits(s, "did")["старий"] for s in range(40))
+    young = statistics.mean(roll_traits(s, "parubok")["старий"] for s in range(40))
+    assert old > 0.7 and young < 0.3
+    spread = [roll_traits(s, "did")["старий"] for s in range(40)]
+    assert max(spread) - min(spread) > 0.3, "зміщення не сміє перетворитись на константу"
+
+
+def test_the_same_seed_is_the_same_village():
+    from ploshcha_sim.domain.people import roll_traits, village_roles
+
+    roles = [p.role for p in PERSONAS]
+    assert village_roles(5, roles, 6) == village_roles(5, roles, 6)
+    assert roll_traits(5, "did") == roll_traits(5, "did")
+    assert village_roles(5, roles, 6) != village_roles(6, roles, 6)
+
+
+def test_a_trait_changes_the_score_not_just_the_label():
+    """Ознака, яка нічого не міняє в поведінці, — наліпка."""
+    from ploshcha_sim.domain.people import Person, roll_traits
+    from ploshcha_sim.domain.viche import interrupt_chance
+
+    hot = Person(role="parubok", traits={**roll_traits(1, "parubok"), "гарячий": 0.98})
+    calm = Person(role="pip", traits={**roll_traits(1, "pip"), "гарячий": 0.02})
+    assert interrupt_chance(hot) > interrupt_chance(calm) * 1.6
+
+
+def test_an_outsider_has_no_access_to_the_village_memory():
+    from ploshcha_sim.domain.people import Person, remembers
+
+    assert not remembers(Person(role="chumak", traits={"прийшлий": 0.95}))
+    assert remembers(Person(role="did", traits={"прийшлий": 0.05}))
+
+
+def test_the_model_never_gets_to_rewrite_the_dice():
+    """Норов визначений кубиком; віддати його моделі означало б віддати те, що вже вирішено даними."""
+    from ploshcha_sim.domain.people import people_schema, repair_people, roll_traits
+
+    fields = people_schema(["did"])["properties"]["люди"]["items"]["properties"]
+    assert "норов" not in fields and "traits" not in fields
+
+    mine = roll_traits(9, "did")
+    got = repair_people({"люди": [{"роль": "did", "імʼя": "Дід", "про_себе": "",
+                                   "примовка": "", "traits": {"старий": 0.0}}]},
+                        ["did"], {"did": mine})
+    assert got[0].traits == mine
+
+
+def test_a_silent_model_still_leaves_a_village():
+    """Краще людина без історії, ніж село, яке мовчки поменшало."""
+    from ploshcha_sim.adapters.router_profile import single_model_router
+    from ploshcha_sim.agents.forge import forge_village
+
+    roles = [p.role for p in PERSONAS]
+    lenses = {p.role: p.lens for p in PERSONAS}
+    people = forge_village(single_model_router(FakeLlm(["не json"], model="f")), PresetEffort(),
+                           seed=3, roles=roles, lenses=lenses, size=5)
+    assert len(people) == 5
+    assert all(p.traits for p in people)
+
+
+def test_the_village_survives_a_restart(tmp_path):
+    from ploshcha_sim.adapters.village_sqlite import SqliteVillage
+    from ploshcha_sim.domain.people import Person, roll_traits
+
+    store = SqliteVillage(tmp_path / "v.db")
+    assert store.load(11) == []
+    folk = [Person(role="did", name="Дід Мирон", traits=roll_traits(11, "did"))]
+    store.save(11, folk)
+    back = store.load(11)
+    assert [p.name for p in back] == ["Дід Мирон"]
+    assert back[0].traits == folk[0].traits
+
+
+def test_a_corrupt_village_regenerates_instead_of_crashing(tmp_path):
+    import sqlite3
+
+    from ploshcha_sim.adapters.village_sqlite import SqliteVillage
+
+    store = SqliteVillage(tmp_path / "v.db")
+    with sqlite3.connect(store.path) as db:
+        db.execute("INSERT INTO village(seed, people) VALUES(?,?)", (11, "{побите"))
+    assert store.load(11) == []

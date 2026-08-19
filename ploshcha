@@ -49,7 +49,8 @@ start() {
     --max-usd "${PLOSHCHA_MAX_USD:-0.50}" \
     --max-items "${PLOSHCHA_MAX_ITEMS:-60}" \
     > "$ROOT/.ploshcha.log" 2>&1 &
-  for _ in $(seq 1 20); do
+  # Перший старт нового села = виклик моделі до відкриття порту, тож чекаємо довше.
+  for _ in $(seq 1 120); do
     if curl -sf -m 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
       echo "ПЛОЩА: http://127.0.0.1:$PORT   (умова $COND)"
       return 0

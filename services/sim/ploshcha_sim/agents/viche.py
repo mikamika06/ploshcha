@@ -21,6 +21,7 @@ import threading
 from ..domain.task import Budget, TaskResult
 from ..domain.viche import (
     BY_ROLE,
+    personas_from,
     GUEST,
     guest_beats,
     chronicle_schema,
@@ -87,7 +88,7 @@ class Viche(AgentPort):
                  prompt_id: str = "viche/v1", prompt_sha: str = "",
                  score_system: str = SCORE_SYSTEM, line_system: str = LINE_SYSTEM,
                  summary_system: str = SUMMARY_SYSTEM, doubt_system: str = DOUBT_SYSTEM,
-                 chronicle_system: str = CHRONICLE_SYSTEM):
+                 chronicle_system: str = CHRONICLE_SYSTEM, village: list | None = None):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -104,6 +105,9 @@ class Viche(AgentPort):
         self.summary_system = summary_system
         self.doubt_system = doubt_system
         self.chronicle_system = chronicle_system
+        # Породжене село. Порожньо — сталі персони: віче мусить працювати й без ланки породження.
+        self.village = list(village or [])
+        self._people = {x.role: x for x in self.village}
         # Скринька вхідних: сюди падає слово гостя й шепіт, поки віче ТРИВАЄ. Читається між
         # тактами, а не в середині — інакше репліка вклинювалась би в напівзгенерований такт.
         self._inbox: list[dict] = []
@@ -124,11 +128,12 @@ class Viche(AgentPort):
     def run(self, task: str, seed: int = 0, budget: Budget | None = None,
             depth: int = 1) -> TaskResult:
         budget = budget or Budget()
-        cast = cast_for(task, self.width)
+        cast = self._cast(task)
         roles = [p.role for p in cast]
         said: list[tuple[Persona, str]] = []
         incidents: list[str] = []
-        beats = scatter(self._plan(task, cast, seed, budget, incidents), roles, seed, task)
+        beats = scatter(self._plan(task, cast, seed, budget, incidents), roles, seed, task,
+                        self._people)
         self._emit_plan(beats)
         pending: list[Beat] = list(beats)
         index = 0
@@ -172,6 +177,16 @@ class Viche(AgentPort):
             recent = [p.role for p, _ in said[-3:]]
             out += guest_beats(len(said), roles, recent, seed, text)
         return out
+
+    def _cast(self, task: str) -> list[Persona]:
+        if not self.village:
+            return cast_for(task, self.width)
+        folk = personas_from(self.village)
+        chosen = cast_for(task, min(self.width, len(folk)))
+        by_role = {p.role: p for p in folk}
+        # Склад беремо з ПОРОДЖЕНОГО села: якщо роль у ньому не живе, її просто немає в цьому селі.
+        picked = [by_role[p.role] for p in chosen if p.role in by_role]
+        return picked or list(folk[:self.width])
 
     # ── партитура ─────────────────────────────────────────────────────────────
     def _plan(self, task: str, cast: list[Persona], seed: int, budget: Budget,
@@ -298,7 +313,14 @@ class Viche(AgentPort):
         підказкою ходу («дід Свирид: … Дід Свирид — памʼять: … Спитай, що робити практично»).
         Системне повідомлення вона так не копіює.
         """
-        return f"{self.line_system}\n\nТИ: {who.name}. Дивишся на світ так: {who.lens}."
+        person = self._people.get(who.role)
+        extra = ""
+        if person is not None:
+            marks = ", ".join(t.pole for t in person.marked)
+            extra = (f"\nПро тебе: {person.bio}" if person.bio else "")
+            extra += (f"\nТвоя примовка: «{person.saying}»" if person.saying else "")
+            extra += (f"\nНоров: {marks}." if marks else "")
+        return f"{self.line_system}\n\nТИ: {who.name}. Дивишся на світ так: {who.lens}.{extra}"
 
     def _packet(self, task: str, who: Persona, beat: Beat,
                 said: list[tuple[Persona, str]], fact: str | None) -> str:

@@ -5,6 +5,20 @@ import { ovalShadow } from "../util/gfx";
 
 type Cell = [number, number];
 
+/** Ознака → колір. Стримано: село має лишатись цілісним, а не набором різнокольорових фігурок. */
+function tintOf(traits: string[]): number {
+  // Ознаки — це ПОЛЮСИ («молодий»/«старий»), не назви осей. Ядро колись слало назву осі, і молода
+  // дівчина приїжджала з міткою «старий», тобто фарбувалась сивиною за протилежною ознакою.
+  let r = 1, g = 1, b = 1;
+  if (traits.includes("старий")) { r *= 0.94; g *= 0.94; b *= 0.97; }
+  if (traits.includes("молодий")) { r *= 1.03; g *= 1.02; b *= 1.0; }
+  if (traits.includes("заможний")) { r *= 1.05; g *= 1.0; b *= 0.92; }
+  if (traits.includes("бідний")) { r *= 0.97; g *= 0.96; b *= 0.95; }
+  if (traits.includes("прийшлий")) { r *= 0.95; g *= 0.99; b *= 1.06; }
+  const to255 = (v: number): number => Math.max(0, Math.min(255, Math.round(v * 255)));
+  return (to255(r) << 16) | (to255(g) << 8) | to255(b);
+}
+
 interface Rec {
   id: string;
   name: string;
@@ -59,6 +73,9 @@ export class AgentDirector {
       shadow.height = dh * 0.15;
       shadow.alpha = 0.32;
       this.world.addChild(shadow);
+      // ★ Вигляд рахується з ОЗНАК, які надіслало ядро: старший сивіший і тьмяніший, заможніший
+      // тепліший. Ядро не вигадує кольорів, сцена не вигадує норову — кожен робить своє.
+      sprite.tint = tintOf(v.traits ?? []);
       this.world.addChild(sprite);
       this.recs.set(v.id, {
         id: v.id, name: v.name, sprite, shadow, tex, frames, sc,

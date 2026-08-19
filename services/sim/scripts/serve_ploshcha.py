@@ -28,12 +28,16 @@ from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm  # noqa: E402
 from ploshcha_sim.adapters.decisions_sqlite import SqliteDecisions  # noqa: E402
 from ploshcha_sim.adapters.queue_sqlite import SqliteQueue  # noqa: E402
 from ploshcha_sim.compose import (  # noqa: E402
-    build_budget, build_graph, build_orchestrator, build_viche)
+    build_budget, build_effort, build_graph, build_orchestrator, build_router, build_viche)
 from ploshcha_sim.domain.governor import Governor  # noqa: E402
-from ploshcha_sim.domain.viche import public_cast  # noqa: E402
+from ploshcha_sim.adapters.village_sqlite import SqliteVillage  # noqa: E402
+from ploshcha_sim.agents.forge import forge_village  # noqa: E402
+from ploshcha_sim.domain.viche import PERSONAS, public_cast  # noqa: E402
 from ploshcha_sim.live import EventBus, LiveRunner, serve  # noqa: E402
 
 SCENE = {"id": "ploshcha", "name": "Площа"}
+# Сід села. Змінити — інше село; те саме число — ті самі сусіди.
+VILLAGE_SEED = int(os.environ.get("PLOSHCHA_VILLAGE_SEED", "11"))
 DEFAULT_CONDITION = "viche"
 
 
@@ -75,6 +79,22 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
     answer_instruction = resolve(spec.answer_prompt_id).render_system()
     budget = build_budget(spec)
 
+    # Село народжується РАЗ на сід і зберігається; ухвали й стосунки кріпляться до конкретних людей.
+    village: list = []
+    if spec.mode == "viche":
+        store = SqliteVillage(db)
+        village = store.load(VILLAGE_SEED)
+        if not village:
+            # Кажемо вголос: це один виклик Mamay і він триває, а порт доти закритий. Мовчазна
+            # пауза на хвилину читається як «не запустилось».
+            print(f"  породжую село (сід {VILLAGE_SEED})… перший старт довший", flush=True)
+            village = forge_village(
+                build_router(spec, lapa=lapa, mamay=mamay), build_effort(spec),
+                seed=VILLAGE_SEED, roles=[p.role for p in PERSONAS],
+                lenses={p.role: p.lens for p in PERSONAS}, size=spec.max_width + 2,
+                system=resolve("viche/forge").render_system())
+            store.save(VILLAGE_SEED, village)
+
     bus = EventBus()
     Path(db).parent.mkdir(parents=True, exist_ok=True)
     queue = SqliteQueue(db)
@@ -91,7 +111,8 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
                                 score_system=resolve("viche/score").render_system(),
                                 summary_system=resolve("viche/summary").render_system(),
                                 doubt_system=resolve("viche/doubt").render_system(),
-                                chronicle_system=resolve("viche/chronicle").render_system())
+                                chronicle_system=resolve("viche/chronicle").render_system(),
+                                village=village)
             agent.budget_template = budget
             return agent
         if spec.graph:
@@ -105,7 +126,7 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
 
     runner = LiveRunner(bus, queue, make_agent, governor=governor, scene=SCENE,
                         paused=paused,
-                        cast=public_cast() if spec.mode == "viche" else None,
+                        cast=public_cast(village) if spec.mode == "viche" else None,
                         decisions=SqliteDecisions(db) if spec.mode == "viche" else None)
     return spec, bus, queue, runner
 

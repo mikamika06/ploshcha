@@ -55,7 +55,7 @@ PERSONAS: tuple[Persona, ...] = (
 BY_ROLE = {p.role: p for p in PERSONAS}
 
 
-def public_cast() -> list[dict]:
+def public_cast(people: list | None = None) -> list[dict]:
     """Склад, який ядро ОГОЛОШУЄ сцені.
 
     Доти вісім селян приходили з фікстури `quiet-day.jsonl`, а не від ядра — і це був корінь цілого
@@ -63,9 +63,20 @@ def public_cast() -> list[dict]:
     розходились (ядро «мірошник Гнат», екран «Панас»), тож я латав це вирівнюванням імен руками.
     Коли склад оголошує ядро, розійтись неможливо за побудовою.
     """
-    people = [*PERSONAS, STAROSTA, PIP, GUEST]
-    return [{"id": p.role, "name": p.name,
-             "role": "chumak" if p is GUEST else p.role, "bio": p.lens} for p in people]
+    generated = {x.role: x for x in (people or [])}
+    folk = [*(personas_from(people) if people else PERSONAS), STAROSTA, PIP, GUEST]
+    out = []
+    for p in folk:
+        person = generated.get(p.role)
+        entry = {"id": p.role, "name": p.name,
+                 "role": "chumak" if p is GUEST else p.role,
+                 "bio": (person.bio if person and person.bio else p.lens)}
+        if person is not None:
+            # Ознаки їдуть у контракт РЯДКАМИ, а вигляд із них рахує фронт. Так ядро не вигадує
+            # кольорів, а сцена не вигадує норову — кожен робить своє.
+            entry["traits"] = [t.key for t in person.marked]
+        out.append(entry)
+    return out
 
 # Ти — не бог над селом, а сусід у гурті: маєш роль, спрайт і голос, як усі. Роль `chumak` («той,
 # хто прийшов»), бо гість справді дивиться на село свіжим оком.
@@ -117,6 +128,31 @@ class Beat(BaseModel):
 
 class Score(BaseModel):
     такти: list[Beat] = Field(default_factory=list)
+
+
+def personas_from(people: list) -> tuple[Persona, ...]:
+    """Породжені люди → персони віча: імʼя й примовка від моделі, ЛІНЗА лишається від ролі.
+
+    Лінза не породжується: вона визначає, як людина дивиться на новину, тобто це слот системи.
+    Породжується той, хто крізь неї дивиться.
+    """
+    out = []
+    for person in people:
+        base = BY_ROLE.get(person.role)
+        out.append(Persona(role=person.role, name=person.name or person.role,
+                           lens=base.lens if base else person.bio or person.role))
+    return tuple(out)
+
+
+def interrupt_chance(person) -> float:
+    """Ймовірність перебивки для конкретної людини.
+
+    ★ Ось заради чого норов узагалі існує: гарячий перебиває частіше, тихий майже ніколи. Якби
+    ознака лишалась написом у промпті, вона не міняла б нічого.
+    """
+    from .people import beat_weights
+
+    return min(0.55, INTERRUPT_P * beat_weights(person)["перебити"])
 
 
 def cast_for(topic: str, size: int) -> list[Persona]:
@@ -294,7 +330,8 @@ def guest_beats(said_index: int, roles: list[str], recent: list[str], seed: int,
             for r in fresh[:GUEST_REPLIES]]
 
 
-def scatter(beats: list[Beat], roles: list[str], seed: int, topic: str) -> list[Beat]:
+def scatter(beats: list[Beat], roles: list[str], seed: int, topic: str,
+            people: dict | None = None) -> list[Beat]:
     """Збурення партитури кубиком за сідом — джерело спонтанності, яке НЕ вимагає вибору моделі.
 
     Той самий сід і та сама тема дають ті самі перебивки: несподіванка для глядача, відтворюваність
@@ -307,11 +344,20 @@ def scatter(beats: list[Beat], roles: list[str], seed: int, topic: str) -> list[
     added = 0
     for beat in beats:
         out.append(beat)
-        if added >= MAX_INTERRUPTS or rng.random() > INTERRUPT_P:
+        speaker = people.get(beat.хто) if people else None
+        chance = interrupt_chance(speaker) if speaker else INTERRUPT_P
+        if added >= MAX_INTERRUPTS or rng.random() > chance:
             continue
         others = [r for r in roles if r != beat.хто]
         if not others:
             continue
+        # Перебиває не хто попало: вага норову вирішує, кому дістанеться слово поперек черги.
+        if people:
+            weights = [max(0.05, interrupt_chance(people[r])) for r in others if r in people]
+            pool = [r for r in others if r in people]
+            who = rng.choices(pool, weights=weights)[0] if pool else rng.choice(others)
+        else:
+            who = rng.choice(others)
         added += 1
-        out.append(Beat(хто=rng.choice(others), хід=INTERRUPT_MOVE, у_відповідь=len(out)))
+        out.append(Beat(хто=who, хід=INTERRUPT_MOVE, у_відповідь=len(out)))
     return out
