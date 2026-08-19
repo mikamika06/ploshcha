@@ -144,6 +144,28 @@ def personas_from(people: list) -> tuple[Persona, ...]:
     return tuple(out)
 
 
+# Хід → що він робить зі стосунками. Виводиться з ПАРТИТУРИ: питати про це модель означало б
+# платити за відповідь, яку ми вже маємо.
+BOND_OF_MOVE: dict[str, float] = {
+    "піддакнути": 1.0, "згадати": 0.2, "пожартувати": 0.3,
+    "заперечити": -1.0, "засумніватись": -0.6, INTERRUPT_MOVE: -0.4,
+}
+
+
+def bonds_from(beats: list[Beat]) -> list[tuple[str, str, float]]:
+    """Хто кому піддакнув — зблизились; хто заперечив — розійшлись."""
+    out: list[tuple[str, str, float]] = []
+    for i, beat in enumerate(beats):
+        target = beat.у_відповідь
+        if not target or not (1 <= target <= i):
+            continue
+        other = beats[target - 1].хто
+        delta = BOND_OF_MOVE.get(beat.хід, 0.0)
+        if delta and other != beat.хто:
+            out.append((beat.хто, other, delta))
+    return out
+
+
 def interrupt_chance(person) -> float:
     """Ймовірність перебивки для конкретної людини.
 
@@ -350,7 +372,8 @@ def guest_beats(said_index: int, roles: list[str], recent: list[str], seed: int,
 
 
 def scatter(beats: list[Beat], roles: list[str], seed: int, topic: str,
-            people: dict | None = None, heat: float = 1.0) -> list[Beat]:
+            people: dict | None = None, heat: float = 1.0,
+            bonds: dict | None = None) -> list[Beat]:
     """Збурення партитури кубиком за сідом — джерело спонтанності, яке НЕ вимагає вибору моделі.
 
     Той самий сід і та сама тема дають ті самі перебивки: несподіванка для глядача, відтворюваність
@@ -372,8 +395,15 @@ def scatter(beats: list[Beat], roles: list[str], seed: int, topic: str,
             continue
         # Перебиває не хто попало: вага норову вирішує, кому дістанеться слово поперек черги.
         if people:
-            weights = [max(0.05, interrupt_chance(people[r])) for r in others if r in people]
             pool = [r for r in others if r in people]
+            # ★ Стосунки міняють, ХТО влізе поперек: хто вже сварився з мовцем, тягнеться
+            # перебити його. Без цього сварка лишалась би записом у базі, а не поведінкою.
+            weights = []
+            for r in pool:
+                w = max(0.05, interrupt_chance(people[r]))
+                if bonds is not None:
+                    w *= 1.0 + max(0.0, -bonds.get(tuple(sorted((r, beat.хто))), 0.0)) * 0.3
+                weights.append(w)
             who = rng.choices(pool, weights=weights)[0] if pool else rng.choice(others)
         else:
             who = rng.choice(others)

@@ -1112,3 +1112,104 @@ def test_the_scout_does_not_lose_the_three_valued_found():
     agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
     res = next(e for e in _events(trace) if e["type"] == "tool.result")
     assert res["payload"]["found"] is False, "шукав і НЕ знайшов — це не «незастосовно»"
+
+
+# ── Ш7: памʼять, стосунки, літопис ────────────────────────────────────────────
+
+def test_the_village_remembers_a_related_viche(tmp_path):
+    from ploshcha_sim.adapters import InMemoryTrace
+    from ploshcha_sim.adapters.memory_sqlite import SqliteMemory
+
+    mem = SqliteMemory(tmp_path / "m.db")
+    mem.remember("вовк коло кошари", "Вовча напасть", "Село погомоніло й розійшлось.", "тривога")
+    mem.remember("гребля протікає", "Гребля", "Дощі обіцяють.", "спокій")
+
+    trace = InMemoryTrace()
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    agent, llm = build([score(beat(pair[0]))] + lines(8), width=2, trace=trace)
+    agent.memory = mem
+    agent.run("Знову вовк коло кошари.", seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    assert "Вовча напасть" in llm.calls[0]["prompt"]
+    assert "Гребля" not in llm.calls[0]["prompt"], "пригадують СПОРІДНЕНЕ, а не все підряд"
+    recalled = [e for e in _events(trace) if e["type"] == "memory.recalled"]
+    assert recalled and recalled[0]["payload"]["items"] == ["Вовча напасть"]
+
+
+def test_an_outsider_is_not_told_what_the_village_remembers(tmp_path):
+    """Прийшлий бачить те, чого свої вже не помічають — але лише якщо йому не переказали."""
+    from ploshcha_sim.adapters.memory_sqlite import SqliteMemory
+    from ploshcha_sim.domain.people import Person, roll_traits
+
+    mem = SqliteMemory(tmp_path / "m.db")
+    mem.remember("вовк коло кошари", "Вовча напасть", "Було таке.", "тривога")
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    stranger = Person(role=pair[0], name="Прийшлий",
+                      traits={**roll_traits(1, pair[0]), "прийшлий": 0.95})
+    agent, llm = build([score(beat(pair[0]))] + lines(8), width=2)
+    agent.memory = mem
+    agent.village = [stranger]
+    agent._people = {stranger.role: stranger}
+    agent.run("Знову вовк коло кошари.", seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    speak = [c for c in llm.calls if "ТВІЙ ХІД" in (c.get("prompt") or "")]
+    assert speak and "Село памʼятає" not in speak[0]["system"]
+
+
+def test_bonds_are_derived_from_the_score_not_asked_of_the_model():
+    """Хто кому піддакнув — зблизились; хто заперечив — розійшлись. Це вже є в партитурі."""
+    from ploshcha_sim.domain.viche import bonds_from
+
+    got = bonds_from([Beat(хто="did", хід="згадати"),
+                      Beat(хто="koval", хід="піддакнути", у_відповідь=1),
+                      Beat(хто="pip", хід="заперечити", у_відповідь=1)])
+    assert ("koval", "did", 1.0) in got
+    assert ("pip", "did", -1.0) in got
+
+
+def test_a_beat_answering_itself_makes_no_bond():
+    from ploshcha_sim.domain.viche import bonds_from
+
+    assert bonds_from([Beat(хто="did", хід="піддакнути", у_відповідь=1)]) == []
+
+
+def test_a_quarrel_makes_you_likelier_to_cut_that_person_off(tmp_path):
+    """★ Інакше сварка лишалась би записом у базі, а не поведінкою."""
+    import collections
+
+    from ploshcha_sim.domain.people import Person, roll_traits
+    from ploshcha_sim.domain.viche import scatter
+
+    people = {r: Person(role=r, traits=roll_traits(1, r)) for r in ("did", "koval", "pip")}
+    base = [Beat(хто="did", хід="згадати") for _ in range(8)]
+    quarrel = {("did", "pip"): -6.0}
+
+    def who_cuts(bonds):
+        c = collections.Counter()
+        for s in range(200):
+            for b in scatter(base, list(people), s, "тема", people, 1.0, bonds):
+                if b.хід == "перебити":
+                    c[b.хто] += 1
+        return c
+
+    calm, angry = who_cuts({}), who_cuts(quarrel)
+    assert angry["pip"] / max(1, angry["koval"]) > calm["pip"] / max(1, calm["koval"])
+
+
+def test_the_chronicle_accumulates(tmp_path):
+    from ploshcha_sim.adapters.memory_sqlite import SqliteMemory
+
+    mem = SqliteMemory(tmp_path / "m.db")
+    for i in range(3):
+        mem.remember(f"тема {i}", f"День {i}", "оповідь", "спокій")
+    book = mem.chronicle()
+    assert [r["title"] for r in book] == ["День 2", "День 1", "День 0"], "найсвіжіше перше"
+
+
+def test_bonds_do_not_run_away(tmp_path):
+    from ploshcha_sim.adapters.memory_sqlite import BOND_CAP, SqliteMemory
+
+    mem = SqliteMemory(tmp_path / "m.db")
+    for _ in range(40):
+        mem.bond("did", "pip", -1.0)
+    assert mem.between("did", "pip") == -BOND_CAP

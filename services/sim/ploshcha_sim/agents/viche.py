@@ -21,9 +21,11 @@ import threading
 from ..domain.evidence import found_in
 from ..domain.graph import child_budget
 from ..domain.modes import Mode, mode_for
+from ..domain.people import remembers
 from ..domain.task import Budget, TaskResult
 from ..domain.viche import (
     BY_ROLE,
+    bonds_from,
     personas_from,
     GUEST,
     guest_beats,
@@ -97,7 +99,7 @@ class Viche(AgentPort):
                  summary_system: str = SUMMARY_SYSTEM, doubt_system: str = DOUBT_SYSTEM,
                  chronicle_system: str = CHRONICLE_SYSTEM, village: list | None = None,
                  standing: dict[str, float] | None = None, rumours: list | None = None,
-                 place: str | None = None, scout=None):
+                 place: str | None = None, scout=None, memory=None):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -122,10 +124,14 @@ class Viche(AgentPort):
         # Кого посилають дізнатись. Це фабрика ПОВНОЦІННОГО агента зі своїм бюджетом: людина йде й
         # робить кілька кроків сама, а не смикає один інструмент. Порожньо — лишається один виклик.
         self.scout = scout
+        # Памʼять села: минулі віча в пакеті, стосунки в партитурі, літопис по завершенні.
+        self.memory = memory
+        self._bonds = memory.bonds() if memory is not None else {}
         self.standing = dict(standing or {})
         self.rumours = list(rumours or [])
         self.village = list(village or [])
         self._people = {x.role: x for x in self.village}
+        self._recalled: list[str] = []
         # Скринька вхідних: сюди падає слово гостя й шепіт, поки віче ТРИВАЄ. Читається між
         # тактами, а не в середині — інакше репліка вклинювалась би в напівзгенерований такт.
         self._inbox: list[dict] = []
@@ -152,7 +158,7 @@ class Viche(AgentPort):
         said: list[tuple[Persona, str]] = []
         incidents: list[str] = []
         beats = scatter(self._plan(task, cast, seed, budget, incidents), roles, seed, task,
-                        self._people, self.mode.interrupts)
+                        self._people, self.mode.interrupts, self._bonds)
         self._emit_plan(beats)
         pending: list[Beat] = list(beats)
         index = 0
@@ -179,6 +185,9 @@ class Viche(AgentPort):
                     said.append(doubt)
             self._chronicle(task, said, seed, budget, incidents)
 
+        if self.memory is not None:
+            for a, b, delta in bonds_from(beats):
+                self.memory.bond(a, b, delta)
         return self._result(task, said, beats, budget, incidents)
 
     def _take_word(self, said: list[tuple[Persona, str]], roles: list[str], seed: int,
@@ -199,6 +208,26 @@ class Viche(AgentPort):
             recent = [p.role for p, _ in said[-3:]]
             out += guest_beats(len(said), roles, recent, seed, text)
         return out
+
+    def _past(self, task: str) -> str:
+        """Що село вже пережило на споріднену тему.
+
+        ★ Прийшлий цієї памʼяті НЕ має — але це не привід ховати її від партитури: розпорядник
+        знає село, а не знає його той, кого щойно прийняли. Тому гейт стоїть у пакеті МОВЦЯ.
+        """
+        if self.memory is None:
+            return ""
+        past = self.memory.recall(task)
+        if not past:
+            return ""
+        self._recalled = [f"{r['title']}: {r['narration']}" for r in past]
+        if self.trace is not None:
+            self.trace.emit(StepRecord(
+                run_id=self.run_id, tick=0, agent="notebook", stage="mem_read", model="viche",
+                lane="none", prompt="", raw_output="",
+                parsed={"items": [r["title"] for r in past], "query": task[:120]},
+                schema_valid=True, world_valid=True))
+        return "СЕЛО ВЖЕ ПЕРЕЖИВАЛО: " + " | ".join(self._recalled) + "\n"
 
     def _cast(self, task: str) -> list[Persona]:
         if not self.village:
@@ -223,6 +252,7 @@ class Viche(AgentPort):
                   + (("ЧУТКИ, ЩО ХОДЯТЬ СЕЛОМ: "
                       + " | ".join(f"{r['who']}: {r['claim']}" for r in self.rumours[:3]) + "\n")
                      if self.rumours else "")
+                  + self._past(task)
                   + "\n"
                   "Розпиши такти віча. `у_відповідь` — номер попереднього такту або null.")
         schema = score_schema(roles, tools, self.mode.beats)
@@ -393,8 +423,12 @@ class Viche(AgentPort):
             extra = (f"\nПро тебе: {person.bio}" if person.bio else "")
             extra += (f"\nТвоя примовка: «{person.saying}»" if person.saying else "")
             extra += (f"\nНоров: {marks}." if marks else "")
+        # Прийшлий не має доступу до памʼяті села — і тому бачить те, чого свої вже не помічають.
+        recalled = ""
+        if self._recalled and (person is None or remembers(person)):
+            recalled = "\nСело памʼятає: " + " | ".join(self._recalled[:2])
         manner = f"\n{self.mode.manner}" if self.mode.manner else ""
-        return (f"{self.line_system}{manner}\n\nТИ: {who.name}. "
+        return (f"{self.line_system}{manner}{recalled}\n\nТИ: {who.name}. "
                 f"Дивишся на світ так: {who.lens}.{extra}")
 
     def _packet(self, task: str, who: Persona, beat: Beat,
@@ -499,6 +533,9 @@ class Viche(AgentPort):
                     lane=self.router.lane("synthesize"), prompt="", raw_output="",
                     parsed={"agentId": item["хто"], "thought": thought[:MAX_LINE_CHARS]},
                     schema_valid=True, world_valid=True))
+        if self.memory is not None:
+            self.memory.remember(task, str(data.get("заголовок") or ""),
+                                 str(data.get("оповідь") or ""), str(data.get("настрій") or ""))
         self._emit_rumour(data.get("чутка"), roles)
         self._emit_decision(data.get("ухвала"), roles)
         self.trace.emit(StepRecord(

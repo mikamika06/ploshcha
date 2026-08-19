@@ -31,6 +31,7 @@ from ploshcha_sim.compose import (  # noqa: E402
     build_budget, build_effort, build_graph, build_orchestrator, build_router,
     build_scout, build_viche)
 from ploshcha_sim.domain.governor import Governor  # noqa: E402
+from ploshcha_sim.adapters.memory_sqlite import SqliteMemory  # noqa: E402
 from ploshcha_sim.adapters.rumours_sqlite import SqliteRumours  # noqa: E402
 from ploshcha_sim.adapters.village_sqlite import SqliteVillage  # noqa: E402
 from ploshcha_sim.agents.forge import forge_village  # noqa: E402
@@ -98,6 +99,7 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
             store.save(VILLAGE_SEED, village)
 
     talk = SqliteRumours(db) if spec.mode == "viche" else None
+    memory = SqliteMemory(db) if spec.mode == "viche" else None
 
     bus = EventBus()
     Path(db).parent.mkdir(parents=True, exist_ok=True)
@@ -120,7 +122,7 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
                                 standing={p.role: talk.standing(p.role) for p in village}
                                          if talk else None,
                                 rumours=talk.open() if talk else None,
-                                place=place,
+                                place=place, memory=memory,
                                 scout=build_scout(
                                     CONDITIONS["ref@8"], lapa=lapa, mamay=mamay,
                                     system=resolve("agent/v2-ref").render_system(),
