@@ -85,8 +85,21 @@ def test_trace_records_each_step_with_seed():
               json.dumps({"accepted": True, "reason": "ok"})], trace=trace)
     o.run("q", seed=5)
     stages = [r.stage for r in trace.records]
-    assert stages == ["select", "select", "judge"]
+    assert stages == ["select", "tool_result", "select", "judge"]
     assert all(r.seed == 5 for r in trace.records)
+
+
+def test_trace_carries_tool_results_not_only_model_decisions():
+    trace = InMemoryTrace()
+    o = orch([tc("lookup_fact", entity="X"), tc("final_answer", text="R"),
+              json.dumps({"accepted": True, "reason": "ok"})], trace=trace)
+    o.run("q", seed=5)
+    tools = [r for r in trace.records if r.agent == "tool"]
+    assert len(tools) == 1
+    assert tools[0].stage == "tool_result"
+    assert tools[0].parsed["tool"] == "lookup_fact"
+    assert tools[0].parsed["ok"] is True
+    assert "found" in tools[0].parsed
 
 
 def test_seed_reaches_llm():

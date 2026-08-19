@@ -7,12 +7,12 @@ from .llm import LlmPort
 
 StepKind = Literal[
     "parse", "classify", "select", "ground", "decide",
-    "generate", "synthesize", "judge", "gate",
+    "generate", "synthesize", "judge", "gate", "speak",
 ]
 
 STEP_KINDS: tuple[StepKind, ...] = (
     "parse", "classify", "select", "ground", "decide",
-    "generate", "synthesize", "judge", "gate",
+    "generate", "synthesize", "judge", "gate", "speak",
 )
 
 Tier = Literal["none", "wire", "strict"]

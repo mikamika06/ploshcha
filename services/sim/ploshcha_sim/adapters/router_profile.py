@@ -8,10 +8,12 @@ from ..ports.router import (
     StepKind,
 )
 
-LAPA_KINDS: tuple[StepKind, ...] = ("parse", "classify", "select", "ground", "gate")
+LAPA_KINDS: tuple[StepKind, ...] = ("parse", "classify", "select", "ground", "gate",
+                                   "speak")
 MAMAY_KINDS: tuple[StepKind, ...] = ("decide", "generate", "synthesize", "judge")
 
-LOW_KINDS: tuple[StepKind, ...] = ("parse", "classify", "select", "ground", "gate")
+LOW_KINDS: tuple[StepKind, ...] = ("parse", "classify", "select", "ground", "gate",
+                                  "speak")
 HIGH_KINDS: tuple[StepKind, ...] = ("decide", "generate", "synthesize", "judge")
 
 

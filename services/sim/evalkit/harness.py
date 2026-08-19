@@ -41,6 +41,10 @@ class EvalResult(BaseModel):
     aux_tokens: int = 0
     tokens_by_lane: dict[str, int] = Field(default_factory=dict)
     prompt_by_lane: dict[str, int] = Field(default_factory=dict)
+    tokens_by_stage: dict[str, int] = Field(default_factory=dict)
+    prompt_by_stage: dict[str, int] = Field(default_factory=dict)
+    tokens_by_stage_lane: dict[str, int] = Field(default_factory=dict)
+    prompt_by_stage_lane: dict[str, int] = Field(default_factory=dict)
     accepted: bool = False
     verdict_kind: str | None = None
     outcome: str = "answer"
@@ -122,6 +126,10 @@ def run_eval(items: list[EvalItem], runners: dict[str, Runner], seeds: list[int]
                     steps=result.steps, tokens=result.tokens, aux_tokens=result.aux_tokens,
                     tokens_by_lane=dict(getattr(result, 'tokens_by_lane', {}) or {}),
                     prompt_by_lane=dict(getattr(result, 'prompt_by_lane', {}) or {}),
+                    tokens_by_stage=dict(getattr(result, 'tokens_by_stage', {}) or {}),
+                    prompt_by_stage=dict(getattr(result, 'prompt_by_stage', {}) or {}),
+                    tokens_by_stage_lane=dict(getattr(result, 'tokens_by_stage_lane', {}) or {}),
+                    prompt_by_stage_lane=dict(getattr(result, 'prompt_by_stage_lane', {}) or {}),
                     accepted=result.accepted, degraded=result.degraded, partial=result.partial,
                     verdict_kind=result.verdict_kind, outcome=result.outcome,
                     evidence=result.evidence, scratch=result.scratch,

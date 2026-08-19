@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from .cost import format_roles
 from .harness import EvalResult
 
 
@@ -223,4 +224,9 @@ def format_report(results: list[EvalResult]) -> str:
             f"{t.get('empty', 0):>6} {rep['hygiene_ok']:>6.2f} "
             f"{rep['avg_steps']:>6.2f} {rep['avg_tokens']:>8.1f} {rep['quality_per_ktoken']:>7.4f}"
         )
+    roles = format_roles(results)
+    if roles.count("\n"):
+        lines.append("")
+        lines.append("РОЗКЛАД ПО РОЛЯХ (Ф0.5)")
+        lines.append(roles)
     return "\n".join(lines)

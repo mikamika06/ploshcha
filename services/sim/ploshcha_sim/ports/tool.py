@@ -6,6 +6,7 @@ UNKNOWN_TOOL = "unknown_tool"
 BAD_ARGS = "bad_args"
 NOT_JSON = "not_json"
 NO_TOOL_FIELD = "no_tool_field"
+TOOL_FIELD_FORBIDDEN = "tool_field_forbidden"
 
 
 class ToolSpec(BaseModel):
@@ -65,6 +66,54 @@ def strict_tool_schema(specs: list[ToolSpec]) -> dict:
     return {"oneOf": variants}
 
 
+def args_tool_schema(spec: ToolSpec) -> dict:
+    props = {name: _flatten(sub) for name, sub in spec.params.get("properties", {}).items()}
+    return {
+        "type": "object",
+        "properties": props,
+        "required": sorted(spec.params.get("required", [])),
+        "additionalProperties": False,
+    }
+
+
+def choice_schema(specs: list[ToolSpec], exclude: tuple[str, ...] = ()) -> dict:
+    names = [s.name for s in specs if s.name not in exclude]
+    return {
+        "type": "object",
+        "properties": {"tool": {"type": "string", "enum": names}},
+        "required": ["tool"],
+        "additionalProperties": False,
+    }
+
+
+def parse_args(data: object, tool: str, specs: list[ToolSpec]) -> tuple["ToolCall | None", str | None]:
+    if not isinstance(data, dict):
+        return None, NOT_JSON
+    spec = next((s for s in specs if s.name == tool), None)
+    if spec is None:
+        return None, UNKNOWN_TOOL
+    if "tool" in data:
+        return None, TOOL_FIELD_FORBIDDEN
+    allowed = set(spec.params.get("properties", {}))
+    args = {k: v for k, v in data.items() if k in allowed}
+    for req in spec.params.get("required", []):
+        if req not in args:
+            return None, BAD_ARGS
+    return ToolCall(tool=spec.name, args=args), None
+
+
+def parse_choice(data: object, specs: list[ToolSpec],
+                 exclude: tuple[str, ...] = ()) -> tuple[str | None, str | None]:
+    if not isinstance(data, dict):
+        return None, NOT_JSON
+    name = data.get("tool")
+    if not isinstance(name, str):
+        return None, NO_TOOL_FIELD
+    if name in exclude or not any(s.name == name for s in specs):
+        return None, UNKNOWN_TOOL
+    return name, None
+
+
 def native_tools(specs: list[ToolSpec]) -> list[dict]:
     return [
         {"type": "function", "function": {"name": s.name, "description": s.description, "parameters": s.params}}
@@ -106,3 +155,19 @@ class ToolPort(ABC):
 
     def parse(self, data: object) -> tuple[ToolCall | None, str | None]:
         return parse_toolcall(data, self.specs())
+
+    def args_schema(self, tool: str) -> dict:
+        spec = next((s for s in self.specs() if s.name == tool), None)
+        if spec is None:
+            raise KeyError(f"no tool named {tool}")
+        return args_tool_schema(spec)
+
+    def choice_schema(self, exclude: tuple[str, ...] = ()) -> dict:
+        return choice_schema(self.specs(), exclude)
+
+    def parse_locked(self, data: object, tool: str) -> tuple[ToolCall | None, str | None]:
+        return parse_args(data, tool, self.specs())
+
+    def parse_choice(self, data: object,
+                     exclude: tuple[str, ...] = ()) -> tuple[str | None, str | None]:
+        return parse_choice(data, self.specs(), exclude)

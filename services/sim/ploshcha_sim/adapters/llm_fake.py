@@ -12,10 +12,11 @@ class FakeLlm(LlmPort):
         self._responses = list(responses)
         self.calls: list[dict] = []
 
-    def _next(self, prompt, system, structured, schema, seed, temperature=0.0) -> LlmResult:
+    def _next(self, prompt, system, structured, schema, seed, temperature=0.0,
+              max_tokens=0) -> LlmResult:
         self.calls.append(
             {"prompt": prompt, "system": system, "structured": structured, "schema": schema,
-             "seed": seed, "temperature": temperature}
+             "seed": seed, "temperature": temperature, "max_tokens": max_tokens}
         )
         if not self._responses and self.strict:
             raise AssertionError(f"FakeLlm: скрипт вичерпано на виклику #{len(self.calls)}")
@@ -30,7 +31,7 @@ class FakeLlm(LlmPort):
         )
 
     def generate(self, prompt, *, system=None, temperature=0.0, max_tokens=512, seed=None) -> LlmResult:
-        return self._next(prompt, system, False, None, seed, temperature)
+        return self._next(prompt, system, False, None, seed, temperature, max_tokens)
 
     def generate_structured(self, prompt, schema, *, system=None, temperature=0.0, max_tokens=512, seed=None) -> LlmResult:
-        return self._next(prompt, system, True, schema, seed, temperature)
+        return self._next(prompt, system, True, schema, seed, temperature, max_tokens)

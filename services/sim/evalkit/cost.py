@@ -60,6 +60,119 @@ def lane_cost(by_lane: dict[str, int], prompt_by_lane: dict[str, int] | None = N
     return total
 
 
+ROLE_OF_STAGE = {
+    "parse": "executor", "classify": "executor", "select": "executor",
+    "ground": "executor", "gate": "executor", "speak": "executor",
+    "decide": "orchestrator", "generate": "orchestrator", "synthesize": "orchestrator",
+    "judge": "verifier",
+    "mem_read": "memory", "mem_write": "memory", "recall": "memory",
+    "importance": "memory", "reflect": "memory",
+}
+ROLE_ORDER = ("orchestrator", "executor", "verifier", "memory", "other")
+
+
+def role_of(stage: str) -> str:
+    return ROLE_OF_STAGE.get(stage, "other")
+
+
+def _fold_roles(by_stage: dict[str, int]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for stage, tokens in (by_stage or {}).items():
+        role = role_of(stage)
+        out[role] = out.get(role, 0) + tokens
+    return out
+
+
+def roles_by_condition(results, field: str = "tokens_by_stage") -> dict[str, dict[str, int]]:
+    out: dict[str, dict[str, int]] = {}
+    for r in results:
+        acc = out.setdefault(r.condition, {})
+        for role, tokens in _fold_roles(getattr(r, field, None) or {}).items():
+            acc[role] = acc.get(role, 0) + tokens
+    return out
+
+
+def stages_by_condition(results, field: str = "tokens_by_stage") -> dict[str, dict[str, int]]:
+    out: dict[str, dict[str, int]] = {}
+    for r in results:
+        acc = out.setdefault(r.condition, {})
+        for stage, tokens in (getattr(r, field, None) or {}).items():
+            acc[stage] = acc.get(stage, 0) + tokens
+    return out
+
+
+def role_lane_by_condition(results) -> dict[str, dict[tuple[str, str], int]]:
+    out: dict[str, dict[tuple[str, str], int]] = {}
+    for r in results:
+        acc = out.setdefault(r.condition, {})
+        for pair, tokens in (getattr(r, "tokens_by_stage_lane", None) or {}).items():
+            stage, _, lane = pair.partition("|")
+            key = (role_of(stage), lane or "unknown")
+            acc[key] = acc.get(key, 0) + tokens
+    return out
+
+
+def role_lane_prompts(results) -> dict[str, dict[tuple[str, str], int]]:
+    out: dict[str, dict[tuple[str, str], int]] = {}
+    for r in results:
+        acc = out.setdefault(r.condition, {})
+        for pair, tokens in (getattr(r, "prompt_by_stage_lane", None) or {}).items():
+            stage, _, lane = pair.partition("|")
+            key = (role_of(stage), lane or "unknown")
+            acc[key] = acc.get(key, 0) + tokens
+    return out
+
+
+def role_attribution_gap(results) -> dict[str, int]:
+    gaps: dict[str, int] = {}
+    for r in results:
+        by_stage = sum((getattr(r, "tokens_by_stage", None) or {}).values())
+        total = r.tokens + r.aux_tokens
+        if by_stage != total:
+            gaps[r.condition] = gaps.get(r.condition, 0) + (total - by_stage)
+    return gaps
+
+
+def role_cost(results) -> dict[str, dict[str, float]]:
+    cross, prompts = role_lane_by_condition(results), role_lane_prompts(results)
+    out: dict[str, dict[str, float]] = {}
+    for cond, cells in cross.items():
+        acc = out.setdefault(cond, {})
+        for (role, lane), tokens in cells.items():
+            p_in, p_out = price(lane)
+            prompt = min(prompts.get(cond, {}).get((role, lane), 0), tokens)
+            acc[role] = acc.get(role, 0.0) + (prompt * p_in + (tokens - prompt) * p_out) / 1_000_000
+    return out
+
+
+def format_roles(results) -> str:
+    cross, prompts = role_lane_by_condition(results), role_lane_prompts(results)
+    costs, gaps = role_cost(results), role_attribution_gap(results)
+    lines = ["умова                     роль          ярус      токени  частка  промпт%        $"]
+    for cond in sorted(set(cross) | set(gaps)):
+        cells = cross.get(cond, {})
+        total = sum(cells.values())
+        if not total:
+            lines.append(f"{cond:<24}  ★ НЕ ВІДНЕСЕНО {gaps.get(cond, 0)} токенів — "
+                         f"розкладки по ролях немає взагалі")
+            continue
+        ordered = sorted(cells, key=lambda k: (ROLE_ORDER.index(k[0])
+                                               if k[0] in ROLE_ORDER else 99, k[1]))
+        for role, lane in ordered:
+            tokens = cells[(role, lane)]
+            pr = prompts.get(cond, {}).get((role, lane), 0)
+            p_in, p_out = price(lane)
+            prompt = min(pr, tokens)
+            usd = (prompt * p_in + (tokens - prompt) * p_out) / 1_000_000
+            lines.append(f"{cond:<24}  {role:<12}  {lane:<8}{tokens:>8}  {tokens/total:>6.0%}  "
+                         f"{(prompt/tokens if tokens else 0):>6.0%}  {usd:>9.5f}")
+        lines.append(f"{cond:<24}  ── усього {total:>8} токенів, "
+                     f"${sum(costs.get(cond, {}).values()):.5f}")
+        if gaps.get(cond):
+            lines.append(f"{cond:<24}  ★ НЕ ВІДНЕСЕНО {gaps[cond]} токенів — дірка в обліку")
+    return "\n".join(lines)
+
+
 def tokens_by_condition(results) -> dict[str, int]:
     out: dict[str, int] = {}
     for r in results:

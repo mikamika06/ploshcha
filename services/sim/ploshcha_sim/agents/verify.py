@@ -135,6 +135,7 @@ class Verdict(BaseModel):
     kind: VerdictKind = "supported"
     reason: str = ""
     tokens: int = 0
+    prompt_tokens: int = 0
 
 
 def _grounded_system(grounding: str, absent: bool, *, contrast: bool = False) -> str:
@@ -169,15 +170,17 @@ def verify(task, answer, router: ModelRouter, effort: EffortPolicy, *,
         if grounded:
             kind: VerdictKind = payload["kind"]
             verdict = Verdict(accepted=kind in ACCEPTING, kind=kind,
-                              reason=str(payload.get("reason", "")), tokens=res.usage.total)
+                              reason=str(payload.get("reason", "")), tokens=res.usage.total,
+                              prompt_tokens=res.usage.prompt_tokens)
         else:
             accepted = bool(payload["accepted"])
             verdict = Verdict(accepted=accepted, kind="supported" if accepted else "unsupported",
-                              reason=str(payload.get("reason", "")), tokens=res.usage.total)
+                              reason=str(payload.get("reason", "")), tokens=res.usage.total,
+                              prompt_tokens=res.usage.prompt_tokens)
         ok = True
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         verdict = Verdict(accepted=False, kind="parse_fail", reason="verify_parse_fail",
-                          tokens=res.usage.total)
+                          tokens=res.usage.total, prompt_tokens=res.usage.prompt_tokens)
         ok = False
     if trace is not None:
         trace.emit(StepRecord(

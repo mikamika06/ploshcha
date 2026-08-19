@@ -33,6 +33,10 @@ class Finding(BaseModel):
     # завищені: при ширині 4 відношення в токенах 2.16×, а в «доларах» виходило 2.59×.
     tokens_by_lane: dict[str, int] = Field(default_factory=dict)
     prompt_by_lane: dict[str, int] = Field(default_factory=dict)
+    tokens_by_stage: dict[str, int] = Field(default_factory=dict)
+    prompt_by_stage: dict[str, int] = Field(default_factory=dict)
+    tokens_by_stage_lane: dict[str, int] = Field(default_factory=dict)
+    prompt_by_stage_lane: dict[str, int] = Field(default_factory=dict)
     incidents: list[str] = Field(default_factory=list)
 
     @property

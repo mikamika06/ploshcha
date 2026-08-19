@@ -48,9 +48,36 @@ def _safe_json(text):
 
 
 VERBATIM_WINDOW = 2
+DIGEST_RESULT_CHARS = 90
 
 
 STEP_INSTRUCTION = "Наступний крок — один JSON (виклик інструмента або final_answer):"
+
+CHOICE_MAX_TOKENS = 64
+LOCKED_RETRIES_BEFORE_BAN = 2
+CHOICE_INSTRUCTION = "Який інструмент викликати наступним? Один JSON з полем tool:"
+
+
+def locked_instruction(tool: str) -> str:
+    return (f"Інструмент уже вибрано: {tool}. Заповни його аргументи так, щоб він відпрацював. "
+            "Якщо вище є помилка від цього інструмента — виправ аргументи. "
+            "Один JSON лише з аргументами, без поля tool:")
+
+
+def _render_choice(state: TaskState, specs, failed: list[str] | None = None) -> str:
+    banned = set(failed or ())
+    lines = [f"Задача: {state.task}", "Доступні інструменти:"]
+    for spec in specs:
+        if spec.name in banned:
+            continue
+        lines.append(f"  {spec.name} — {spec.description}")
+    for name in sorted(banned):
+        lines.append(f"Уже пробували й не вийшло: {name} — не обирай його знову.")
+    if state.scratch:
+        lines.append("Уже здобуто:")
+        lines.extend(_digest_line(x) for x in state.scratch)
+    lines.append(CHOICE_INSTRUCTION)
+    return "\n".join(lines)
 
 PREMATURE_FINAL = "premature_final"
 NO_FINAL = "no_final_answer"
@@ -65,14 +92,29 @@ PLAN_GUARD_HINT = ("У плані ще лишились кроки збору д
                    "для наступного елемента, який ще не здобутий.")
 
 
+def _digest_line(item) -> str:
+    call = item.get("call") or {}
+    tool = call.get("tool", "?")
+    args = ", ".join(f"{k}={v}" for k, v in call.items() if k != "tool")
+    res = json.dumps(item.get("result"), ensure_ascii=False)
+    if len(res) > DIGEST_RESULT_CHARS:
+        res = res[:DIGEST_RESULT_CHARS] + "…"
+    return f"  {tool}({args}) → {res}"
+
+
 def _render(state: TaskState, recall=None, verbatim: int | None = None,
-            tail: str | None = None, instruction: str | None = None) -> str:
+            tail: str | None = None, instruction: str | None = None,
+            digest: bool = False) -> str:
     lines = [f"Задача: {state.task}"]
     if recall is not None and recall.hits:
         lines.append("Пригадане:")
         for hit in recall.hits:
             lines.append(f"  {hit.item.id} · {hit.item.text}")
     scratch = state.scratch if verbatim is None else state.scratch[-verbatim:]
+    older = state.scratch[:-verbatim] if verbatim is not None else []
+    if digest and older:
+        lines.append("Уже зроблено раніше:")
+        lines.extend(_digest_line(x) for x in older)
     for item in scratch:
         lines.append(f"Виклик: {json.dumps(item['call'], ensure_ascii=False)}")
         lines.append(f"Результат: {json.dumps(item['result'], ensure_ascii=False)}")
@@ -130,7 +172,8 @@ class Orchestrator:
                  answer_channel: str = "schema", answer_instruction: str | None = None,
                  plan_guard: bool = False, coverage: bool = False,
                  coverage_guard: bool = False, verify_mode: str = "basic",
-                 absent_answer: bool = False, guard=None):
+                 absent_answer: bool = False, guard=None, executor_mode: str = "free",
+                 history_window: int | None = None, history_digest: bool = False):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -153,6 +196,9 @@ class Orchestrator:
         self.verify_mode = verify_mode
         self.absent_answer = absent_answer
         self.guard = guard
+        self.executor_mode = executor_mode
+        self.history_window = history_window
+        self.history_digest = history_digest
         self.has_data_tools = needs_loop(tools.specs())
 
     def run(self, task: str, seed: int = 0, budget: Budget | None = None) -> TaskResult:
@@ -185,17 +231,25 @@ class Orchestrator:
                 cfg = cfg.model_copy(update=state.overrides)
                 state.overrides = {}
             answering = self._is_answer_step(state)
-            schema = self.tools.strict_schema() if cfg.tier == "strict" else self.tools.wire_schema()
+            locked_tool = self._locked_tool(state, seed, answering)
+            if locked_tool is not None:
+                schema = self.tools.args_schema(locked_tool)
+            else:
+                schema = (self.tools.strict_schema() if cfg.tier == "strict"
+                          else self.tools.wire_schema())
             recall = None
             if notebook is not None:
                 recall = notebook.recall(_recall_query(state), state.budget.steps_used)
                 self._emit_memory(state, "mem_read", recall.as_trace(), seed)
-            prompt = _render(state, recall, VERBATIM_WINDOW if notebook is not None else None,
-                             self.tail, self.answer_instruction if answering else None)
+            prompt = _render(state, recall, self._window(notebook), self.tail,
+                             locked_instruction(locked_tool) if locked_tool is not None
+                             else (self.answer_instruction if answering else None),
+                             digest=self.history_digest)
             if answering:
                 res = llm.generate(prompt, system=self.system, temperature=cfg.temperature,
                                    max_tokens=cfg.max_tokens, seed=seed)
-                state.budget.spend(res.usage.total, self.router.lane(kind), res.usage.prompt_tokens)
+                state.budget.spend(res.usage.total, self.router.lane(kind),
+                                   res.usage.prompt_tokens, stage=kind)
                 self._emit(state, kind, llm.model, res, None, None, seed, prompt, "none")
                 state.answer = res.text.strip()
                 state.done = True
@@ -203,8 +257,12 @@ class Orchestrator:
             res = llm.generate_structured(prompt, schema, system=self.system,
                                           temperature=cfg.temperature,
                                           max_tokens=cfg.max_tokens, seed=seed)
-            state.budget.spend(res.usage.total, self.router.lane(kind), res.usage.prompt_tokens)
-            call, reason = self.tools.parse(_safe_json(res.text))
+            state.budget.spend(res.usage.total, self.router.lane(kind),
+                               res.usage.prompt_tokens, stage=kind)
+            if locked_tool is not None:
+                call, reason = self.tools.parse_locked(_safe_json(res.text), locked_tool)
+            else:
+                call, reason = self.tools.parse(_safe_json(res.text))
             self._emit(state, kind, llm.model, res, call, reason, seed, prompt, cfg.tier)
             state.hints = []
 
@@ -254,7 +312,10 @@ class Orchestrator:
                 code = classify(StepOutcome(raw_output=res.text, duplicate=duplicate,
                                             near_duplicate=near))
                 self._note_incident(notebook, state, code, seed, detail=sig)
+                self._unlock_tool(state, call.tool)
                 if self._recover(state, code, cfg, kind):
+                    continue
+                if self.executor_mode == "locked" and state.budget.can_continue():
                     continue
                 state.degraded = True
                 break
@@ -262,6 +323,7 @@ class Orchestrator:
             seen.append(sig)
             history.append((call.tool, dict(call.args)))
             result = self.tools.call(call)
+            self._emit_tool(state, call, result, seed)
             history_ok.append(result.ok and _tool_known(result) is not False)
             if result.ok and state.plan is not None:
                 state.plan.advance()
@@ -282,6 +344,8 @@ class Orchestrator:
                                         tool_known=_tool_known(result)))
             if code is not None:
                 self._note_incident(notebook, state, code, seed, detail=result.error)
+                if not result.ok:
+                    self._unlock_tool(state, call.tool)
                 self._recover(state, code, cfg, kind, detail=result.error)
 
         if not state.done:
@@ -307,7 +371,8 @@ class Orchestrator:
                                  evidence=state.scratch, seed=seed, trace=self.trace,
                                  run_id=self.run_id, mode=self.verify_mode,
                                  grounding=grounding, absent=evidence is False)
-            state.budget.spend_aux(verdict.tokens, self.router.lane("judge"))
+            state.budget.spend_aux(verdict.tokens, self.router.lane("judge"),
+                                   verdict.prompt_tokens, stage="judge")
             accepted, reason, kind = verdict.accepted, verdict.reason, verdict.kind
         elif state.done and not state.partial:
             accepted = True
@@ -321,6 +386,10 @@ class Orchestrator:
             tokens=state.budget.tokens_used, aux_tokens=state.budget.aux_tokens,
             tokens_by_lane=dict(sorted(state.budget.tokens_by_lane.items())),
             prompt_by_lane=dict(sorted(state.budget.prompt_by_lane.items())),
+            tokens_by_stage=dict(sorted(state.budget.tokens_by_stage.items())),
+            prompt_by_stage=dict(sorted(state.budget.prompt_by_stage.items())),
+            tokens_by_stage_lane=dict(sorted(state.budget.tokens_by_stage_lane.items())),
+            prompt_by_stage_lane=dict(sorted(state.budget.prompt_by_stage_lane.items())),
             incidents=state.incidents, notes=state.notes, scratch=state.scratch,
         )
 
@@ -328,12 +397,12 @@ class Orchestrator:
         """Відповідь — не дія, тому не йде через схему дій (K7b)."""
         recall = notebook.recall(_recall_query(state), state.budget.steps_used) \
             if notebook is not None else None
-        prompt = _render(state, recall, VERBATIM_WINDOW if notebook is not None else None,
-                         self.tail, self.answer_instruction)
+        prompt = _render(state, recall, self._window(notebook), self.tail,
+                         self.answer_instruction, digest=self.history_digest)
         res = llm.generate(prompt, system=self.system, temperature=cfg.temperature,
                            max_tokens=cfg.max_tokens, seed=seed)
         state.budget.spend(res.usage.total, self.router.lane("synthesize"),
-                           res.usage.prompt_tokens)
+                           res.usage.prompt_tokens, stage="synthesize")
         self._emit(state, "synthesize", llm.model, res, None, None, seed, prompt, "none")
         return res.text.strip()
 
@@ -438,6 +507,66 @@ class Orchestrator:
         text = f"збій {code}" + (f": {detail}" if detail else "")
         if notebook.note(text, state.budget.steps_used, sort="incident") is not None:
             self._emit_memory(state, "mem_write", {"sort": "incident", "text": text}, seed)
+
+    def _window(self, notebook) -> int | None:
+        if self.history_window is not None:
+            return self.history_window
+        return VERBATIM_WINDOW if notebook is not None else None
+
+    def _locked_tool(self, state: TaskState, seed, answering: bool) -> str | None:
+        if self.executor_mode != "locked" or answering:
+            return None
+        step = state.plan.current() if state.plan is not None else None
+        if step is None or step.tool_hint == FINAL_TOOL:
+            return None
+        if step.tool_hint is None:
+            chosen = self._decide_tool(state, seed)
+            if chosen is None:
+                return None
+            step.tool_hint = chosen
+        return step.tool_hint
+
+    def _decide_tool(self, state: TaskState, seed) -> str | None:
+        exclude = (FINAL_TOOL, *state.failed_tools)
+        if not [s for s in self.tools.specs() if s.name not in exclude]:
+            return None
+        llm = self.router.route("decide")
+        cfg = self.effort.effort("decide")
+        prompt = _render_choice(state, self.tools.specs(), state.failed_tools)
+        res = llm.generate_structured(prompt, self.tools.choice_schema(exclude=exclude),
+                                      system=self.system, temperature=cfg.temperature,
+                                      max_tokens=CHOICE_MAX_TOKENS, seed=seed)
+        state.budget.spend(res.usage.total, self.router.lane("decide"),
+                           res.usage.prompt_tokens, stage="decide")
+        chosen, reason = self.tools.parse_choice(_safe_json(res.text), exclude=exclude)
+        self._emit(state, "decide", llm.model, res, None, reason, seed, prompt, "none")
+        return chosen
+
+    def _unlock_tool(self, state: TaskState, tool: str | None) -> None:
+        if self.executor_mode != "locked" or not tool:
+            return
+        state.tool_failures[tool] = state.tool_failures.get(tool, 0) + 1
+        if state.tool_failures[tool] < LOCKED_RETRIES_BEFORE_BAN:
+            return
+        if tool not in state.failed_tools:
+            state.failed_tools.append(tool)
+        step = state.plan.current() if state.plan is not None else None
+        if step is not None and step.tool_hint != FINAL_TOOL:
+            step.tool_hint = None
+
+    def _emit_tool(self, state, call, result, seed) -> None:
+        if self.trace is None:
+            return
+        value = result.value if result.ok else {"error": result.error}
+        self.trace.emit(StepRecord(
+            run_id=self.run_id, tick=state.budget.steps_used, agent="tool",
+            stage="tool_result", model="tool", lane="none", prompt="",
+            raw_output=json.dumps(value, ensure_ascii=False),
+            parsed={"tool": call.tool, "ok": bool(result.ok), "found": result.found,
+                    **({"error": str(result.error)} if result.error else {})},
+            schema_valid=True, world_valid=bool(result.ok), seed=seed,
+            latency_ms=getattr(result, "latency_ms", 0) or 0,
+        ))
 
     def _emit_memory(self, state, stage: str, payload: dict, seed) -> None:
         if self.trace is None:

@@ -60,6 +60,15 @@ class OpenAICompatLlm(LlmPort):
             latency_ms=latency,
             structured=bool(extra_body or response_format),
             finish_reason=resp.choices[0].finish_reason,
+            rendered={
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "seed": seed,
+                "response_format": response_format,
+                "extra_body": extra_body or {},
+            },
         )
 
     def _with_retry(self, call):

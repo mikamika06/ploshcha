@@ -88,6 +88,10 @@ class AgentGraph(AgentPort):
                            tokens=result.tokens + result.aux_tokens, steps=result.steps,
                            tokens_by_lane=dict(result.tokens_by_lane),
                            prompt_by_lane=dict(result.prompt_by_lane),
+                           tokens_by_stage=dict(result.tokens_by_stage),
+                           prompt_by_stage=dict(result.prompt_by_stage),
+                           tokens_by_stage_lane=dict(result.tokens_by_stage_lane),
+                           prompt_by_stage_lane=dict(result.prompt_by_stage_lane),
                            incidents=list(result.incidents))
 
         if self.workers <= 1 or split.width == 1:
@@ -121,6 +125,14 @@ class AgentGraph(AgentPort):
                 merged.tokens_by_lane[lane] = merged.tokens_by_lane.get(lane, 0) + count
             for lane, count in finding.prompt_by_lane.items():
                 merged.prompt_by_lane[lane] = merged.prompt_by_lane.get(lane, 0) + count
+            for stage, count in finding.tokens_by_stage.items():
+                merged.tokens_by_stage[stage] = merged.tokens_by_stage.get(stage, 0) + count
+            for stage, count in finding.prompt_by_stage.items():
+                merged.prompt_by_stage[stage] = merged.prompt_by_stage.get(stage, 0) + count
+            for pair, count in finding.tokens_by_stage_lane.items():
+                merged.tokens_by_stage_lane[pair] = merged.tokens_by_stage_lane.get(pair, 0) + count
+            for pair, count in finding.prompt_by_stage_lane.items():
+                merged.prompt_by_stage_lane[pair] = merged.prompt_by_stage_lane.get(pair, 0) + count
 
         outcome = merge_outcome(findings)
         return TaskResult(
@@ -133,6 +145,10 @@ class AgentGraph(AgentPort):
             tokens=merged.tokens_used,
             tokens_by_lane=dict(sorted(merged.tokens_by_lane.items())),
             prompt_by_lane=dict(sorted(merged.prompt_by_lane.items())),
+            tokens_by_stage=dict(sorted(merged.tokens_by_stage.items())),
+            prompt_by_stage=dict(sorted(merged.prompt_by_stage.items())),
+            tokens_by_stage_lane=dict(sorted(merged.tokens_by_stage_lane.items())),
+            prompt_by_stage_lane=dict(sorted(merged.prompt_by_stage_lane.items())),
             incidents=[i for f in findings for i in f.incidents],
             notes=[FANOUT_NOTE, f"width={split.width}", f"depth={split.depth}"]
             + [f"missing={m}" for m in missing],

@@ -16,7 +16,16 @@ BINARY = {
 }
 UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
 
-CONTRACT = "приймаю лише числа й дії + - * / // % ** ( )"
+AGGREGATES = {
+    "sum": lambda xs: sum(xs),
+    "min": lambda xs: min(xs),
+    "max": lambda xs: max(xs),
+    "len": lambda xs: float(len(xs)),
+}
+MAX_ITEMS = 500
+
+CONTRACT = ("приймаю лише числа й дії + - * / // % ** ( ), "
+            "а також згортки sum/min/max/len над списком чисел, напр. sum([29, 58, 91])")
 
 
 class ArithError(ValueError):
@@ -60,7 +69,27 @@ def _eval(node) -> float:
         if isinstance(node.op, (ast.Div, ast.FloorDiv, ast.Mod)) and right == 0:
             raise ArithError("ділення на нуль")
         return _guard(BINARY[type(node.op)](left, right))
+    if isinstance(node, ast.Call):
+        return _aggregate(node)
     raise ArithError(f"заборонена конструкція {type(node).__name__}; {CONTRACT}")
+
+
+def _aggregate(node) -> float:
+    if not isinstance(node.func, ast.Name):
+        raise ArithError(f"заборонена конструкція Call; {CONTRACT}")
+    if node.func.id not in AGGREGATES:
+        raise ArithError(f"невідома згортка {node.func.id}; {CONTRACT}")
+    if node.keywords or len(node.args) != 1:
+        raise ArithError(f"згортка бере рівно один список; {CONTRACT}")
+    arg = node.args[0]
+    if not isinstance(arg, (ast.List, ast.Tuple)):
+        raise ArithError(f"аргумент згортки мусить бути списком чисел; {CONTRACT}")
+    if len(arg.elts) > MAX_ITEMS:
+        raise ArithError(f"у списку понад {MAX_ITEMS} елементів")
+    if not arg.elts:
+        raise ArithError("порожній список")
+    values = [_eval(el) for el in arg.elts]
+    return _guard(AGGREGATES[node.func.id](values))
 
 
 def _guard(value) -> float:

@@ -21,6 +21,7 @@ class LlmResult(BaseModel):
     latency_ms: int = 0
     structured: bool = False
     finish_reason: str | None = None
+    rendered: dict | None = None
 
 
 class LlmPort(ABC):

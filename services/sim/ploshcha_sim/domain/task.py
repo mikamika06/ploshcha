@@ -10,22 +10,34 @@ class Budget(BaseModel):
     aux_tokens: int = 0
     tokens_by_lane: dict[str, int] = Field(default_factory=dict)
     prompt_by_lane: dict[str, int] = Field(default_factory=dict)
+    tokens_by_stage: dict[str, int] = Field(default_factory=dict)
+    prompt_by_stage: dict[str, int] = Field(default_factory=dict)
+    tokens_by_stage_lane: dict[str, int] = Field(default_factory=dict)
+    prompt_by_stage_lane: dict[str, int] = Field(default_factory=dict)
 
     def can_continue(self) -> bool:
         return self.steps_used < self.max_steps and self.tokens_used < self.max_tokens
 
-    def spend(self, tokens: int, lane: str = "unknown", prompt: int = 0) -> None:
+    def spend(self, tokens: int, lane: str = "unknown", prompt: int = 0,
+              stage: str = "unknown") -> None:
         self.steps_used += 1
         self.tokens_used += tokens
-        self._attribute(tokens, lane, prompt)
+        self._attribute(tokens, lane, prompt, stage)
 
-    def spend_aux(self, tokens: int, lane: str = "unknown", prompt: int = 0) -> None:
+    def spend_aux(self, tokens: int, lane: str = "unknown", prompt: int = 0,
+                  stage: str = "unknown") -> None:
         self.aux_tokens += tokens
-        self._attribute(tokens, lane, prompt)
+        self._attribute(tokens, lane, prompt, stage)
 
-    def _attribute(self, tokens: int, lane: str, prompt: int = 0) -> None:
+    def _attribute(self, tokens: int, lane: str, prompt: int = 0,
+                   stage: str = "unknown") -> None:
         self.tokens_by_lane[lane] = self.tokens_by_lane.get(lane, 0) + tokens
         self.prompt_by_lane[lane] = self.prompt_by_lane.get(lane, 0) + prompt
+        self.tokens_by_stage[stage] = self.tokens_by_stage.get(stage, 0) + tokens
+        self.prompt_by_stage[stage] = self.prompt_by_stage.get(stage, 0) + prompt
+        pair = f"{stage}|{lane}"
+        self.tokens_by_stage_lane[pair] = self.tokens_by_stage_lane.get(pair, 0) + tokens
+        self.prompt_by_stage_lane[pair] = self.prompt_by_stage_lane.get(pair, 0) + prompt
 
 
 class TaskStep(BaseModel):
@@ -64,6 +76,8 @@ class TaskState(BaseModel):
     overrides: dict = Field(default_factory=dict)
     route_as: str | None = None
     attempts: dict[str, int] = Field(default_factory=dict)
+    failed_tools: list[str] = Field(default_factory=list)
+    tool_failures: dict[str, int] = Field(default_factory=dict)
     incidents: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     recoveries: int = 0
@@ -86,4 +100,8 @@ class TaskResult(BaseModel):
     notes: list[str] = Field(default_factory=list)
     tokens_by_lane: dict[str, int] = Field(default_factory=dict)
     prompt_by_lane: dict[str, int] = Field(default_factory=dict)
+    tokens_by_stage: dict[str, int] = Field(default_factory=dict)
+    prompt_by_stage: dict[str, int] = Field(default_factory=dict)
+    tokens_by_stage_lane: dict[str, int] = Field(default_factory=dict)
+    prompt_by_stage_lane: dict[str, int] = Field(default_factory=dict)
     scratch: list[dict] = Field(default_factory=list)
