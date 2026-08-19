@@ -24,6 +24,7 @@ from .adapters.tools_ua import UA_TOOLS
 from .adapters.tools_ua_norm import UA_NORM_TOOLS
 from .agents import Orchestrator
 from .agents.graph import AgentGraph
+from .agents.viche import Viche
 from .domain.gate import FINAL_TOOL
 from .domain.spec import AppSpec
 from .domain.task import Budget
@@ -85,16 +86,37 @@ def build_budget(spec: AppSpec) -> Budget:
     return Budget(max_steps=spec.max_steps)
 
 
+def build_viche(spec: AppSpec, *, lapa, mamay, **kw):
+    """Віче — окремий агент, не гілка графа: у графа інша петля й інший критерій успіху."""
+    return Viche(build_router(spec, lapa=lapa, mamay=mamay), build_effort(spec),
+                 build_toolbox(spec) if spec.toolset != "none" else None,
+                 trace=kw.get("trace"), run_id=kw.get("run_id", "viche"),
+                 width=spec.max_width, system=kw.get("system"),
+                 prompt_id=kw.get("prompt_id", spec.prompt_id),
+                 prompt_sha=kw.get("prompt_sha", ""),
+                 **{k: kw[k] for k in ("score_system", "line_system", "summary_system",
+                                       "doubt_system", "chronicle_system") if k in kw})
+
+
 def build_graph(spec: AppSpec, *, lapa, mamay, **kw):
     """Граф — це КОНФІГ, не окремий застосунок: дитина збирається тим самим коренем.
 
     `budget` дитини приходить від графа (поділений), тому тут його не задаємо.
     """
+    # `trace`/`run_id` належать графу, а не дитині: раніше вони форвардились у
+    # `build_orchestrator`, який їх не приймає, тому трасований граф падав із TypeError —
+    # тобто граф не можна було спостерігати взагалі.
+    trace = kw.pop("trace", None)
+    run_id = kw.pop("run_id", "graph")
+
     def child(budget):
-        return build_orchestrator(spec, lapa=lapa, mamay=mamay, **kw)
+        orch = build_orchestrator(spec, lapa=lapa, mamay=mamay, **kw)
+        orch.trace = trace
+        orch.run_id = run_id
+        return orch
 
     return AgentGraph(child, max_depth=spec.max_depth, max_width=spec.max_width,
-                      trace=kw.get("trace"), run_id=kw.get("run_id", "graph"))
+                      trace=trace, run_id=run_id)
 
 
 def build_orchestrator(spec: AppSpec, *, lapa, mamay, system: str | None = None,
@@ -126,4 +148,7 @@ def build_orchestrator(spec: AppSpec, *, lapa, mamay, system: str | None = None,
         plan_guard=spec.plan_guard,
         coverage=spec.coverage,
         coverage_guard=spec.coverage_guard,
+        executor_mode=spec.executor,
+        history_window=spec.history_window,
+        history_digest=spec.history_digest,
     )

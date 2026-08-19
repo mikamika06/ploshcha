@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-Mode = Literal["single", "loop", "gated"]
+Mode = Literal["single", "loop", "gated", "viche"]
 Routing = Literal["hetero", "mamay", "lapa"]
 Toolset = Literal["default", "ua", "registry", "registry_agg", "registry_teach", "registry_sum", "registry_reduce",
                    "docs", "docs_agg", "docs_years",
@@ -14,6 +14,7 @@ MemoryKind = Literal["none", "notebook"]
 AnswerChannel = Literal["schema", "text"]
 VerifyMode = Literal["basic", "grounded", "auto", "contrast"]
 JudgeLane = Literal["auto", "mamay", "lapa"]
+ExecutorMode = Literal["free", "locked"]
 
 
 class AppSpec(BaseModel):
@@ -42,6 +43,9 @@ class AppSpec(BaseModel):
     max_depth: int = 2
     max_width: int = 6
     recovery: bool = False
+    executor: ExecutorMode = "free"
+    history_window: int | None = None
+    history_digest: bool = False
     max_steps: int = 5
     max_tokens: int = 512
     temperature: float = 0.0

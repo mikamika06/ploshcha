@@ -121,7 +121,8 @@ def test_by_prompt_and_sensitivity_math():
     assert "spread=" in format_prompt_report(rows)
 
 
-CANDIDATE_ON_PURPOSE = {"agent/v2-ua", "agent/v2-reg", "agent/v2-iter", "agent/v2-agg", "agent/v2-docs", "agent/v2-docs-agg", "agent/v2-sum", "agent/v2-reduce", "agent/v2-docs-years", "agent/v2-uanorm", "agent/v2-ref", "agent/v2-lexis", "lexis/plain", "answer/full"}
+CANDIDATE_ON_PURPOSE = {"agent/v2-ua", "agent/v2-reg", "agent/v2-iter", "agent/v2-agg", "agent/v2-docs", "agent/v2-docs-agg", "agent/v2-sum", "agent/v2-reduce", "agent/v2-docs-years", "agent/v2-uanorm", "agent/v2-ref", "agent/v2-lexis", "lexis/plain", "answer/full",
+                        }
 
 
 def test_frozen_prompt_is_the_one_eval_uses():
@@ -156,6 +157,16 @@ def test_the_prompt_slot_must_fit_the_toolset():
     for name, spec in CONDITIONS.items():
         slot = resolve(spec.prompt_id).slot
         has_data = needs_loop(build_toolbox(spec).specs())
+        if spec.mode == "viche":
+            # У вічі інструмент вибирає НЕ той, хто говорить: вибір робить партитура (Mamay), і
+            # список інструментів там — енум СХЕМИ, не текст промпту. Тому вимога «слот
+            # orchestrator» тут не послаблена, а перевернута: промпт мовця мусить бути `plain`,
+            # інакше ми описали б інструменти тому, хто не має права їх обирати.
+            if slot != "plain":
+                wrong.append(f"{name}: мовець віча мусить мати промпт слота «plain», а має «{slot}»")
+            if resolve("viche/score").slot == "orchestrator":
+                wrong.append("viche/score: партитура не перелічує інструменти текстом — це енум схеми")
+            continue
         if has_data and slot != "orchestrator":
             wrong.append(f"{name}: є інструменти, але промпт слота «{slot}»")
         if not has_data and slot == "orchestrator":
