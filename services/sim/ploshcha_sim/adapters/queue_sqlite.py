@@ -90,6 +90,21 @@ class SqliteQueue(QueuePort):
             db.execute("UPDATE work SET status=?, error=?, leased_at=NULL WHERE key=?",
                        (status, error[:500], key))
 
+    def requeue_dead(self, key: str | None = None) -> int:
+        """Повернути мертві айтеми в чергу, скинувши лічильник спроб.
+
+        Без цього єдиний спосіб оживити задачу, яка вмерла через уже виправлений дефект коду, — лізти
+        в SQLite руками. Саме так у базі й лежав `dead: 1` від давно полагодженого `TypeError`.
+        """
+        with self._db() as db:
+            if key is None:
+                cur = db.execute("UPDATE work SET status='pending', attempts=0, error=NULL, "
+                                 "leased_at=NULL WHERE status='dead'")
+            else:
+                cur = db.execute("UPDATE work SET status='pending', attempts=0, error=NULL, "
+                                 "leased_at=NULL WHERE status='dead' AND key=?", (key,))
+            return cur.rowcount
+
     def recover_stale(self, older_than_s: float) -> int:
         """Покинута аренда повертається в чергу. Це і є переживання краша."""
         cutoff = self._clock() - older_than_s

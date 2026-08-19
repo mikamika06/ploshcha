@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field
 
 from .memory import MemoryItem
 
-TimeOfDay = Literal["dawn", "morning", "noon", "afternoon", "evening", "night"]
+TimeOfDay = Literal["dawn", "morning", "noon", "evening", "dusk", "night"]
 
-PHASES: tuple[TimeOfDay, ...] = ("dawn", "morning", "noon", "afternoon", "evening", "night")
+PHASES: tuple[TimeOfDay, ...] = ("dawn", "morning", "noon", "evening", "dusk", "night")
 TICKS_PER_PHASE = 1
 
 
