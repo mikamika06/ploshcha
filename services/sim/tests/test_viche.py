@@ -864,3 +864,87 @@ def test_a_corrupt_village_regenerates_instead_of_crashing(tmp_path):
     with sqlite3.connect(store.path) as db:
         db.execute("INSERT INTO village(seed, people) VALUES(?,?)", (11, "{побите"))
     assert store.load(11) == []
+
+
+# ── Ш4: чутка й репутація ─────────────────────────────────────────────────────
+
+def chron_r(*thoughts, rumour="так", who=None, claim="то не вовк, а пес шинкаря",
+            ground="не було", decided="ні") -> str:
+    return json.dumps({"заголовок": "Вовк", "оповідь": "Погомоніли.", "настрій": "тривога",
+                       "сила": "помірно",
+                       "чутка": {"є": rumour, "хто": who or thoughts[0][0], "що": claim,
+                                 "підстава": ground},
+                       "ухвала": {"ухвалено": decided, "що": "-", "хто": who or thoughts[0][0],
+                                  "де": "ploshcha"},
+                       "думки": [{"хто": r, "думка": t} for r, t in thoughts]},
+                      ensure_ascii=False)
+
+
+def test_a_claim_without_ground_becomes_a_rumour():
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    trace = InMemoryTrace()
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    agent, _ = build([score(beat(pair[0]))] + lines(3) + [chron_r((pair[0], "Отак."))],
+                     width=2, trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    ev = next(e for e in _events(trace) if e["type"] == "event.happened")
+    assert ev["payload"]["event"]["kind"] == "rumour"
+    assert "пес шинкаря" in ev["payload"]["event"]["label"]
+
+
+def test_a_claim_with_ground_is_not_a_rumour():
+    """Якщо підстава була — це просто слово, і в обіг воно не йде."""
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    trace = InMemoryTrace()
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    agent, _ = build([score(beat(pair[0]))] + lines(3)
+                     + [chron_r((pair[0], "Отак."), ground="була")], width=2, trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    assert not [e for e in _events(trace) if e["type"] == "event.happened"]
+
+
+def test_being_refuted_costs_you_speaking_time():
+    """★ Заради чого репутація й існує: не напис, а буквально менше тактів."""
+    roles = [p.role for p in PERSONAS]
+    raw = {"такти": [beat(roles[0]) for _ in range(MAX_BEATS)]}
+    full = repair_score(raw, roles, [])
+    punished = repair_score(raw, roles, [], {roles[0]: 0.4})
+    assert len(punished) < len(full)
+    assert punished, "людину не викидають із села за помилку"
+
+
+def test_being_right_returns_trust_but_buys_nothing_extra(tmp_path):
+    """Інакше один щасливий здогад робив би людину головною назавжди."""
+    from ploshcha_sim.adapters.rumours_sqlite import SqliteRumours
+
+    store = SqliteRumours(tmp_path / "r.db")
+    store.add("t", "shynkar", "щось")
+    store.settle(1, "спростована")
+    hurt = store.standing("shynkar")
+    store.add("t", "shynkar", "інше")
+    store.settle(2, "підтверджена")
+    assert hurt < 1.0
+    assert store.standing("shynkar") == 1.0
+
+
+def test_reputation_has_a_floor(tmp_path):
+    from ploshcha_sim.adapters.rumours_sqlite import SqliteRumours
+
+    store = SqliteRumours(tmp_path / "r.db")
+    for i in range(1, 12):
+        store.add("t", "did", f"чутка {i}")
+        store.settle(i, "спростована")
+    assert store.standing("did") >= 0.4
+
+
+def test_open_rumours_reach_the_next_score():
+    """Чутка мусить ХОДИТИ селом, інакше вона просто рядок у базі."""
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    llm = FakeLlm([score(beat(pair[0]))] + lines(6), model="f")
+    agent = Viche(single_model_router(llm), PresetEffort(), None, width=2, run_id="r",
+                  rumours=[{"who": "shynkar", "claim": "то пес, а не вовк"}])
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    assert "то пес, а не вовк" in llm.calls[0]["prompt"]

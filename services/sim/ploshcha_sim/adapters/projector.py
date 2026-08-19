@@ -203,6 +203,16 @@ class StreamProjector:
                     "thought": str(payload["thought"]).strip()}, tick))
             return out
 
+        if record.agent == "rumour":
+            payload = record.parsed or {}
+            claim, who = str(payload.get("claim") or ""), str(payload.get("who") or "")
+            if claim:
+                out.append(self._envelope("event.happened", {"event": {
+                    "id": f"rumour-{self.run_id}", "kind": "rumour", "label": claim,
+                    **({"involves": [who]} if who else {}),
+                }}, tick))
+            return out
+
         if record.agent == "council":
             payload = record.parsed or {}
             label, who, poi = (str(payload.get("label") or ""), str(payload.get("who") or ""),

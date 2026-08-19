@@ -30,6 +30,7 @@ from ploshcha_sim.adapters.queue_sqlite import SqliteQueue  # noqa: E402
 from ploshcha_sim.compose import (  # noqa: E402
     build_budget, build_effort, build_graph, build_orchestrator, build_router, build_viche)
 from ploshcha_sim.domain.governor import Governor  # noqa: E402
+from ploshcha_sim.adapters.rumours_sqlite import SqliteRumours  # noqa: E402
 from ploshcha_sim.adapters.village_sqlite import SqliteVillage  # noqa: E402
 from ploshcha_sim.agents.forge import forge_village  # noqa: E402
 from ploshcha_sim.domain.viche import PERSONAS, public_cast  # noqa: E402
@@ -95,6 +96,8 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
                 system=resolve("viche/forge").render_system())
             store.save(VILLAGE_SEED, village)
 
+    talk = SqliteRumours(db) if spec.mode == "viche" else None
+
     bus = EventBus()
     Path(db).parent.mkdir(parents=True, exist_ok=True)
     queue = SqliteQueue(db)
@@ -112,7 +115,10 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
                                 summary_system=resolve("viche/summary").render_system(),
                                 doubt_system=resolve("viche/doubt").render_system(),
                                 chronicle_system=resolve("viche/chronicle").render_system(),
-                                village=village)
+                                village=village,
+                                standing={p.role: talk.standing(p.role) for p in village}
+                                         if talk else None,
+                                rumours=talk.open() if talk else None)
             agent.budget_template = budget
             return agent
         if spec.graph:
@@ -127,7 +133,8 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
     runner = LiveRunner(bus, queue, make_agent, governor=governor, scene=SCENE,
                         paused=paused,
                         cast=public_cast(village) if spec.mode == "viche" else None,
-                        decisions=SqliteDecisions(db) if spec.mode == "viche" else None)
+                        decisions=SqliteDecisions(db) if spec.mode == "viche" else None,
+                        rumours=talk)
     return spec, bus, queue, runner
 
 

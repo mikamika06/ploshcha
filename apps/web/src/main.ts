@@ -349,12 +349,14 @@ async function boot(): Promise<void> {
         // Ухвала — не чергова тема, а СКРІПЛЕНЕ рішення: інший вигляд, і по ній не запускається
         // новий прогін (клікабельні лише «гарячі»).
         const decision = ev.payload.event.kind === "decision";
+        const rumour = ev.payload.event.kind === "rumour";
         board.addTopic({
           text: ev.payload.event.label,
-          heat: decision ? "sealed" : "warm",
+          heat: decision ? "sealed" : rumour ? "warm" : "cold",
           author: decision ? store.state.villagers.get(ev.payload.event.involves?.[0] ?? "")?.name : undefined,
         });
         if (decision) chron.decided(ev.payload.event.label);
+        if (rumour) chron.rumour(ev.payload.event.label);
         break;
       }
       case "report.compiled":

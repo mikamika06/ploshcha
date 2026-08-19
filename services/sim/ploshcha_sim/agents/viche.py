@@ -88,7 +88,8 @@ class Viche(AgentPort):
                  prompt_id: str = "viche/v1", prompt_sha: str = "",
                  score_system: str = SCORE_SYSTEM, line_system: str = LINE_SYSTEM,
                  summary_system: str = SUMMARY_SYSTEM, doubt_system: str = DOUBT_SYSTEM,
-                 chronicle_system: str = CHRONICLE_SYSTEM, village: list | None = None):
+                 chronicle_system: str = CHRONICLE_SYSTEM, village: list | None = None,
+                 standing: dict[str, float] | None = None, rumours: list | None = None):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -106,6 +107,9 @@ class Viche(AgentPort):
         self.doubt_system = doubt_system
         self.chronicle_system = chronicle_system
         # Породжене село. Порожньо — сталі персони: віче мусить працювати й без ланки породження.
+        # Скільки важить слово кожного (репутація) і які чутки ще ходять селом.
+        self.standing = dict(standing or {})
+        self.rumours = list(rumours or [])
         self.village = list(village or [])
         self._people = {x.role: x for x in self.village}
         # Скринька вхідних: сюди падає слово гостя й шепіт, поки віче ТРИВАЄ. Читається між
@@ -197,12 +201,16 @@ class Viche(AgentPort):
         people = "\n".join(f"- {p.role} ({p.name}): {p.lens}" for p in cast)
         prompt = (f"НОВИНА ДЛЯ ВІЧА:\n{task}\n\nЛЮДИ:\n{people}\n\n"
                   f"ДОСТУПНІ ХОДИ: {', '.join(MOVE_HINT)}\n"
-                  f"ДОВІДНИК: {', '.join(tools) if tools else 'немає'}\n\n"
+                  f"ДОВІДНИК: {', '.join(tools) if tools else 'немає'}\n"
+                  + (("ЧУТКИ, ЩО ХОДЯТЬ СЕЛОМ: "
+                      + " | ".join(f"{r['who']}: {r['claim']}" for r in self.rumours[:3]) + "\n")
+                     if self.rumours else "")
+                  + "\n"
                   "Розпиши такти віча. `у_відповідь` — номер попереднього такту або null.")
         schema = score_schema(roles, tools)
         beats = repair_score(_safe_json(
             self._call("decide", prompt, self.score_system, schema, seed, budget,
-                       max_tokens=SCORE_TOKENS)), roles, tools)
+                       max_tokens=SCORE_TOKENS)), roles, tools, self.standing)
         if not beats:
             # Збій структурованого виводу тут ПЕРЕРИВЧАСТИЙ, а не детермінований: та сама схема й
             # той самий промпт то проходять, то дають нерозбірний JSON. Один перепит із іншим сідом
@@ -210,7 +218,7 @@ class Viche(AgentPort):
             incidents.append("viche_score_retry")
             beats = repair_score(_safe_json(
                 self._call("decide", prompt, self.score_system, schema, seed + 101, budget,
-                           max_tokens=SCORE_TOKENS)), roles, tools)
+                           max_tokens=SCORE_TOKENS)), roles, tools, self.standing)
         if not beats:
             # Запасний план мусить бути ГУЧНИЙ. Тихо він виглядав як «розмова коротка», а насправді
             # означав, що плану не було взагалі.
@@ -424,6 +432,7 @@ class Viche(AgentPort):
                     lane=self.router.lane("synthesize"), prompt="", raw_output="",
                     parsed={"agentId": item["хто"], "thought": thought[:MAX_LINE_CHARS]},
                     schema_valid=True, world_valid=True))
+        self._emit_rumour(data.get("чутка"), roles)
         self._emit_decision(data.get("ухвала"), roles)
         self.trace.emit(StepRecord(
             run_id=self.run_id, tick=0, agent="chronicler", stage="report", model="viche",
@@ -433,6 +442,26 @@ class Viche(AgentPort):
                     "mood": mood_view(str(data.get("настрій") or "спокій"),
                                       data.get("сила") or "помірно"),
                     "highlights": [t for _, t in said[:3]]},
+            schema_valid=True, world_valid=True))
+
+    def _emit_rumour(self, raw, roles: list[str]) -> None:
+        """Чутка — твердження без підстави, сказане вголос.
+
+        Якщо підстава БУЛА, це не чутка, а просто слово — і в обіг воно не йде. Тому «є: так» самого
+        по собі мало: розрізняє саме `підстава`.
+        """
+        if self.trace is None or not isinstance(raw, dict):
+            return
+        if str(raw.get("є")) != "так" or str(raw.get("підстава")) != "не було":
+            return
+        claim = " ".join(str(raw.get("що") or "").split())
+        who = str(raw.get("хто") or "")
+        if not claim or who not in roles:
+            return
+        self.trace.emit(StepRecord(
+            run_id=self.run_id, tick=0, agent="rumour", stage="judge", model="viche",
+            lane=self.router.lane("judge"), prompt="", raw_output="",
+            parsed={"who": who, "claim": claim[:200]},
             schema_valid=True, world_valid=True))
 
     def _emit_decision(self, raw, roles: list[str]) -> None:

@@ -90,6 +90,11 @@ export class Chronicle {
     this.say(`ухвалили: ${label}`.slice(0, 140));
   }
 
+  /** Чутка — сказане без підстави; вона піде селом і колись або підтвердиться, або ні. */
+  rumour(claim: string): void {
+    this.say(`пішла чутка: ${claim}`.slice(0, 140), "dim");
+  }
+
   clear(): void {
     this.root.innerHTML = "";
   }

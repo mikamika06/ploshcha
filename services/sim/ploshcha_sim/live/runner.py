@@ -45,7 +45,7 @@ class LiveRunner:
                  *, governor: Governor | None = None, scene: dict | None = None,
                  worker: str = "ploshcha", paused: bool = True,
                  estimate_tokens: int = 2000, cast: list[dict] | None = None,
-                 decisions=None):
+                 decisions=None, rumours=None):
         self.bus = bus
         self.queue = queue
         self.make_orchestrator = make_orchestrator
@@ -53,6 +53,7 @@ class LiveRunner:
         self.scene = scene
         self.cast = cast
         self.decisions = decisions
+        self.rumours = rumours
         self.worker = worker
         self.estimate_tokens = estimate_tokens
         self._paused = threading.Event()
@@ -190,6 +191,11 @@ class LiveRunner:
                 self.queue.fail(item.key, self.last_error)
             return
         self.current = None
+        if self.rumours is not None:
+            for rec in trace.records:
+                if rec.agent == "rumour" and (rec.parsed or {}).get("claim"):
+                    self.rumours.add(task, str(rec.parsed.get("who") or ""),
+                                     str(rec.parsed["claim"]))
         if self.decisions is not None:
             for rec in trace.records:
                 if rec.agent == "council" and (rec.parsed or {}).get("poi"):

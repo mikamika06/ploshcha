@@ -187,6 +187,19 @@ def chronicle_schema(roles: list[str]) -> dict:
             "оповідь": {"type": "string"},
             "настрій": {"type": "string", "enum": list(MOODS)},
             "сила": {"type": "string", "enum": list(FORCES)},
+            # Чутка — твердження БЕЗ підстави, сказане вголос. Їде тією ж ланкою, що хроніка й
+            # ухвала: усе це судження про ту саму розмову, і платити за нього тричі нема за що.
+            "чутка": {
+                "type": "object",
+                "properties": {
+                    "є": {"type": "string", "enum": ["так", "ні"]},
+                    "хто": {"type": "string", "enum": list(roles)},
+                    "що": {"type": "string", "maxLength": 90},
+                    "підстава": {"type": "string", "enum": ["була", "не було"]},
+                },
+                "required": ["є", "хто", "що", "підстава"],
+                "additionalProperties": False,
+            },
             # Ухвала їде в ТІЙ САМІЙ ланці, що хроніка: окремий виклик коштував би стільки ж, а
             # рішення — це судження про ту саму розмову. `хто`/`де` енумами, текст із межею: обидва
             # обмеження — з заміру, не з обережності.
@@ -214,7 +227,7 @@ def chronicle_schema(roles: list[str]) -> dict:
                 },
             },
         },
-        "required": ["заголовок", "оповідь", "настрій", "сила", "ухвала", "думки"],
+        "required": ["заголовок", "оповідь", "настрій", "сила", "ухвала", "чутка", "думки"],
         "additionalProperties": False,
     }
 
@@ -286,7 +299,8 @@ def line_schema() -> dict:
     }
 
 
-def repair_score(raw: dict | None, roles: list[str], tools: list[str]) -> list[Beat]:
+def repair_score(raw: dict | None, roles: list[str], tools: list[str],
+                 standing: dict[str, float] | None = None) -> list[Beat]:
     """Лагодить КОД, не модель: чужа роль, невідомий хід, посилання в майбутнє — усе відкидається.
 
     Схема це вже гарантує на строгому ярусі, але шлюз не завжди строгий, а мовчазний дефект
@@ -294,14 +308,17 @@ def repair_score(raw: dict | None, roles: list[str], tools: list[str]) -> list[B
     """
     beats: list[Beat] = []
     quota: dict[str, int] = {}
-    cap = max(2, int(MAX_BEATS * MAX_SHARE))
+    base_cap = max(2, int(MAX_BEATS * MAX_SHARE))
+    # ★ Репутація = ЧАС СЛОВА. Кому спростували чутку, того слухають менше — не метафорично, а
+    # буквально меншою квотою тактів. Рахує код: це визначено даними, а не судженням моделі.
+    caps = {r: max(1, round(base_cap * (standing or {}).get(r, 1.0))) for r in roles}
     for item in (raw or {}).get("такти") or []:
         if not isinstance(item, dict):
             continue
         who, move = str(item.get("хто") or ""), str(item.get("хід") or "")
         if who not in roles or move not in MOVES:
             continue
-        if quota.get(who, 0) >= cap:
+        if quota.get(who, 0) >= caps.get(who, base_cap):
             continue
         quota[who] = quota.get(who, 0) + 1
         reply = item.get("у_відповідь")
