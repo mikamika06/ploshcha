@@ -45,3 +45,5 @@ services/sim/evalkit/data/*.db
 services/sim/evalkit/data/*.db-wal
 services/sim/evalkit/data/*.db-shm
 services/sim/evalkit/data/STOP
+.ploshcha.log
+apps/web/dist/

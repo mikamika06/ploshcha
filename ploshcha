@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# ПЛОЩА — один запуск. Ядро роздає і API, і збірку фронта: один процес, один порт.
+#
+# Vite тут НЕ потрібен. Доти прод вимагав два процеси, і коли девелоперський сервер падав, це
+# виглядало як «ПЛОЩА зламалась» — хоч ядро працювало.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PORT="${PLOSHCHA_PORT:-8765}"
+COND="${PLOSHCHA_CONDITION:-viche}"
+DB="${PLOSHCHA_DB:-$ROOT/docs/research/eval-runs/ploshcha.db}"
+PY="$ROOT/.venv/bin/python"
+DIST="$ROOT/apps/web/dist"
+
+usage() {
+  cat <<'TXT'
+ПЛОЩА — керування
+
+  ./ploshcha build     зібрати фронт у статику (потрібно один раз після змін фронта)
+  ./ploshcha start     підняти (збирає фронт, якщо збірки немає)
+  ./ploshcha stop      зупинити
+  ./ploshcha status    стан, витрати, черга
+  ./ploshcha topic ТЕКСТ   кинути тему в чергу
+  ./ploshcha requeue   повернути мертві айтеми в чергу
+  ./ploshcha logs      останні рядки логу
+
+Змінні: PLOSHCHA_PORT (8765) · PLOSHCHA_CONDITION (viche) · PLOSHCHA_DB
+        PLOSHCHA_MAX_TOKENS (300000) · PLOSHCHA_MAX_USD (0.50) · PLOSHCHA_MAX_ITEMS (60)
+
+БЕЗПЕКА: ядро слухає ЛИШЕ 127.0.0.1 і не має автентифікації, а POST /command витрачає гроші.
+Не виставляй порт у мережу й не пробрасуй його тунелем.
+TXT
+}
+
+build() {
+  ( cd "$ROOT/apps/web" && VITE_LIVE_URL=same-origin npx vite build )
+}
+
+start() {
+  [[ -f "$DIST/index.html" ]] || build
+  if curl -sf -m 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+    echo "уже працює: http://127.0.0.1:$PORT"
+    return 0
+  fi
+  mkdir -p "$(dirname "$DB")"
+  nohup "$PY" "$ROOT/services/sim/scripts/serve_ploshcha.py" \
+    --port "$PORT" --condition "$COND" --resume --db "$DB" \
+    --max-tokens "${PLOSHCHA_MAX_TOKENS:-300000}" \
+    --max-usd "${PLOSHCHA_MAX_USD:-0.50}" \
+    --max-items "${PLOSHCHA_MAX_ITEMS:-60}" \
+    > "$ROOT/.ploshcha.log" 2>&1 &
+  for _ in $(seq 1 20); do
+    if curl -sf -m 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+      echo "ПЛОЩА: http://127.0.0.1:$PORT   (умова $COND)"
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "не піднялось — дивись $ROOT/.ploshcha.log" >&2
+  tail -20 "$ROOT/.ploshcha.log" >&2 || true
+  return 1
+}
+
+case "${1:-}" in
+  build) build ;;
+  start) start ;;
+  stop)
+    curl -sf -m 3 -X POST "http://127.0.0.1:$PORT/command" \
+      -H 'Content-Type: application/json' -d '{"kind":"stop"}' >/dev/null 2>&1 || true
+    pkill -f serve_ploshcha.py 2>/dev/null || true
+    echo "зупинено"
+    ;;
+  status) curl -sf -m 3 "http://127.0.0.1:$PORT/health" || echo "не працює" ;;
+  topic)
+    shift
+    [[ $# -gt 0 ]] || { echo "потрібен текст теми" >&2; exit 2; }
+    "$PY" - "$PORT" "$*" <<'PYEOF'
+import json, sys, urllib.request
+port, text = sys.argv[1], sys.argv[2]
+body = json.dumps({"kind": "topic", "text": text}).encode()
+req = urllib.request.Request(f"http://127.0.0.1:{port}/command", body,
+                             {"Content-Type": "application/json"})
+print(urllib.request.urlopen(req, timeout=10).read().decode())
+PYEOF
+    ;;
+  requeue)
+    curl -sf -m 5 -X POST "http://127.0.0.1:$PORT/command" \
+      -H 'Content-Type: application/json' -d '{"kind":"requeue"}'
+    ;;
+  logs) tail -40 "$ROOT/.ploshcha.log" 2>/dev/null || echo "логу немає" ;;
+  *) usage ;;
+esac
