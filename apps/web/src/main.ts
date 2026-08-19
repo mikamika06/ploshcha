@@ -215,6 +215,7 @@ async function boot(): Promise<void> {
         void sendCommand(LIVE_URL, {
           kind: "topic",
           text: t.text,
+          place: board.where,
           key: `${t.id}-${Date.now().toString(36)}`,
         }).catch((err: unknown) => {
           console.warn("[board] тема не доїхала в ядро", err);

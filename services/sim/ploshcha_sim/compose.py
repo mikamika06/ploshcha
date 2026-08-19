@@ -86,6 +86,12 @@ def build_budget(spec: AppSpec) -> Budget:
     return Budget(max_steps=spec.max_steps)
 
 
+# Усе, що `Viche` приймає понад базове. Тест звіряє цей перелік із сигнатурою, щоб новий параметр
+# не міг знову зникнути дорогою.
+VICHE_KWARGS = ("score_system", "line_system", "summary_system", "doubt_system",
+                "chronicle_system", "village", "standing", "rumours", "place")
+
+
 def build_viche(spec: AppSpec, *, lapa, mamay, **kw):
     """Віче — окремий агент, не гілка графа: у графа інша петля й інший критерій успіху."""
     return Viche(build_router(spec, lapa=lapa, mamay=mamay), build_effort(spec),
@@ -94,8 +100,12 @@ def build_viche(spec: AppSpec, *, lapa, mamay, **kw):
                  width=spec.max_width, system=kw.get("system"),
                  prompt_id=kw.get("prompt_id", spec.prompt_id),
                  prompt_sha=kw.get("prompt_sha", ""),
-                 **{k: kw[k] for k in ("score_system", "line_system", "summary_system",
-                                       "doubt_system", "chronicle_system") if k in kw})
+                 # ★ Перелік явний і повний. Раніше сюди йшли лише промпти, а `village`,
+                 # `standing`, `rumours` і `place` мовчки лишались у `kw`: агент працював зі
+                 # сталими персонами, поки сцена показувала породжені імена, а режим місця не
+                 # доїжджав узагалі. Мовчазне ковтання kwargs — той самий клас, що вже коштував
+                 # нам нетрасованого графа.
+                 **{k: kw[k] for k in VICHE_KWARGS if k in kw})
 
 
 def build_graph(spec: AppSpec, *, lapa, mamay, **kw):

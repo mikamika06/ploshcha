@@ -18,6 +18,7 @@ import json
 import random
 import threading
 
+from ..domain.modes import Mode, mode_for
 from ..domain.task import Budget, TaskResult
 from ..domain.viche import (
     BY_ROLE,
@@ -89,7 +90,8 @@ class Viche(AgentPort):
                  score_system: str = SCORE_SYSTEM, line_system: str = LINE_SYSTEM,
                  summary_system: str = SUMMARY_SYSTEM, doubt_system: str = DOUBT_SYSTEM,
                  chronicle_system: str = CHRONICLE_SYSTEM, village: list | None = None,
-                 standing: dict[str, float] | None = None, rumours: list | None = None):
+                 standing: dict[str, float] | None = None, rumours: list | None = None,
+                 place: str | None = None):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -108,6 +110,9 @@ class Viche(AgentPort):
         self.chronicle_system = chronicle_system
         # Породжене село. Порожньо — сталі персони: віче мусить працювати й без ланки породження.
         # Скільки важить слово кожного (репутація) і які чутки ще ходять селом.
+        # Місце розмови — це профіль ядра, а не підпис: інша ширина, інші такти, інша температура,
+        # і подекуди взагалі немає старости, який зводить.
+        self.mode: Mode = mode_for(place)
         self.standing = dict(standing or {})
         self.rumours = list(rumours or [])
         self.village = list(village or [])
@@ -132,12 +137,13 @@ class Viche(AgentPort):
     def run(self, task: str, seed: int = 0, budget: Budget | None = None,
             depth: int = 1) -> TaskResult:
         budget = budget or Budget()
+        self.width = min(self.width, self.mode.width)
         cast = self._cast(task)
         roles = [p.role for p in cast]
         said: list[tuple[Persona, str]] = []
         incidents: list[str] = []
         beats = scatter(self._plan(task, cast, seed, budget, incidents), roles, seed, task,
-                        self._people)
+                        self._people, self.mode.interrupts)
         self._emit_plan(beats)
         pending: list[Beat] = list(beats)
         index = 0
@@ -155,10 +161,13 @@ class Viche(AgentPort):
             said += self._play(task, beat, index, cast, said, seed, budget, incidents)
 
         if said:
-            said.append(self._summary(task, said, seed, budget))
-            doubt = self._doubt(task, said, seed, budget)
-            if doubt is not None:
-                said.append(doubt)
+            # Староста зводить не всюди: у шинку модератора немає, і саме тому там кажуть інше.
+            if self.mode.summary:
+                said.append(self._summary(task, said, seed, budget))
+            if self.mode.doubt:
+                doubt = self._doubt(task, said, seed, budget)
+                if doubt is not None:
+                    said.append(doubt)
             self._chronicle(task, said, seed, budget, incidents)
 
         return self._result(task, said, beats, budget, incidents)
@@ -207,7 +216,7 @@ class Viche(AgentPort):
                      if self.rumours else "")
                   + "\n"
                   "Розпиши такти віча. `у_відповідь` — номер попереднього такту або null.")
-        schema = score_schema(roles, tools)
+        schema = score_schema(roles, tools, self.mode.beats)
         beats = repair_score(_safe_json(
             self._call("decide", prompt, self.score_system, schema, seed, budget,
                        max_tokens=SCORE_TOKENS)), roles, tools, self.standing)
@@ -328,7 +337,9 @@ class Viche(AgentPort):
             extra = (f"\nПро тебе: {person.bio}" if person.bio else "")
             extra += (f"\nТвоя примовка: «{person.saying}»" if person.saying else "")
             extra += (f"\nНоров: {marks}." if marks else "")
-        return f"{self.line_system}\n\nТИ: {who.name}. Дивишся на світ так: {who.lens}.{extra}"
+        manner = f"\n{self.mode.manner}" if self.mode.manner else ""
+        return (f"{self.line_system}{manner}\n\nТИ: {who.name}. "
+                f"Дивишся на світ так: {who.lens}.{extra}")
 
     def _packet(self, task: str, who: Persona, beat: Beat,
                 said: list[tuple[Persona, str]], fact: str | None) -> str:
@@ -452,6 +463,8 @@ class Viche(AgentPort):
         """
         if self.trace is None or not isinstance(raw, dict):
             return
+        if not self.mode.rumours:
+            return
         if str(raw.get("є")) != "так" or str(raw.get("підстава")) != "не було":
             return
         claim = " ".join(str(raw.get("що") or "").split())
@@ -519,7 +532,8 @@ class Viche(AgentPort):
         llm = self.router.route(kind)
         cfg = self.effort.effort(kind)
         res = llm.generate_structured(prompt, schema, system=system,
-                                      temperature=cfg.temperature,
+                                      temperature=max(0.0, min(1.5,
+                                                               cfg.temperature + self.mode.heat)),
                                       max_tokens=max_tokens or cfg.max_tokens,
                                       seed=seed)
         budget.spend(res.usage.total, self.router.lane(kind), res.usage.prompt_tokens, stage=kind)

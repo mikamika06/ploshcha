@@ -948,3 +948,37 @@ def test_open_rumours_reach_the_next_score():
                   rumours=[{"who": "shynkar", "claim": "то пес, а не вовк"}])
     agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
     assert "то пес, а не вовк" in llm.calls[0]["prompt"]
+
+
+def test_the_builder_forwards_every_parameter_viche_accepts():
+    """★ `build_viche` мовчки ковтав `village`, `standing`, `rumours` і `place`: агент працював зі
+    сталими персонами, поки сцена показувала породжені імена, а режим місця не доїжджав узагалі.
+    Мовчазне ковтання kwargs — той самий клас, що вже коштував нам нетрасованого графа."""
+    import inspect
+
+    from ploshcha_sim.compose import VICHE_KWARGS
+
+    base = {"router", "effort", "tools", "trace", "run_id", "width", "system",
+            "prompt_id", "prompt_sha", "self"}
+    accepted = set(inspect.signature(Viche.__init__).parameters) - base
+    assert accepted == set(VICHE_KWARGS), f"розійшлось: {accepted ^ set(VICHE_KWARGS)}"
+
+
+def test_the_place_actually_changes_the_run():
+    """Режим, який не міняє нічого, крім підпису, не потрібен."""
+    from ploshcha_sim.domain.modes import mode_for
+
+    tavern, square = mode_for("shynok"), mode_for("ploshcha")
+    assert tavern.summary is False and square.summary is True, "у шинку старости НЕМА"
+    assert tavern.interrupts > square.interrupts
+    assert mode_for("tserkva").width < square.width
+    assert mode_for("tserkva").rumours is False, "сповідь не пускають селом"
+
+
+def test_a_tavern_viche_has_no_elder_and_no_priest():
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    agent, _ = build([score(beat(pair[0]))] + lines(8), width=4)
+    agent.mode = __import__("ploshcha_sim.domain.modes", fromlist=["x"]).mode_for("shynok")
+    result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    names = [ln.split(":")[0] for ln in (result.answer or "").splitlines()]
+    assert "староста" not in names and "піп" not in names

@@ -144,7 +144,7 @@ def runner(tmp_path):
     bus = EventBus()
     queue = SqliteQueue(str(tmp_path / "q.db"))
 
-    def make(trace, run_id):
+    def make(trace, run_id, place=None):
         return _orch([tc("final_answer", text="R")], trace=trace)
 
     return bus, queue, _Runner(bus, queue, make, governor=Governor(max_tokens=1))
@@ -242,3 +242,42 @@ def test_requeue_can_target_one_key(runner):
     code, body = handle_command({"kind": "requeue", "key": "a"}, r)
     assert code == 200 and body["requeued"] == 1
     assert queue.stats().get("dead") == 1
+
+
+def test_the_place_travels_with_the_task(runner):
+    """Розмова в шинку й розмова на площі — різні процеси, тож місце належить задачі."""
+    _, queue, r = runner
+    code, _ = handle_command({"kind": "topic", "text": "Вовк коло кошари", "place": "shynok"}, r)
+    assert code == 200
+    item = queue.lease("w")
+    assert item.payload["place"] == "shynok"
+
+
+def test_a_task_without_a_place_carries_none(runner):
+    _, queue, r = runner
+    handle_command({"kind": "topic", "text": "Гребля"}, r)
+    assert "place" not in queue.lease("w").payload
+
+
+def test_the_agent_factory_is_given_the_place(runner):
+    """Контракт фабрики явний: інакше він тримався випадково, поки ніхто не глянув."""
+    import inspect
+
+    seen = {}
+
+    def make(trace, run_id, place=None):
+        seen["place"] = place
+        return _orch([tc("final_answer", text="R")], trace=trace)
+
+    _, queue, r = runner
+    r.make_orchestrator = make
+    r.governor.max_tokens = 10_000
+    queue.put("k", {"task": "тема", "place": "tserkva"})
+    r.resume()
+    r.start()
+    deadline = time.time() + 3.0
+    while time.time() < deadline and "place" not in seen:
+        time.sleep(0.05)
+    r.stop()
+    assert seen.get("place") == "tserkva"
+    assert len(inspect.signature(make).parameters) == 3

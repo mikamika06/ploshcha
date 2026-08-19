@@ -259,7 +259,8 @@ def plan_steps(beats: list["Beat"]) -> list[str]:
     return out
 
 
-def score_schema(roles: list[str], tools: list[str]) -> dict:
+def score_schema(roles: list[str], tools: list[str],
+                 beats: tuple[int, int] | None = None) -> dict:
     """`хто`/`хід` — енуми. Такт із чужим селянином або вигаданим ходом висловити неможливо."""
     beat = {
         "type": "object",
@@ -277,10 +278,11 @@ def score_schema(roles: list[str], tools: list[str]) -> dict:
         "required": ["хто", "хід", "у_відповідь", "інструмент", "запит"],
         "additionalProperties": False,
     }
+    low, high = beats or (MIN_BEATS, MAX_BEATS)
     return {
         "type": "object",
-        "properties": {"такти": {"type": "array", "minItems": MIN_BEATS,
-                                 "maxItems": MAX_BEATS, "items": beat}},
+        "properties": {"такти": {"type": "array", "minItems": low,
+                                 "maxItems": high, "items": beat}},
         "required": ["такти"],
         "additionalProperties": False,
     }
@@ -348,7 +350,7 @@ def guest_beats(said_index: int, roles: list[str], recent: list[str], seed: int,
 
 
 def scatter(beats: list[Beat], roles: list[str], seed: int, topic: str,
-            people: dict | None = None) -> list[Beat]:
+            people: dict | None = None, heat: float = 1.0) -> list[Beat]:
     """Збурення партитури кубиком за сідом — джерело спонтанності, яке НЕ вимагає вибору моделі.
 
     Той самий сід і та сама тема дають ті самі перебивки: несподіванка для глядача, відтворюваність
@@ -362,7 +364,7 @@ def scatter(beats: list[Beat], roles: list[str], seed: int, topic: str,
     for beat in beats:
         out.append(beat)
         speaker = people.get(beat.хто) if people else None
-        chance = interrupt_chance(speaker) if speaker else INTERRUPT_P
+        chance = (interrupt_chance(speaker) if speaker else INTERRUPT_P) * heat
         if added >= MAX_INTERRUPTS or rng.random() > chance:
             continue
         others = [r for r in roles if r != beat.хто]

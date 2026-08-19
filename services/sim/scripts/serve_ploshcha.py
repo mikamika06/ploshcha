@@ -104,7 +104,7 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
     governor = Governor(max_tokens=max_tokens, max_usd=max_usd, max_items=max_items,
                         kill_file=kill_file)
 
-    def make_agent(trace, run_id):
+    def make_agent(trace, run_id, place=None):
         kw = dict(system=system, tail=variant.tail or None, prompt_id=variant.id,
                   prompt_sha=variant.sha256, answer_instruction=answer_instruction)
         if spec.mode == "viche":
@@ -118,7 +118,8 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
                                 village=village,
                                 standing={p.role: talk.standing(p.role) for p in village}
                                          if talk else None,
-                                rumours=talk.open() if talk else None)
+                                rumours=talk.open() if talk else None,
+                                place=place)
             agent.budget_template = budget
             return agent
         if spec.graph:

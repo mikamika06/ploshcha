@@ -169,7 +169,7 @@ def _runner(tmp_path, *, tokens: int = 1):
     bus = EventBus()
     queue = SqliteQueue(str(tmp_path / "q.db"))
 
-    def make(trace, run_id):
+    def make(trace, run_id, place=None):
         llm = FakeLlm([tc("final_answer", text="Готово.")], model="fake")
         return Orchestrator(single_model_router(llm), PresetEffort(), FakeToolbox(),
                             verifier=False, trace=trace, run_id=run_id)
@@ -203,7 +203,7 @@ def test_a_crashed_loop_reports_a_contract_valid_error(validator, tmp_path):
     bus, runner = _runner(tmp_path, tokens=10_000)
     runner.queue.put("k", {"task": "тема"})
 
-    def boom(trace, run_id):
+    def boom(trace, run_id, place=None):
         raise RuntimeError("двигун не піднявся")
 
     runner.make_orchestrator = boom

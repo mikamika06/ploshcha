@@ -134,7 +134,8 @@ def make_handler(bus, runner, static: Path | None = None):
     return Handler
 
 
-def handle_command(payload: dict, runner) -> tuple[int, dict]:
+def handle_command(payload_in: dict, runner) -> tuple[int, dict]:
+    payload = payload_in
     kind = str(payload.get("kind") or "").strip()
     if kind == "pause":
         runner.pause()
@@ -170,7 +171,12 @@ def handle_command(payload: dict, runner) -> tuple[int, dict]:
         if not text:
             return 400, {"error": "порожня тема"}
         key = payload.get("key") or f"topic-{abs(hash(text)) % 10**10}"
-        fresh = runner.queue.put(str(key), {"task": text, "source": "board"})
+        # Місце їде РАЗОМ із темою: розмова в шинку й розмова на площі — різні процеси, тож
+        # місце має бути частиною задачі, а не станом сервера.
+        payload = {"task": text, "source": "board"}
+        if payload_place := str(payload_in.get("place") or "").strip():
+            payload["place"] = payload_place
+        fresh = runner.queue.put(str(key), payload)
         return 200, {"ok": True, "key": str(key), "fresh": bool(fresh),
                      "queue": runner.queue.stats()}
     return 400, {"error": f"невідома команда {kind!r}"}

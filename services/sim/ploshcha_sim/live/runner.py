@@ -177,7 +177,7 @@ class LiveRunner:
         self.bus.publish(self._restore_decisions(proj))
         trace = BusTrace(self.bus, proj)
         try:
-            orch = self.make_orchestrator(trace, run_id)
+            orch = self.make_orchestrator(trace, run_id, (item.payload or {}).get("place"))
             self.current = orch
             template = getattr(orch, "budget_template", None)
             result = orch.run(task, seed=1,

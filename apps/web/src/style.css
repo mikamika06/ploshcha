@@ -1082,3 +1082,30 @@ body {
   color: #7d2b1c;
   font-weight: 700;
 }
+
+/* Вибір місця розмови. Не оформлення: у шинку немає старости, у церкві двоє. */
+.board-places {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: clamp(64px, 10vh, 108px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: min(760px, 86%);
+}
+.board-place {
+  padding: 5px 12px;
+  border: 1px solid rgba(228, 196, 138, 0.26);
+  border-radius: 999px;
+  background: rgba(20, 13, 7, 0.72);
+  color: #d9c9a8;
+  font: 500 12px/1 var(--sans);
+  cursor: pointer;
+}
+.board-place.on {
+  border-color: rgba(255, 214, 140, 0.7);
+  background: rgba(72, 42, 18, 0.92);
+  color: #ffdfa8;
+}

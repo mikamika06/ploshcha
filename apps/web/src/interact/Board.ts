@@ -1,4 +1,14 @@
 export type Heat = "hot" | "warm" | "cold" | "sealed";
+
+/** Де гомоніти. Місце — не декорація: у шинку немає старости, у церкві розмова віч-на-віч. */
+const PLACES: { id: string; label: string }[] = [
+  { id: "ploshcha", label: "на Площі" },
+  { id: "shynok", label: "у шинку" },
+  { id: "tserkva", label: "у церкві" },
+  { id: "kuznya", label: "у кузні" },
+  { id: "mlyn", label: "у млині" },
+  { id: "dzvin", label: "б’ючи в дзвін" },
+];
 export interface Topic {
   id: string;
   text: string;
@@ -21,6 +31,9 @@ export class Board {
   private plan: HTMLElement;
   private input: HTMLTextAreaElement;
   private topics: Topic[] = [];
+  /** Куди піде наступна тема. Місце їде РАЗОМ із нею — це різні процеси, не інтерʼєри.
+   *  Назва `where`, а не `place`: `place()` тут уже зайнятий розкидом цидулок. */
+  where = "ploshcha";
   private seq = 0;
   private jit = new Map<string, { cx: number; cy: number; rot: number }>(); // сталий розкид+нахил на цидулку
 
@@ -38,6 +51,7 @@ export class Board {
       <div class="board-title">Дошка-вісник</div>
       <div class="board-plan"></div>
       <button class="board-back" type="button">← до села</button>
+      <div class="board-places"></div>
       <form class="board-write">
         <textarea class="board-ta" rows="1" maxlength="500" placeholder="Нашепни селу тему для розмови…"></textarea>
         <button class="board-pin" type="button">Пришпилити</button>
@@ -45,6 +59,19 @@ export class Board {
     this.notes = this.root.querySelector(".board-notes") as HTMLElement;
     this.plan = this.root.querySelector(".board-plan") as HTMLElement;
     this.input = this.root.querySelector(".board-ta") as HTMLTextAreaElement;
+    const places = this.root.querySelector(".board-places") as HTMLElement;
+    for (const p of PLACES) {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = `board-place${p.id === this.where ? " on" : ""}`;
+      el.textContent = p.label;
+      el.addEventListener("click", () => {
+        this.where = p.id;
+        for (const other of places.children) other.classList.remove("on");
+        el.classList.add("on");
+      });
+      places.appendChild(el);
+    }
 
     // контейнер цидулок над зеленою панеллю, з відступом від країв маски
     const IN = 0.03;
