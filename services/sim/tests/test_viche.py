@@ -982,3 +982,133 @@ def test_a_tavern_viche_has_no_elder_and_no_priest():
     result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
     names = [ln.split(":")[0] for ln in (result.answer or "").splitlines()]
     assert "староста" not in names and "піп" not in names
+
+
+# ── Ш6: послати когось ────────────────────────────────────────────────────────
+
+class _Scout:
+    """Дитина-агент: робить кілька кроків і вертається з висновком, а не з сирим полем."""
+
+    def __init__(self, answer="у книзі писано, що грамота справжня", steps=2, outcome="answer"):
+        self.answer, self.steps, self.outcome = answer, steps, outcome
+        self.seen: list[str] = []
+
+    def __call__(self, budget):
+        self.budget = budget
+        return self
+
+    def run(self, task, seed=0, budget=None, depth=1):
+        from ploshcha_sim.domain.task import TaskResult
+
+        self.seen.append(task)
+        return TaskResult(
+            answer=self.answer, accepted=True, outcome=self.outcome, evidence=True,
+            steps=self.steps, tokens=140,
+            scratch=[{"call": {"tool": "словник", "запит": task}, "found": True}
+                     for _ in range(self.steps)])
+
+
+def _with_scout(scout, **kw):
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    agent, llm = build([score(beat(pair[0], tool="словник", query="грамота"))] + lines(8),
+                       tools=FakeToolbox(tools=LEXIS_TOOLS), width=2, **kw)
+    agent.scout = scout
+    return agent, llm, pair
+
+
+def test_sending_someone_spawns_a_child_agent_not_a_tool_call():
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    scout = _Scout()
+    trace = InMemoryTrace()
+    agent, _, _ = _with_scout(scout, trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    assert scout.seen == ["грамота"], "посланому дають ЗАПИТ, а не всю тему"
+    events = _events(trace)
+    assert len([e for e in events if e["type"] == "tool.called"]) == scout.steps
+    assert len([e for e in events if e["type"] == "tool.result"]) == scout.steps
+
+
+def test_the_scouts_steps_are_shown_as_that_persons_own():
+    """Інакше на сцені це робив би хтось інший, і глядач бачив би не те, що сталось."""
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    trace = InMemoryTrace()
+    scout = _Scout()
+    agent, _, pair = _with_scout(scout, trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    moved = [e for e in _events(trace) if e["type"] == "agent.moved"]
+    assert any(e["payload"]["agentId"] == pair[0] for e in moved)
+
+
+def test_the_scouts_spending_lands_in_our_budget():
+    """Інакше стеля прогону нічого не обмежувала б: дитина витрачала б повз облік."""
+    scout = _Scout()
+    agent, _, _ = _with_scout(scout)
+    budget = Budget(max_steps=40, max_tokens=99_999)
+    agent.run(NEWS, seed=1, budget=budget)
+    assert budget.tokens_used >= 140
+
+
+def test_the_scout_gets_a_divided_budget_not_the_whole_one():
+    scout = _Scout()
+    agent, _, _ = _with_scout(scout)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=48, max_tokens=99_999))
+    assert scout.budget.max_steps < 48
+
+
+def test_a_scout_that_found_nothing_says_so_instead_of_inventing():
+    scout = _Scout(answer="", outcome="abstain")
+    agent, _, _ = _with_scout(scout)
+    result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    assert "viche_scout_empty" in result.incidents
+
+
+def test_a_broken_scout_does_not_kill_the_viche():
+    class Boom:
+        def __call__(self, budget):
+            return self
+
+        def run(self, *a, **kw):
+            raise RuntimeError("зламався")
+
+    agent, _, _ = _with_scout(Boom())
+    result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    assert any(i.startswith("viche_scout_failed") for i in result.incidents)
+    assert result.outcome == "answer", "розмова мусить іти далі"
+
+
+def test_without_a_scout_it_is_still_one_tool_call():
+    """Розвідник — доповнення, не заміна: віче мусить працювати й без нього."""
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    trace = InMemoryTrace()
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    agent, _ = build([score(beat(pair[0], tool="словник", query="грамота"))] + lines(8),
+                     tools=FakeToolbox(tools=LEXIS_TOOLS), width=2, trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    assert len([e for e in _events(trace) if e["type"] == "tool.called"]) == 1
+
+
+def test_the_scout_does_not_lose_the_three_valued_found():
+    """«Не знайшов» ≠ «зламався» ≠ «незастосовно». У сліді оркестратора `found` не лежить готовим,
+    тож посланий показував «незастосовно» там, де насправді знав."""
+    from ploshcha_sim.adapters import InMemoryTrace
+    from ploshcha_sim.domain.task import TaskResult
+
+    class Knowing:
+        def __call__(self, budget):
+            return self
+
+        def run(self, task, seed=0, budget=None, depth=1):
+            return TaskResult(answer="знайшов", accepted=True, outcome="answer", steps=1,
+                              tokens=10,
+                              scratch=[{"call": {"tool": "словник"}, "result": {"відомо": False}}])
+
+    trace = InMemoryTrace()
+    agent, _, _ = _with_scout(Knowing(), trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    res = next(e for e in _events(trace) if e["type"] == "tool.result")
+    assert res["payload"]["found"] is False, "шукав і НЕ знайшов — це не «незастосовно»"

@@ -89,7 +89,25 @@ def build_budget(spec: AppSpec) -> Budget:
 # Усе, що `Viche` приймає понад базове. Тест звіряє цей перелік із сигнатурою, щоб новий параметр
 # не міг знову зникнути дорогою.
 VICHE_KWARGS = ("score_system", "line_system", "summary_system", "doubt_system",
-                "chronicle_system", "village", "standing", "rumours", "place")
+                "chronicle_system", "village", "standing", "rumours", "place", "scout")
+
+
+def build_scout(spec: AppSpec, *, lapa, mamay, system: str, answer_instruction: str,
+                prompt_id: str = "", prompt_sha: str = ""):
+    """Фабрика посланого: той самий оркестратор, лише з поділеним бюджетом.
+
+    ★ Це і є «Мамай кличе себе як агента»: не окремий механізм, а той самий цикл, запущений
+    усередині розмови. Верифікатор вимкнено — вирок тут виносить не він, а сама розмова, до якої
+    посланий повернеться.
+    """
+    def make(budget):
+        agent = build_orchestrator(spec.with_(verifier=False, mode="loop"), lapa=lapa, mamay=mamay,
+                                   system=system, answer_instruction=answer_instruction,
+                                   prompt_id=prompt_id, prompt_sha=prompt_sha)
+        agent.budget_template = budget
+        return agent
+
+    return make
 
 
 def build_viche(spec: AppSpec, *, lapa, mamay, **kw):

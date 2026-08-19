@@ -18,6 +18,8 @@ import json
 import random
 import threading
 
+from ..domain.evidence import found_in
+from ..domain.graph import child_budget
 from ..domain.modes import Mode, mode_for
 from ..domain.task import Budget, TaskResult
 from ..domain.viche import (
@@ -57,6 +59,10 @@ MIN_LINE_CHARS = 8
 # запасний план «кожен реагує по разу». Тобто партитуру Mamay викидало щопрогону, а видно було лише
 # «щось розмова коротка».
 SCORE_TOKENS = 2200
+# На скільки ділиться бюджет для посланого. Не половина: він іде по одну річ, а віче
+# мусить дожити до кінця.
+SCOUT_PARTS = 6
+SCOUT_SHOW = 3
 CHRONICLE_TOKENS = 900
 
 SCORE_SYSTEM = """Ти — Мамай, розпорядник сільського віча. Тобі дають новину й склад людей.
@@ -91,7 +97,7 @@ class Viche(AgentPort):
                  summary_system: str = SUMMARY_SYSTEM, doubt_system: str = DOUBT_SYSTEM,
                  chronicle_system: str = CHRONICLE_SYSTEM, village: list | None = None,
                  standing: dict[str, float] | None = None, rumours: list | None = None,
-                 place: str | None = None):
+                 place: str | None = None, scout=None):
         self.router = router
         self.effort = effort
         self.tools = tools
@@ -113,6 +119,9 @@ class Viche(AgentPort):
         # Місце розмови — це профіль ядра, а не підпис: інша ширина, інші такти, інша температура,
         # і подекуди взагалі немає старости, який зводить.
         self.mode: Mode = mode_for(place)
+        # Кого посилають дізнатись. Це фабрика ПОВНОЦІННОГО агента зі своїм бюджетом: людина йде й
+        # робить кілька кроків сама, а не смикає один інструмент. Порожньо — лишається один виклик.
+        self.scout = scout
         self.standing = dict(standing or {})
         self.rumours = list(rumours or [])
         self.village = list(village or [])
@@ -251,7 +260,10 @@ class Viche(AgentPort):
             # дізнаюсь про «вовк»») та ще й тягнув сміттєвий запит від партитури («про «жена»»).
             # Те, що людина пішла, уже видно рухом у локацію (`agent.moved` перед `tool.result`),
             # тож рядок нічого не додавав, а один виклик коштував.
-            fact = self._ask(beat, index, seed, budget, self._span(who, index))
+            span = self._span(who, index)
+            fact = (self._send(beat, index, seed, budget, span, incidents)
+                    if self.scout is not None else
+                    self._ask(beat, index, seed, budget, span))
 
         move = beat.хід if not beat.інструмент else "згадати"
         line = self._line(task, who, Beat(хто=beat.хто, хід=move, у_відповідь=beat.у_відповідь),
@@ -275,6 +287,50 @@ class Viche(AgentPort):
         if result.found is False:
             return "у довіднику того немає"
         return json.dumps(value, ensure_ascii=False)[:400]
+
+    def _send(self, beat: Beat, index: int, seed: int, budget: Budget, span: str,
+              incidents: list[str]) -> str:
+        """Послати людину дізнатись — тобто породити ДИТИНУ-АГЕНТА зі своїм бюджетом.
+
+        Різниця з одним викликом інструмента принципова: дитина робить власний багатокроковий цикл
+        (вибрала інструмент → побачила результат → вирішила, що далі), і повертається з висновком,
+        а не з сирим полем. Саме це «Мамай кличе себе як агента» й означає.
+
+        Її кроки ми переграємо у СВОЮ трасу з проміжком тієї людини, яку послали: інакше на сцені
+        це робив би хтось інший, і спостерігач бачив би не те, що сталось.
+        """
+        query = (beat.запит or "").strip()
+        if not query:
+            return self._ask(beat, index, seed, budget, span)
+        child = child_budget(budget, SCOUT_PARTS)
+        try:
+            result = self.scout(child).run(query, seed=seed, budget=child)
+        except Exception as exc:
+            incidents.append(f"viche_scout_failed:{type(exc).__name__}")
+            return "нічого не дізнався"
+
+        for entry in list(getattr(result, "scratch", []) or [])[:SCOUT_SHOW]:
+            call = entry.get("call") or {}
+            if not call.get("tool"):
+                continue
+            self._emit_call(ToolCall(tool=str(call["tool"]),
+                                     args={k: v for k, v in call.items() if k != "tool"}),
+                            index, seed, span)
+            # `found` у сліді оркестратора не лежить готовим — його виводять із результату. Без
+            # цього посланий показував «незастосовно» там, де насправді знав: тризначність
+            # («не знайшов» ≠ «зламався» ≠ «незастосовно») губилась саме на шляху спостереження.
+            found = entry.get("found", found_in(entry.get("result")))
+            self._emit_tool_record(str(call["tool"]), found, index, seed, span)
+
+        # Витрати дитини лягають у НАШ бюджет: інакше стеля прогону нічого не обмежувала б.
+        spent = int(getattr(result, "tokens", 0) or 0) + int(getattr(result, "aux_tokens", 0) or 0)
+        if spent:
+            budget.spend(spent, self.router.lane("decide"), 0, stage="decide")
+        answer = " ".join((getattr(result, "answer", "") or "").split())
+        if not answer or getattr(result, "outcome", "") == "abstain":
+            incidents.append("viche_scout_empty")
+            return "нічого не дізнався"
+        return answer[:400]
 
     def _args(self, tool: str, query: str | None) -> dict:
         spec = next((s for s in self.tools.specs() if s.name == tool), None)
@@ -569,6 +625,15 @@ class Viche(AgentPort):
             run_id=self.run_id, tick=index, agent="orchestrator", span=span, stage="select",
             model="viche", lane=self.router.lane("decide"), prompt="", raw_output="",
             parsed={"tool": call.tool, **dict(call.args)},
+            schema_valid=True, world_valid=True, seed=seed))
+
+    def _emit_tool_record(self, tool: str, found, index: int, seed: int, span: str) -> None:
+        if self.trace is None:
+            return
+        self.trace.emit(StepRecord(
+            run_id=self.run_id, tick=index, agent="tool", stage="tool_result", span=span,
+            model="tool", lane="none", prompt="", raw_output="",
+            parsed={"tool": tool, "ok": True, "found": found},
             schema_valid=True, world_valid=True, seed=seed))
 
     def _emit_tool(self, call: ToolCall, result, index: int, seed: int, span: str) -> None:
