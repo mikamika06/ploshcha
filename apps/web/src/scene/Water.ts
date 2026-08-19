@@ -31,9 +31,17 @@ void main(){ vec2 uv=vTextureCoord; vec4 base=texture2D(uSampler,uv); vec4 fl=te
   gl_FragColor=vec4(col, base.a);
 }`;
 
-export function makeWaterFilter(flowUrl: string, aspect: number): Filter {
+export function makeWaterFilter(flowUrl: string, aspect: number, resolution = 1): Filter {
   const flowTex = Texture.from(assetUrl(flowUrl));
   const f = new Filter(undefined, waterFrag, { flowTex, t: 0, aspect, wa: 1.0 });
-  f.resolution = 0.5; // ріпл м'який і анімований → пів-роздільність невидима, а філ-рейт у 4× менший
+  // ★ Роздільність фільтра = роздільність полотна, і НЕ менше.
+  //
+  // Тут стояло 0.5 з міркування «ріпл мʼякий, пів-роздільності не видно». Для самих брижів це
+  // правда, але фільтр накладений на ВЕСЬ спрайт землі: Pixi малює його в тимчасову текстуру,
+  // тобто половинна роздільність робила ВЕСЬ фон 1408×768 замість 2816×1536, і далі розтягувала.
+  // Вчетверо менше пікселів — саме це й читалось як «розмитий фон», причому лише фон: спрайти
+  // хат і криниці фільтра не мають, тому лишались чіткими поруч.
+  // `resolution` тут АБСОЛЮТНА, не множник: лишити 1 при полотні 2× означало б ту саму половину.
+  f.resolution = resolution;
   return f;
 }

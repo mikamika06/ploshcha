@@ -489,36 +489,67 @@ body {
   pointer-events: none;
   background: linear-gradient(180deg, rgba(12, 8, 4, 0.26) 0%, transparent 24%, transparent 46%, rgba(12, 8, 4, 0.66) 100%);
 }
-.gtalk-cast {
+/* Дебатна розкладка: хто сказав тезу — з одного боку, хто заперечує — з протилежного, і так
+   ланцюжком. Текст посередині, фігури його НЕ перекривають: сцена в колонках, а не в шарах. */
+.gtalk-side {
   position: absolute;
-  left: 0;
-  right: 0;
   bottom: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: clamp(2px, 1.5vw, 30px);
-  padding: 0 clamp(10px, 4vw, 80px);
-  pointer-events: none;
+  width: clamp(120px, 20vw, 260px);
+  height: clamp(190px, 42vh, 430px);
+  overflow: hidden;
+}
+/* Фігура ловить клік — це прицілювання «пошептати саме їй». Порожній простір боку не ловить,
+   інакше він з'їдав би клік-«далі» по половині екрана. */
+.gtalk-side .gtalk-p {
+  cursor: pointer;
+}
+.gtalk-side.left {
+  left: clamp(4px, 2vw, 40px);
+}
+.gtalk-side.right {
+  right: clamp(4px, 2vw, 40px);
 }
 .gtalk-p {
-  flex: 0 0 auto;
-  width: clamp(92px, calc(72vw / var(--n, 4)), 230px);
-  height: clamp(160px, 30vh, 330px);
+  position: absolute;
+  inset: 0;
   background-repeat: no-repeat;
-  background-position: center top;
-  background-size: auto 150%;
+  background-position: center bottom;
+  background-size: auto 96%;
   image-rendering: pixelated;
-  -webkit-mask-image: linear-gradient(180deg, #000 88%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 88%, transparent 100%);
-  filter: brightness(0.5) saturate(0.85);
-  transform: translateY(14px) scale(0.9);
-  transition: filter 0.28s ease, transform 0.28s ease;
+  -webkit-mask-image: linear-gradient(180deg, #000 90%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 90%, transparent 100%);
+  filter: brightness(0.55) saturate(0.85);
+  opacity: 0;
+  transition: filter 0.3s ease, transform 0.34s cubic-bezier(0.22, 0.9, 0.3, 1),
+    opacity 0.3s ease;
+}
+/* заходить із свого краю — видно, що людина ПРИЙШЛА заперечити, а не просто зʼявилась */
+.gtalk-side.left .gtalk-p {
+  transform: translateX(-34%);
+}
+.gtalk-side.right .gtalk-p {
+  transform: translateX(34%);
+}
+.gtalk-p.here {
+  opacity: 1;
+  transform: translateX(0);
 }
 .gtalk-p.active {
-  filter: brightness(1.06) saturate(1.06) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.6));
-  transform: translateY(-6px) scale(1.06);
+  filter: brightness(1.08) saturate(1.06) drop-shadow(0 8px 18px rgba(0, 0, 0, 0.6));
   z-index: 2;
+}
+/* той, хто щойно говорив, лишається — але притемнений і трохи відступає */
+.gtalk-p.here:not(.active) {
+  filter: brightness(0.5) saturate(0.7);
+}
+.gtalk-side.left .gtalk-p.here:not(.active) {
+  transform: translateX(-12%) scale(0.94);
+}
+.gtalk-side.right .gtalk-p.here:not(.active) {
+  transform: translateX(12%) scale(0.94);
+}
+.gtalk-p.gone {
+  opacity: 0;
 }
 .gtalk-theme {
   position: absolute;
@@ -540,7 +571,7 @@ body {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: clamp(96px, 15vh, 168px);
+  bottom: clamp(170px, 26vh, 286px);
   padding: 4px 14px;
   border-radius: 9px 9px 0 0;
   background: rgba(40, 24, 12, 0.92);
@@ -551,8 +582,9 @@ body {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: clamp(34px, 6vh, 74px);
-  width: min(720px, 62%);
+  bottom: clamp(96px, 15vh, 172px);
+  /* ширина рахується так, щоб плашка НЕ залазила під бічні фігури */
+  width: min(760px, calc(100% - 2 * clamp(120px, 20vw, 260px) - clamp(28px, 6vw, 110px)));
   min-height: 46px;
   padding: 12px 22px;
   border-radius: 13px;
@@ -897,4 +929,156 @@ body {
   .vn-p {
     transition: opacity 0.2s ease;
   }
+}
+
+/* ── літопис: когнітивний шар ядра сільською мовою ───────────────────────────
+   Ядро від початку надсилало route/tool/memory/degraded, а фронт не мав для них жодного `case` —
+   тобто видно було лише розмову й ходьбу, а ЧОМУ вона така, не видно. HUD-панель тут заборонена
+   рамкою, тож це тихий рядок унизу, який читається як шепіт села, а не як лог. */
+.chron {
+  /* Вгорі-праворуч, а не внизу-ліворуч: у дебатній розкладці нижні кути займають фігури
+     співрозмовників, і літопис читався ЗА людиною. */
+  position: absolute;
+  right: clamp(16px, 3vw, 44px);
+  top: clamp(66px, 11vh, 116px);
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  max-width: min(40%, 460px);
+  pointer-events: none;
+}
+.chron-line {
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(20, 13, 7, 0.62);
+  color: #e8dbc4;
+  font: 400 12px/1.35 var(--sans);
+  overflow: hidden;
+  /* Слово Оповідача — ціле речення; `nowrap` виганяв його за край екрана. */
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  opacity: 0;
+  animation: chron-in 0.3s ease forwards;
+}
+.chron-line.dim {
+  opacity: 0.45;
+}
+.chron-line.warn {
+  background: rgba(74, 30, 14, 0.8);
+  color: #ffd9b0;
+}
+@keyframes chron-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── партитура віча на Дошці ─────────────────────────────────────────────────
+   Порядок виступів складає Мамай; доти він жив лише в ядрі, і глядач бачив наслідок, не задум. */
+.board-plan {
+  position: absolute;
+  right: clamp(10px, 2.5vw, 34px);
+  top: clamp(58px, 11vh, 120px);
+  width: min(30%, 300px);
+  max-height: 54%;
+  overflow: hidden;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(28, 19, 10, 0.86);
+  color: #ecdcbd;
+  box-shadow: inset 0 0 0 1px rgba(228, 196, 138, 0.24);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.board-plan.on {
+  opacity: 1;
+}
+.board-plan-head {
+  margin-bottom: 6px;
+  font: 600 12.5px/1.2 var(--serif);
+  color: #ffdfa8;
+}
+.board-plan-steps {
+  margin: 0;
+  padding-left: 16px;
+  font: 400 11.5px/1.45 var(--sans);
+  list-style: decimal;
+}
+.board-plan-steps li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── слово гостя: ти в розмові, а не за склом ────────────────────────────── */
+.gtalk-say {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Не на самому краю: сцена має декоративну рамку, і смугу підрізало знизу. */
+  bottom: clamp(30px, 5vh, 62px);
+  display: flex;
+  gap: 8px;
+  width: min(760px, calc(100% - 2 * clamp(120px, 20vw, 260px) - clamp(28px, 6vw, 110px)));
+  z-index: 4;
+}
+.gtalk-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 14px;
+  border: 1px solid rgba(228, 196, 138, 0.26);
+  border-radius: 999px;
+  background: rgba(18, 12, 7, 0.9);
+  color: #f2e8d4;
+  font: 400 14px/1.2 var(--sans);
+  outline: none;
+}
+.gtalk-input:focus {
+  border-color: rgba(255, 214, 140, 0.6);
+}
+/* Шепіт видно кольором, а не підписом: інакше легко послати вголос те, що призначалось одному. */
+.gtalk-say.whisper .gtalk-input {
+  border-color: rgba(150, 200, 255, 0.6);
+  background: rgba(12, 18, 30, 0.92);
+}
+.gtalk-send {
+  flex: 0 0 auto;
+  padding: 9px 18px;
+  border: 1px solid rgba(228, 196, 138, 0.3);
+  border-radius: 999px;
+  background: rgba(58, 32, 15, 0.9);
+  color: #f7dca6;
+  font: 600 13px/1 var(--sans);
+  cursor: pointer;
+}
+.gtalk-send:hover {
+  background: rgba(78, 44, 20, 0.95);
+}
+
+/* Ухвала на Дошці — скріплена, а не чергова цидулка: по ній не починають нової розмови,
+   вона вже наслідок. Темніший папір + сургучева смуга. */
+.note-sealed {
+  background: linear-gradient(180deg, #e8d8b6 0%, #d8c39a 100%);
+  box-shadow: 0 3px 10px #0006, inset 0 0 0 1px rgba(120, 60, 30, 0.3);
+  cursor: default;
+}
+.note-sealed::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 16px;
+  height: 16px;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 3px;
+  background: #7d2b1c;
+  box-shadow: 0 1px 3px #0007;
+}
+.note-sealed .note-heat {
+  color: #7d2b1c;
+  font-weight: 700;
 }

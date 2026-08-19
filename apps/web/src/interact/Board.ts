@@ -18,6 +18,7 @@ const PANEL = { x0: 0.233, y0: 0.207, x1: 0.767, y1: 0.767 };
 export class Board {
   private root: HTMLElement;
   private notes: HTMLElement;
+  private plan: HTMLElement;
   private input: HTMLTextAreaElement;
   private topics: Topic[] = [];
   private seq = 0;
@@ -35,12 +36,14 @@ export class Board {
         <div class="board-notes"></div>
       </div>
       <div class="board-title">Дошка-вісник</div>
+      <div class="board-plan"></div>
       <button class="board-back" type="button">← до села</button>
       <form class="board-write">
         <textarea class="board-ta" rows="1" maxlength="500" placeholder="Нашепни селу тему для розмови…"></textarea>
         <button class="board-pin" type="button">Пришпилити</button>
       </form>`;
     this.notes = this.root.querySelector(".board-notes") as HTMLElement;
+    this.plan = this.root.querySelector(".board-plan") as HTMLElement;
     this.input = this.root.querySelector(".board-ta") as HTMLTextAreaElement;
 
     // контейнер цидулок над зеленою панеллю, з відступом від країв маски
@@ -76,7 +79,27 @@ export class Board {
     const text = this.input.value.trim();
     if (!text) return;
     this.input.value = "";
+    // Пришпилити — лише локально. У чергу ядра тема йде на КЛІК по цидулці (`onOpenTalk`), бо
+    // інакше засіяні теми не мали б прогону взагалі, а власна мала б їх ДВА: один на пришпилення,
+    // другий на клік. Один шлях постановки роботи = одна витрата.
     this.addTopic({ text, heat: "hot", author: "ти" });
+  }
+
+  /**
+   * Партитура віча — предмет на Дошці, а не рядок у лозі.
+   *
+   * Порядок виступів складає Мамай одним викликом; доти він жив лише всередині ядра, і глядач
+   * бачив наслідок (розмову), не бачачи задуму.
+   */
+  pinPlan(summary: string, steps: string[]): void {
+    if (!steps.length) {
+      this.plan.classList.remove("on");
+      return;
+    }
+    this.plan.innerHTML = `
+      <div class="board-plan-head">${escapeHtml(summary)}</div>
+      <ol class="board-plan-steps">${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>`;
+    this.plan.classList.add("on");
   }
 
   addTopic(t: Omit<Topic, "id">): Topic {

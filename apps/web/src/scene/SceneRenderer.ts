@@ -1,4 +1,4 @@
-import { Application, Container, Filter, Sprite } from "pixi.js";
+import { Application, Container, Filter, Sprite, Texture } from "pixi.js";
 import type { SceneSpec } from "@ploshcha/contract-ts";
 import { assetUrl, loadGraded, readPixels } from "../util/gfx";
 import { makeWaterFilter } from "./Water";
@@ -67,13 +67,18 @@ export class SceneRenderer {
   }
 
   async loadGround(): Promise<void> {
-    const tex = await loadGraded(assetUrl(this.scene.background));
+    // Фон іде на GPU ЯК Є. Раніше він проходив через `loadGraded`: canvas-перезапікання плюс
+    // кольоровий грейд (saturate/sepia/brightness) — тобто ми самі змінювали малюнок і зайвий раз
+    // його переганяли. Для 5632×3072 це і втрата, і марна памʼять.
+    const tex = Texture.from(assetUrl(this.scene.background));
     const g = new Sprite(tex);
     g.width = this.scene.size.w;
     g.height = this.scene.size.h;
     g.zIndex = -1e9;
     if (this.scene.masks.flow) {
-      this.waterFilter = makeWaterFilter(this.scene.masks.flow, this.scene.size.w / this.scene.size.h);
+      this.waterFilter = makeWaterFilter(this.scene.masks.flow,
+                                        this.scene.size.w / this.scene.size.h,
+                                        this.app.renderer.resolution);
       g.filters = [this.waterFilter];
     }
     this.world.addChild(g);

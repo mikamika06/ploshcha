@@ -12,6 +12,7 @@ import { SimStore } from "./store/SimStore";
 import { Ports, radiusFor } from "./interact/Ports";
 import { Board } from "./interact/Board";
 import { GroupTalk } from "./interact/GroupTalk";
+import { Chronicle } from "./interact/Chronicle";
 import { discussionFor, type TalkPart } from "./interact/discussion";
 import { LivingRoom, type RoomCast, type Pt } from "./interact/LivingRoom";
 import { Inspector } from "./interact/Inspector";
@@ -45,9 +46,10 @@ const SOCIAL_ROOM: Record<string, { bg: string; name: string; floor: Pt[]; mask?
 };
 
 import { FixtureDriver } from "./net/FixtureDriver";
+import { LiveDriver, sendCommand } from "./net/LiveDriver";
 import { parseEnvelope } from "./net/validate";
 import { GRADE_MUTED, loadGraded } from "./util/gfx";
-import { REPLAY_MS } from "./config";
+import { IS_LIVE, LIVE_URL, REPLAY_MS } from "./config";
 
 function tuftUrls(dir: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `/assets/nb/${dir}/0${i}.png`);
@@ -146,8 +148,10 @@ async function boot(): Promise<void> {
 
   const squarePoi = scene.pois.find((p) => p.kind === "square");
   let resumeSkips = 0; // після рестарту тікера (вкладка/вихід з кімнати) — відкинути перші «биті» кадри
+  let talkOpen = false; // чи чекає відкрите вікно розмови на репліки з живого потоку
 
   const exitToVillage = (): void => {
+    talkOpen = false;
     board.close();
     groupTalk.close();
     room.close();
@@ -170,7 +174,16 @@ async function boot(): Promise<void> {
     renderer.camera?.diveTo(p.x, p.y);
   };
 
-  const groupTalk = new GroupTalk(() => exitToVillage());
+  const groupTalk = new GroupTalk(
+    () => exitToVillage(),
+    (text, whisperTo) => {
+      if (!IS_LIVE) return;
+      void sendCommand(LIVE_URL, {
+        kind: whisperTo ? "whisper" : "say", text,
+        ...(whisperTo ? { to: whisperTo } : {}),
+      }).catch(() => groupTalk.setStatus("слово не доїхало — віче вже скінчилось"));
+    },
+  );
   const board = new Board(
     (t) => {
       board.close();
@@ -191,10 +204,30 @@ async function boot(): Promise<void> {
         for (const p of parts) director.moveTo(p.id, { poi: squarePoi.id });
         renderer.camera?.diveTo(squarePoi.x, squarePoi.y);
       }
-      groupTalk.open(t.text, parts, discussionFor(t.text, parts));
+      // У живому режимі репліки беруться ЛИШЕ з реального потоку. Генератор тут дав би фікцію:
+      // тема щойно поставлена в чергу, ядро над нею думає десятки секунд, тож `transcript`
+      // порожній — і колишня умова `live.length` тихо падала в заготовані репліки.
+      if (IS_LIVE) {
+        talkOpen = true;
+        groupTalk.openLive(t.text, "Тему передано в ядро. Село сходиться, Мамай думає…");
+        // Ключ мусить бути свіжий: черга ядра ідемпотентна за ключем, тож стабільний хеш тексту
+        // означав би, що другий клік по тій самій темі тихо НЕ запускає прогін.
+        void sendCommand(LIVE_URL, {
+          kind: "topic",
+          text: t.text,
+          key: `${t.id}-${Date.now().toString(36)}`,
+        }).catch((err: unknown) => {
+          console.warn("[board] тема не доїхала в ядро", err);
+          groupTalk.finish("Тема не доїхала в ядро — воно не відповідає.");
+        });
+      } else {
+        talkOpen = false;
+        groupTalk.open(t.text, parts, discussionFor(t.text, parts));
+      }
     },
     () => exitToVillage(),
   );
+  const chron = new Chronicle();
   const inspector = new Inspector(() => inspector.close());
   const room = new LivingRoom(
     () => exitToVillage(),
@@ -268,15 +301,74 @@ async function boot(): Promise<void> {
       case "agent.moved":
         director.moveTo(ev.payload.agentId, ev.payload.to);
         break;
-      case "utterance.spoken":
-        director.speak(ev.payload.agentId, ev.payload.text);
+      case "utterance.spoken": {
+        const who = ev.payload.agentId;
+        director.speak(who, ev.payload.text);
+        if (!talkOpen) break;
+        const v = store.state.villagers.get(who);
+        // Імʼя беремо ЛИШЕ зі стору: каст оголошує ядро (`casting.done`), тож розійтись із текстом
+        // репліки неможливо. Мапа-латка `ROLE_NAME_UA` існувала саме тому, що каст був фікстурний.
+        const part: TalkPart = { id: who, name: v?.name ?? who, role: v?.role ?? who };
+        if (squarePoi) director.moveTo(who, { poi: squarePoi.id });
+        groupTalk.push(part, { ...part, text: ev.payload.text });
         break;
-      case "event.happened":
-        board.addTopic({ text: ev.payload.event.label, heat: "warm" });
+      }
+      case "task.outcome":
+        chron.outcome(ev.payload.outcome);
+        if (talkOpen) {
+          // Порожня розмова називається порожньою: вигадати репліку тут = та сама фікція.
+          groupTalk.finish(
+            ev.payload.outcome === "abstain"
+              ? "Село не дійшло згоди: у довіднику нема підтвердження."
+              : "Прогін завершено, реплік не було.",
+          );
+        }
         break;
+      case "run.error":
+        if (talkOpen) groupTalk.finish("Ядро впало — розмова не відбулась.");
+        break;
+      case "tool.called":
+        chron.called(ev.payload.tool);
+        break;
+      case "tool.result":
+        chron.resulted(ev.payload.tool, ev.payload.ok, ev.payload.found);
+        break;
+      case "memory.recalled":
+        chron.recalled(ev.payload.items.length);
+        break;
+      case "plan.revised":
+        chron.revised(ev.payload.reason);
+        break;
+      case "run.degraded":
+        chron.degraded(ev.payload.stage, ev.payload.reason);
+        break;
+      case "run.started":
+        chron.clear();
+        break;
+      case "event.happened": {
+        // Ухвала — не чергова тема, а СКРІПЛЕНЕ рішення: інший вигляд, і по ній не запускається
+        // новий прогін (клікабельні лише «гарячі»).
+        const decision = ev.payload.event.kind === "decision";
+        board.addTopic({
+          text: ev.payload.event.label,
+          heat: decision ? "sealed" : "warm",
+          author: decision ? store.state.villagers.get(ev.payload.event.involves?.[0] ?? "")?.name : undefined,
+        });
+        if (decision) chron.decided(ev.payload.event.label);
+        break;
+      }
       case "report.compiled":
         renderer.weather?.setMood(ev.payload.chronicle.mood.valence);
+        chron.chronicle(ev.payload.chronicle.title ?? "", ev.payload.chronicle.narration ?? "");
         break;
+      case "plan.formed":
+        board.pinPlan(ev.payload.summary, ev.payload.steps ?? []);
+        break;
+      case "reflection.formed": {
+        const who = store.state.villagers.get(ev.payload.agentId);
+        chron.thought(who?.name ?? ev.payload.agentId);
+        break;
+      }
       default:
         break;
     }
@@ -326,10 +418,12 @@ async function boot(): Promise<void> {
     const ev = parseEnvelope(l);
     if (ev) store.apply(ev); // run.started + casting.* → селяни спавняться зараз, під хмарами
   }
-  const driver = new FixtureDriver(tail.length ? tail : allLines, REPLAY_MS);
+  const driver = IS_LIVE
+    ? new LiveDriver(`${LIVE_URL}/stream`)
+    : new FixtureDriver(tail.length ? tail : allLines, REPLAY_MS);
   driver.subscribe(
     (ev) => store.apply(ev),
-    () => console.log("[fixture] done"),
+    () => console.log(IS_LIVE ? "[live] закрито" : "[fixture] done"),
   );
 
   (window as unknown as { __ploshcha: unknown }).__ploshcha = { renderer, store, director };

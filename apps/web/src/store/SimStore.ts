@@ -23,6 +23,17 @@ export interface ViewState {
   unknownEvents: number;
   sceneName?: string;
   villagers: Map<string, VillagerState>;
+  /** Стенограма ОДНОГО прогону, НЕЗАЛЕЖНО від касту: у живому потоці немає `casting.*`, тому
+   *  голос селянина, якого мапа ще не знає, інакше тихо зникав би. Скидається на `run.started`:
+   *  накопичена між прогонами стенограма показувала б на нову тему репліки з минулої. */
+  transcript: { agentId: string; text: string }[];
+  runId?: string;
+  /** Когнітивний шар. Ядро надсилало це від самого початку, а стор не мав жодного `case` — тобто
+   *  видно було ЛИШЕ розмову й ходьбу, а чому вона така, не видно взагалі. */
+  tools: { tool: string; ok?: boolean; found?: boolean | null }[];
+  lanes: Record<string, number>;
+  recalled: string[];
+  degraded?: { stage: string; reason?: string };
   timeOfDay?: string;
   mood?: { valence: number; label: string };
   day?: number;
@@ -33,7 +44,8 @@ export type StoreListener = (ev: ParsedEvent, state: ViewState) => void;
 
 /** Редьюсер подій контракту → queryable ViewState. Слухачі реагують імперативно й/або перечитують стан. */
 export class SimStore {
-  state: ViewState = { runStatus: "idle", villagers: new Map(), unknownEvents: 0 };
+  state: ViewState = { runStatus: "idle", villagers: new Map(), unknownEvents: 0,
+                      transcript: [], tools: [], lanes: {}, recalled: [] };
   private listeners: StoreListener[] = [];
 
   on(l: StoreListener): void {
@@ -51,6 +63,39 @@ export class SimStore {
       case "run.started":
         s.runStatus = "running";
         s.sceneName = ev.payload.scene.name;
+        s.runId = ev.runId;
+        s.transcript = [];
+        s.tools = [];
+        s.lanes = {};
+        s.recalled = [];
+        s.degraded = undefined;
+        s.outcome = undefined;
+        s.verdictKind = undefined;
+        s.verdictReason = undefined;
+        break;
+      case "route.decided":
+        s.lanes[ev.payload.lane] = (s.lanes[ev.payload.lane] ?? 0) + 1;
+        break;
+      case "tool.called":
+        s.tools.push({ tool: ev.payload.tool });
+        break;
+      case "tool.result": {
+        // Останній виклик того самого інструмента дістає свій результат; так пара
+        // `called`/`result` лишається парою й у стані, а не лише в потоці.
+        const open = [...s.tools].reverse().find((t) => t.tool === ev.payload.tool && t.ok === undefined);
+        if (open) {
+          open.ok = ev.payload.ok;
+          open.found = ev.payload.found;
+        } else {
+          s.tools.push({ tool: ev.payload.tool, ok: ev.payload.ok, found: ev.payload.found });
+        }
+        break;
+      }
+      case "memory.recalled":
+        s.recalled.push(...ev.payload.items);
+        break;
+      case "run.degraded":
+        s.degraded = { stage: ev.payload.stage, reason: ev.payload.reason };
         break;
       case "casting.done":
         for (const v of ev.payload.cast) {
@@ -78,6 +123,7 @@ export class SimStore {
       case "utterance.spoken": {
         const v = s.villagers.get(ev.payload.agentId);
         if (v) v.said.push(ev.payload.text);
+        s.transcript.push({ agentId: ev.payload.agentId, text: ev.payload.text });
         break;
       }
       case "tick.begin":
