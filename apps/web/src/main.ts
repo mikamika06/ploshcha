@@ -381,6 +381,7 @@ async function boot(): Promise<void> {
   };
 
   const ports = new Ports(renderer.world, scene.pois, {
+    wasDrag: () => Boolean(renderer.camera?.wasDrag()),
     onHover: (p, x, y) => {
       if (!p) {
         whisper.classList.remove("on");
@@ -434,7 +435,9 @@ async function boot(): Promise<void> {
     const w = cam.clientToWorld(e.clientX, e.clientY);
     // порти (POI) мають пріоритет — їхні тапи обробляє Pixi окремо (guard = точний радіус порту)
     for (const p of scene.pois) if (Math.hypot(w.x - p.x, w.y - p.y) < radiusFor(p.kind)) return;
-    const id = director.nearestAt(w.x, w.y, 60);
+    // Радіус влучання менший для пальця: 60 світових пікселів на телефоні — це пів долоні, і
+    // кожен дотик по мапі відкривав інспектора на випадковій людині поблизу.
+    const id = director.nearestAt(w.x, w.y, matchMedia("(pointer: coarse)").matches ? 30 : 60);
     if (id) {
       const v = store.state.villagers.get(id);
       if (v) inspector.open(v);

@@ -1,17 +1,25 @@
 import { Container, Sprite, Texture } from "pixi.js";
 
+/** Скільки клубків. На пальцевому пристрої їх менше: сорок напівпрозорих спрайтів на весь екран —
+ *  це сорок шарів змішування щокадру, і саме там телефон і затинався на самому вході. */
+const PUFFS = matchMedia("(pointer: coarse)").matches ? 14 : 40;
+
 function makeCloudTexture(): Texture {
   const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 256;
+  // 128 замість 256 на телефоні: хмару однаково розтягують у кілька разів, різниці не видно,
+  // а текстура вчетверо легша.
+  const side = PUFFS < 20 ? 128 : 256;
+  c.width = side;
+  c.height = side;
   const x = c.getContext("2d")!;
-  const g = x.createRadialGradient(128, 128, 8, 128, 128, 128);
+  const h = side / 2;
+  const g = x.createRadialGradient(h, h, side / 32, h, h, h);
   g.addColorStop(0, "rgba(252,252,255,1)");
   g.addColorStop(0.55, "rgba(246,247,251,.92)");
   g.addColorStop(1, "rgba(246,247,251,0)");
   x.fillStyle = g;
   x.beginPath();
-  x.arc(128, 128, 128, 0, Math.PI * 2);
+  x.arc(h, h, h, 0, Math.PI * 2);
   x.fill();
   return Texture.from(c);
 }
@@ -39,7 +47,7 @@ export class Intro {
   constructor(stage: Container, Wn: number, Hn: number) {
     stage.addChild(this.layer);
     const tex = makeCloudTexture();
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < PUFFS; i++) {
       const s = new Sprite(tex);
       s.anchor.set(0.5);
       const px = Math.random() * Wn;

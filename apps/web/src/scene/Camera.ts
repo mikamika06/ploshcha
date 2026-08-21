@@ -13,6 +13,7 @@ export class Camera {
   private lastX = 0;
   private lastY = 0;
   private moved = false;
+  private moveSum = 0;
   /**
    * Пальці на полотні. Зум був ТІЛЬКИ на колесі, тобто на телефоні його не існувало взагалі:
    * село відкривалось у кадрі-cover, де видно пʼяту частину його ширини, і наблизити хату чи
@@ -71,6 +72,17 @@ export class Camera {
     const m = this.moved;
     this.moved = false;
     return m;
+  }
+
+  /**
+   * Чи був щойно перетяг — БЕЗ гасіння прапорця.
+   *
+   * Два споживачі дивляться на один прапорець: хіт-зони POI (Pixi) і клік по полотну. Той, хто
+   * питав першим, гасив його для другого — тож палець, який просто тягнув мапу й спинився над
+   * криницею, відкривав локацію. Тепер гасить лише полотно, наприкінці жесту.
+   */
+  wasDrag(): boolean {
+    return this.moved;
   }
 
   private recompute(): void {
@@ -174,6 +186,7 @@ export class Camera {
     }
     this.dragging = true;
     this.moved = false;
+    this.moveSum = 0;
     this.lastX = e.clientX;
     this.lastY = e.clientY;
     this.view.style.cursor = "grabbing";
@@ -193,7 +206,10 @@ export class Camera {
     if (!this.dragging) return;
     const dx = e.clientX - this.lastX;
     const dy = e.clientY - this.lastY;
-    if (Math.abs(dx) + Math.abs(dy) > 2) this.moved = true;
+    // Поріг для пальця більший, ніж для миші: великий палець ніколи не стоїть на місці, і
+    // двопіксельний зсув робив кожен дотик «перетягом» або навпаки — кожен перетяг кліком.
+    this.moveSum += Math.abs(dx) + Math.abs(dy);
+    if (this.moveSum > (matchMedia("(pointer: coarse)").matches ? 12 : 3)) this.moved = true;
     this.x += dx;
     this.y += dy;
     this.lastX = e.clientX;

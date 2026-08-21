@@ -19,6 +19,8 @@ export function radiusFor(kind: string): number {
 export interface PortEvents {
   onHover: (poi: POI | null, clientX: number, clientY: number) => void;
   onSelect: (poi: POI) => void;
+  /** Чи жест був перетягом. Без цього палець, що тягнув мапу, відкривав локацію під собою. */
+  wasDrag?: () => boolean;
 }
 
 /**
@@ -47,7 +49,10 @@ export class Ports {
       c.on("pointerover", (e: FederatedPointerEvent) => ev.onHover(p, e.client.x, e.client.y));
       c.on("pointermove", (e: FederatedPointerEvent) => ev.onHover(p, e.client.x, e.client.y));
       c.on("pointerout", () => ev.onHover(null, 0, 0));
-      c.on("pointertap", () => ev.onSelect(p));
+      c.on("pointertap", () => {
+        if (ev.wasDrag?.()) return; // тягнув мапу, а не тицяв у криницю
+        ev.onSelect(p);
+      });
       world.addChild(c);
       this.nodes.push(c);
     }
