@@ -47,3 +47,18 @@ services/sim/evalkit/data/*.db-shm
 services/sim/evalkit/data/STOP
 .ploshcha.log
 apps/web/dist/
+
+# === кеші лінтерів/типів (локальні, не артефакт репо) ===
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# === чернетки й локальні робочі теки агентів/редакторів ===
+scratchpad/
+.scratch/
+tmp/
+.claude/settings.local.json
+infra/.env
+!infra/.env.example

@@ -8,7 +8,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT="${PLOSHCHA_PORT:-8765}"
 COND="${PLOSHCHA_CONDITION:-viche}"
-DB="${PLOSHCHA_DB:-$ROOT/docs/research/eval-runs/ploshcha.db}"
+# База стану — у data/ploshcha/, бо docs/ навмисно поза репозиторієм: на чужій машині
+# такої теки немає, і старт падав би ще до відкриття порту.
+DB="${PLOSHCHA_DB:-$ROOT/data/ploshcha/ploshcha.db}"
 PY="$ROOT/.venv/bin/python"
 DIST="$ROOT/apps/web/dist"
 

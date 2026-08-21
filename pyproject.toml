@@ -1,12 +1,12 @@
 [project]
 name = "ploshcha"
 version = "0.0.0"
-description = "ПЛОЩА — generative-agents бек (Python side; наповнюється у Фазі 4)"
+description = "ПЛОЩА — generative-agents бек (Python); код у services/sim"
 requires-python = ">=3.11"
 dependencies = []
 
-# Робочі залежності (fastapi, pydantic, openai, pytest…) додаються у Фазі 4,
-# коли пишемо services/sim. Зараз — лише валідний плейсхолдер для uv/hatch.
+# Корінь залежностей не тримає: вони живуть у services/sim/pyproject.toml.
+# Тут — лише контейнер uv-воркспейсу.
 
 [tool.uv]
 package = false  # корінь — лише workspace-контейнер, не пакет для збірки

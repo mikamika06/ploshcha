@@ -1,5 +1,42 @@
-# Dev-оркестрація. Наповнюється, коли зʼявиться services/sim (Фаза 4).
-# НІКОЛИ не вкладати сюди ваги моделей чи бази — тільки сервіси застосунку.
-services: {}
-#  web:            # apps/web (Vite dev) — Фаза 2c
-#  sim:            # services/sim (FastAPI SSE) — Фаза 4
+# Прод-розгортання ПЛОЩІ на власній машині (ноут теж годиться).
+#
+# ЧОМУ ТУНЕЛЬ, А НЕ ПРОКСІ З TLS: домашній інтернет за NAT і з динамічною адресою — портів туди не
+# пробросиш, а сертифікат нема на що видавати. `cloudflared` тримає ВИХІДНЕ зʼєднання назовні:
+# роутер чіпати не треба, адреса може мінятись, TLS і публічне імʼя дає Cloudflare.
+#
+# ЧОМУ ЗАМОК ОБОВʼЯЗКОВИЙ: `POST /command` ставить тему в чергу, тобто витрачає токени власника
+# ключа. Дивитись село може будь-хто — це читання; витрачати мусить лише той, кого пустили.
+# Замок ставиться в Cloudflare Access (вхід поштою, безкоштовно до 50 людей) на шлях /command,
+# або Basic-паролем у самому тунелі. У ядрі є ДРУГА, незалежна стеля — частота команд на адресу.
+services:
+  core:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Ключ моделі приходить із infra/.env. У репозиторії його немає й не буде.
+      LAPA_API_KEY: ${LAPA_API_KEY:?потрібен ключ моделі}
+      PLOSHCHA_MAX_TOKENS: ${PLOSHCHA_MAX_TOKENS:-1000000}
+      PLOSHCHA_MAX_USD: ${PLOSHCHA_MAX_USD:-5}
+      PLOSHCHA_MAX_ITEMS: ${PLOSHCHA_MAX_ITEMS:-200}
+      # Скільки живе село відвідувача, якого не торкались, і скільки сіл тримаємо взагалі.
+      PLOSHCHA_SESSION_TTL_DAYS: ${PLOSHCHA_SESSION_TTL_DAYS:-7}
+      PLOSHCHA_MAX_SESSIONS: ${PLOSHCHA_MAX_SESSIONS:-200}
+    volumes:
+      # Стан сіл переживає перезапуск: без тому кожен `up` стирав би памʼять усіх відвідувачів.
+      - state:/app/data
+    # Порт НЕ публікуємо назовні: до ядра ходить лише тунель, і лише всередині мережі compose.
+    expose:
+      - "8765"
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on: [core]
+    # Токен тунелю береться в панелі Cloudflare (Zero Trust → Networks → Tunnels).
+    # Маршрут налаштовується там же: <домен> → http://core:8765
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN:?потрібен токен тунелю}
+
+volumes:
+  state:

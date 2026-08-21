@@ -33,3 +33,33 @@ jobs:
       # Детерміноване ядро мусить бути зеленим без мережі й без LLM.
       - run: uv run --frozen --extra dev pytest
         working-directory: services/sim
+
+  web:
+    name: frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Типи й збірка — окремі гейти: тип може бути цілим, а збірка падати на ассеті.
+      - run: npx tsc --noEmit
+        working-directory: apps/web
+      # Порожній VITE_LIVE_URL = режим фікстури: збірка не потребує ані ядра, ані ключів.
+      - run: npx vite build
+        working-directory: apps/web
+
+  secrets:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Гачок `.githooks/pre-commit` рятує лише того, хто його ввімкнув. Гейт мусить бути тут.
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
