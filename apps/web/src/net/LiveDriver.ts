@@ -26,7 +26,14 @@ export class LiveDriver implements EventSourcePort {
   private timer: ReturnType<typeof setTimeout> | undefined;
 
   /** `sid` — чиє село слухаємо. Ядро фільтрує потік ним, тож без нього прилетіли б чужі розмови. */
-  constructor(private url: string, private sid: string = sessionId()) {}
+  constructor(private url: string, private sid: string = sessionId()) {
+    // ★ Перше підключення бере СВОЮ історію з нуля, а не лише нові події.
+    //
+    // Село гостя переживає перезавантаження сторінки (сесія в localStorage, стан у ядрі), але
+    // екран був порожній: потік починався з хвоста, тож усе сказане до перезавантаження зникало
+    // разом із вкладкою. Ядро фільтрує потік сесією, тож із нуля прилітає рівно своє.
+    if (this.sid) this.cursor = 0;
+  }
 
   private drain(onEvent: (ev: ParsedEvent) => void): void {
     if (this.timer !== undefined || this.stopped) return;

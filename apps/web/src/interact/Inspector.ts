@@ -38,7 +38,6 @@ export class Inspector {
       <div class="ins-panel">
         <button class="ins-close" type="button" aria-label="Закрити">✕</button>
         <div class="ins-body"></div>
-        <div class="ins-foot">внутрішнє життя · analytics</div>
       </div>`;
     this.body = this.root.querySelector(".ins-body") as HTMLElement;
     (this.root.querySelector(".ins-close") as HTMLElement).textContent = "×";
@@ -48,23 +47,14 @@ export class Inspector {
 
   open(v: VillagerState): void {
     const role = ROLE_UA[v.role] ?? v.role;
-    const steps = v.plan ? v.plan.steps.map((s) => `<li>${esc(s)}</li>`).join("") : "";
+    // Тут ЛИШЕ сказане вголос. План дня, думки й поточне заняття були службовим шаром: вони
+    // пояснювали ядро, а не людину, і читалися як налагоджувальна панель поверх села.
     this.body.innerHTML = `
       <div class="ins-head">
         <div class="ins-name">${esc(v.name)}</div>
         <div class="ins-role">${esc(role)}</div>
       </div>
-      ${v.activity ? `<div class="ins-now">зараз: <b>${esc(v.activity)}</b></div>` : ""}
       <div class="ins-bio">${esc(v.bio)}</div>
-
-      <div class="ins-sec">
-        <div class="ins-lbl">План дня</div>
-        ${v.plan ? `<div class="ins-plan">${esc(v.plan.summary)}</div><ol class="ins-steps">${steps}</ol>` : `<div class="ins-empty">—</div>`}
-      </div>
-      <div class="ins-sec">
-        <div class="ins-lbl">Думки <span class="ins-tag">внутрішнє</span></div>
-        ${list(v.thoughts, "ins-thought")}
-      </div>
       <div class="ins-sec">
         <div class="ins-lbl">Сказав</div>
         ${list(v.said, "ins-said")}

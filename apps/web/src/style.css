@@ -832,15 +832,6 @@ body {
   color: #8a5f1e;
   letter-spacing: 0.04em;
 }
-.ins-now {
-  margin-top: 8px;
-  font: 400 13.5px/1.4 var(--serif);
-  color: #6b5836;
-}
-.ins-now b {
-  color: #402d12;
-  font-weight: 600;
-}
 .ins-bio {
   margin-top: 10px;
   font: italic 400 14px/1.5 var(--serif);
@@ -859,32 +850,6 @@ body {
   color: #96702f;
   margin-bottom: 10px;
 }
-.ins-tag {
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: #5c4726;
-  text-transform: none;
-  padding: 3px 9px;
-  border-radius: 10px;
-  border: 1.5px solid var(--plaq-edge);
-  background: rgba(255, 255, 255, 0.4);
-}
-.ins-plan {
-  font: 400 15px/1.5 var(--serif);
-  color: var(--plaq-ink);
-}
-.ins-steps {
-  margin: 8px 0 0;
-  padding-left: 20px;
-  color: #6b5836;
-  font: 400 13.5px/1.7 var(--serif);
-}
-.ins-thought {
-  font: italic 400 15px/1.5 var(--serif);
-  color: #4a3a1c;
-  padding: 7px 0;
-  border-bottom: 1px solid rgba(108, 76, 38, 0.18);
-}
 .ins-said {
   font: 400 14px/1.5 var(--serif);
   color: #3f3118;
@@ -894,14 +859,6 @@ body {
 .ins-empty {
   color: #8b7a58;
   font-style: italic;
-}
-.ins-foot {
-  padding: 10px 22px 14px;
-  font: 500 10px/1 var(--serif);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #8b7a58;
-  border-top: 1px solid rgba(108, 76, 38, 0.2);
 }
 
 @media (prefers-reduced-motion: reduce) {
