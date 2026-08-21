@@ -31,7 +31,11 @@ jobs:
         with:
           enable-cache: true
       # Детерміноване ядро мусить бути зеленим без мережі й без LLM.
-      - run: uv run --frozen --extra dev pytest
+      #
+      # `retrieval` тут не забаганка: реєстр записів відмінює українські назви («Сухому Яру» →
+      # «Сухий Яр») через pymorphy3, і без нього 17 тестів падають на CI, лишаючись зеленими
+      # локально — рівно там, де морфологія колись стала до venv руками.
+      - run: uv run --frozen --extra dev --extra retrieval pytest
         working-directory: services/sim
 
   web:
