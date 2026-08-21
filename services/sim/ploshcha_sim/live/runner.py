@@ -70,10 +70,12 @@ class LiveRunner:
                  *, governor: Governor | None = None, scene: dict | None = None,
                  worker: str = "ploshcha", paused: bool = True,
                  estimate_tokens: int = 2000, cast: list[dict] | None = None,
-                 decisions=None, rumours=None, sessions=None,
+                 decisions=None, rumours=None, sessions=None, latency=None,
                  sweep_every_s: float = SWEEP_EVERY_S):
         self.bus = bus
         self.queue = queue
+        # Прилад тривалості: «чому так довго» мусить мати число, а не здогад.
+        self.latency = latency
         self.make_orchestrator = make_orchestrator
         self.governor = governor or Governor()
         self.scene = scene
@@ -105,6 +107,7 @@ class LiveRunner:
         # він не бачить, чуже чує, і виглядає це як «моє слово пішло невідомо куди».
         self.current_sid = None
         self.sessions_swept = 0
+
         self._last_sweep = 0.0
 
     # ── керування ────────────────────────────────────────────────────────────
@@ -172,6 +175,9 @@ class LiveRunner:
             "tick": self.tick,
             "runsDone": self.runs_done,
             "recovered": self.recovered,
+            # Скільки СПРАВДІ триває виклик кожного ярусу: «чому так довго» має вимірюватись,
+            # а не вгадуватись. Тримаємо останні заміри в памʼяті, без окремого сховища.
+            "latency": self.latency.summary() if self.latency is not None else {},
             "spend": {"items": spend.items_done, "tokens": spend.tokens,
                       "usd": round(spend.usd, 6)},
             "caps": {"maxItems": self.governor.max_items, "maxTokens": self.governor.max_tokens,

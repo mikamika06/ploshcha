@@ -736,7 +736,7 @@ body {
 }
 .room-name {
   position: absolute;
-  z-index: 100000;
+  z-index: 900000;
   top: clamp(20px, 4vh, 42px);
   left: 50%;
   transform: translateX(-50%);
@@ -751,7 +751,7 @@ body {
 }
 .room-back {
   position: absolute;
-  z-index: 100000;
+  z-index: 900000;
   top: clamp(18px, 3vh, 36px);
   left: clamp(18px, 3vw, 40px);
   margin: 0;
@@ -962,7 +962,8 @@ body {
 .room-say {
   display: flex;
   width: min(720px, 76%);
-  z-index: 100000; /* спрайти отримують zIndex від свого y — інакше люди ходять по формі */
+  /* Вище за ярус реплік (500000+): інакше бульбашка лягала б на поле вводу. */
+  z-index: 900000;
 }
 /* «ядро думає» — тихий рядок НАД смугою слова, щоб не лягав на назву локації */
 .room-wait {
@@ -972,7 +973,7 @@ body {
   transform: translateX(-50%);
   padding: 7px 16px;
   font: italic 500 13px/1.2 var(--serif);
-  z-index: 100001;
+  z-index: 900001;
   cursor: default;
   opacity: 0;
   visibility: hidden;
@@ -992,7 +993,8 @@ body {
   width: min(560px, 84%);
   padding: 22px 26px 18px;
   text-align: center;
-  z-index: 100002;
+  /* Найвище: підсумок віча мусить перекривати геть усе, зокрема репліки. */
+  z-index: 900002;
   cursor: default;
   opacity: 0;
   visibility: hidden;
@@ -1026,7 +1028,7 @@ body {
   padding: 9px 20px;
   font: 500 14px/1.35 var(--serif);
   text-align: center;
-  z-index: 100001;
+  z-index: 900001;
   cursor: default;
   opacity: 0;
   visibility: hidden;

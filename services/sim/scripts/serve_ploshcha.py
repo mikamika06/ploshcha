@@ -25,6 +25,7 @@ load_env(ROOT / ".env")
 from evalkit.conditions import CONDITIONS  # noqa: E402
 from evalkit.prompts import resolve  # noqa: E402
 from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm  # noqa: E402
+from ploshcha_sim.adapters.llm_timed import LatencyBook, TimedLlm  # noqa: E402
 from ploshcha_sim.adapters.decisions_sqlite import SqliteDecisions  # noqa: E402
 from ploshcha_sim.adapters.queue_sqlite import SqliteQueue  # noqa: E402
 from ploshcha_sim.compose import (  # noqa: E402
@@ -84,6 +85,11 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
                            structured_mode="json_schema")
     mamay = OpenAICompatLlm(model=os.environ["MAMAY_MODEL"], base_url=url, api_key=key,
                             structured_mode="json_schema")
+    # Обидва яруси міряємо: найдовше в прогоні — саме планування партитури Мамаєм, і без заміру
+    # «чому так довго» лишалось питанням смаку.
+    clock = LatencyBook()
+    lapa = TimedLlm(lapa, clock, "lapa")
+    mamay = TimedLlm(mamay, clock, "mamay")
     variant = resolve(spec.prompt_id)
     system = variant.render_system()
     answer_instruction = resolve(spec.answer_prompt_id).render_system()
@@ -180,7 +186,7 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
 
     runner = LiveRunner(bus, queue, base.make_agent, governor=governor, scene=SCENE,
                         paused=paused, cast=base.cast, decisions=base.decisions,
-                        rumours=base.rumours, sessions=sessions)
+                        rumours=base.rumours, sessions=sessions, latency=clock)
     return spec, bus, queue, runner
 
 

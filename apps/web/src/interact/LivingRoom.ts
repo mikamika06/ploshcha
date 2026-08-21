@@ -342,8 +342,16 @@ export class LivingRoom {
       const py = v.y * H;
       const sprH = H * (0.18 + 0.06 * v.y) * this.figScale; // глибина × масштаб сцени
       v.el.style.height = `${sprH}px`;
-      v.el.style.left = `${px}px`;
-      v.el.style.top = `${py}px`;
+      // ★ Тримаємо фігуру В МЕЖАХ намальованої кімнати.
+      //
+      // Ноги стоять на масці підлоги, а тіло росте ВГОРУ й убік: коло самого краю маски людина
+      // вилазила за стіну. Маска цього не ловить — вона про те, де можна СТАТИ, а не про те, де
+      // видно спрайт.
+      const halfW = (sprH * 0.42) / 2;
+      v.el.style.left = `${Math.min(Math.max(px, halfW), Math.max(halfW, W - halfW))}px`;
+      // Ноги стоять на `py`, тіло росте ВГОРУ на всю висоту спрайта — тож нижня межа для ніг це
+      // сама висота фігури, інакше голова виходить за верх кімнати (заміряно: 18px над краєм).
+      v.el.style.top = `${Math.min(Math.max(py, sprH), H)}px`;
       v.el.style.transform = `translate(-50%,-100%) scaleX(${v.face})`;
       v.el.style.zIndex = String(Math.round(v.y * 1000));
       if (v.bubble) {
