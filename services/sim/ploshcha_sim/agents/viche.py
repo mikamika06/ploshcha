@@ -891,11 +891,86 @@ class Viche(AgentPort):
 
 
 def _safe_json(text: str) -> dict | None:
+    """Розбір відповіді шлюзу з ВРЯТУВАННЯМ того, що вціліло.
+
+    ★ Заміряно на живих прогонах: `viche_chronicle_lost` двічі з двох. Літопис — найбільша
+    відповідь у прогоні (заголовок, оповідь, настрій, ухвала, чутка й думки кожного), і саме вона
+    найчастіше приходить обрізаною або в обгортці з прози. Строгий `json.loads` викидав УСЕ через
+    одну незакриту дужку в хвості, разом із заголовком і оповіддю, які лежали на самому початку.
+
+    Тому: спершу чесний розбір; якщо не вийшло — беремо перший обʼєкт у тексті й доліплюємо
+    незакриті дужки, відкинувши обірваний хвіст. Це не «пробачити модель», а не викидати те, що
+    вона вже сказала правильно.
+    """
     try:
         value = json.loads(text)
+        return value if isinstance(value, dict) else None
     except (ValueError, TypeError):
+        pass
+    raw = (text or "").strip()
+    start = raw.find("{")
+    if start < 0:
         return None
-    return value if isinstance(value, dict) else None
+    depth = 0
+    in_str = False
+    esc = False
+    cut = None
+    for i, ch in enumerate(raw[start:], start):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{" or ch == "[":
+            depth += 1
+        elif ch == "}" or ch == "]":
+            depth -= 1
+            if depth == 0:
+                cut = i + 1
+                break
+    if cut is not None:
+        try:
+            value = json.loads(raw[start:cut])
+            return value if isinstance(value, dict) else None
+        except (ValueError, TypeError):
+            return None
+    # Обірвано посеред обʼєкта: пробуємо все коротші префікси, доліплюючи закриття. Перший, що
+    # розібрався, і є тим, що модель встигла сказати цілим.
+    body = raw[start:]
+    for cutoff in _cut_points(body):
+        head = body[:cutoff]
+        for closing in _closings(head):
+            try:
+                value = json.loads(head + closing)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(value, dict):
+                return value
+    return None
+
+
+def _cut_points(body: str) -> list[int]:
+    """Місця, де відповідь можна обрізати без втрати цілої пари: коми й закриття на верхніх рівнях."""
+    points = [i for i, ch in enumerate(body) if ch in ",}]"]
+    return list(reversed(points))[:40]
+
+
+def _closings(head: str) -> list[str]:
+    """Варіанти дужок, якими можна закрити обрізане: спершу без лапок, тоді з ними."""
+    depth_curly = head.count("{") - head.count("}")
+    depth_square = head.count("[") - head.count("]")
+    tail = ""
+    for _ in range(max(0, depth_square)):
+        tail += "]"
+    for _ in range(max(0, depth_curly)):
+        tail += "}"
+    stripped = head.rstrip().rstrip(",")
+    return [tail, '"' + tail] if stripped is not None else [tail]
 
 
 def _text(raw: str) -> str:

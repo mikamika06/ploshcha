@@ -1472,3 +1472,30 @@ def test_a_lost_chronicle_still_closes_the_viche():
                 and e["payload"]["event"]["kind"] == "decision"]
     assert decision, "лічба голосів дає ухвалу навіть без літописця"
     assert "за" in decision[0]["payload"]["event"]["label"]
+
+
+# ── розбір відповіді шлюзу: врятувати те, що вціліло ──────────────────────────
+
+def test_a_truncated_answer_keeps_what_the_model_already_said():
+    """Строгий розбір викидав УСЕ через одну незакриту дужку в хвості.
+
+    Заміряно на живих прогонах: `viche_chronicle_lost` двічі з двох. Літопис — найбільша відповідь
+    у прогоні, і саме вона приходила обрізаною; при цьому заголовок і оповідь лежали на самому
+    початку й були цілі. Викидати їх разом із хвостом — це втрачати вже зроблену роботу.
+    """
+    from ploshcha_sim.agents.viche import _safe_json
+
+    whole = _safe_json('{"заголовок":"Вовки","оповідь":"Село радилось."}')
+    assert whole == {"заголовок": "Вовки", "оповідь": "Село радилось."}
+
+    cut_array = _safe_json('{"заголовок":"Вовки","оповідь":"Радились.","думки":[{"хто":"koval","дум')
+    assert cut_array and cut_array["заголовок"] == "Вовки" and cut_array["оповідь"] == "Радились."
+
+    cut_string = _safe_json('{"заголовок":"Гребля","оповідь":"Ухвалили лагод')
+    assert cut_string and cut_string["заголовок"] == "Гребля"
+
+    in_prose = _safe_json('Ось хроніка:\n{"заголовок":"Гребля","оповідь":"Готово."}\nсподіваюсь')
+    assert in_prose and in_prose["оповідь"] == "Готово."
+
+    assert _safe_json("зовсім не json") is None
+    assert _safe_json("") is None
