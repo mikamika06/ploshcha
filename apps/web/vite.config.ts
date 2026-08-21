@@ -6,6 +6,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..", "..");
 
 export default defineConfig({
+  // GitHub Pages віддає сайт із підтеки `/<репо>/`, тож шляхи до ассетів мусять бути відносні
+  // саме до неї. Локально й на власному домені база лишається кореневою.
+  base: process.env.PLOSHCHA_BASE ?? "/",
   resolve: {
     alias: {
       "@ploshcha/contract-ts": resolve(repoRoot, "packages/contract-ts/src/index.ts"),

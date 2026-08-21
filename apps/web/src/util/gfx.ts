@@ -68,6 +68,15 @@ export function ovalShadow(): Texture {
 }
 
 // Шляхи зі SceneSpec ("assets/...") → абсолютні від кореня статики ("/assets/...").
+/**
+ * Шлях до ассета З УРАХУВАННЯМ бази збірки.
+ *
+ * ★ Жорсткий «/assets/…» ламає будь-яке розгортання в підтеку: на GitHub Pages сайт лежить у
+ * `/<репо>/`, і кожен такий шлях віддає 404 — заміряно, село не піднімалось узагалі. `BASE_URL`
+ * підставляє Vite: локально це «/», у вітрині — «/ploshcha/».
+ */
 export function assetUrl(p: string): string {
-  return p.startsWith("/") ? p : "/" + p;
+  const base = import.meta.env.BASE_URL || "/";
+  const rel = p.startsWith("/") ? p.slice(1) : p;
+  return base.endsWith("/") ? base + rel : `${base}/${rel}`;
 }

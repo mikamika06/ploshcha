@@ -1,3 +1,4 @@
+import { assetUrl } from "../util/gfx";
 import type { TalkPart, DiscussionLine } from "./discussion";
 
 type Side = "left" | "right";
@@ -19,6 +20,7 @@ export class GroupTalk {
   private plate: HTMLElement;
   private name: HTMLElement;
   private theme: HTMLElement;
+  private count: HTMLElement;
   private lines: DiscussionLine[] = [];
   private i = 0;
   private pEls = new Map<string, HTMLElement>();
@@ -27,15 +29,13 @@ export class GroupTalk {
   private status = "";
   private input: HTMLInputElement;
   private form: HTMLElement;
-  /** Кому шепочемо. `null` — кажемо вголос усім. */
-  private whisperTo: { id: string; name: string } | null = null;
   private standing: Partial<Record<Side, Standing>> = {};
   private sideOf = new Map<string, Side>();
   private lastSide: Side = "right";
 
   constructor(
     private onClose: () => void,
-    private onSay: (text: string, whisperTo?: string) => void = () => {},
+    private onSay: (text: string) => void = () => {},
   ) {
     this.root = document.createElement("div");
     this.root.className = "gtalk";
@@ -44,14 +44,17 @@ export class GroupTalk {
       <div class="gtalk-theme"></div>
       <div class="gtalk-side left"></div>
       <div class="gtalk-side right"></div>
-      <div class="gtalk-name"></div>
-      <div class="gtalk-plate"></div>
-      <button class="gtalk-back" type="button">← до села</button>
+      <div class="gtalk-box">
+        <div class="tag gtalk-name"></div>
+        <div class="gtalk-plate"></div>
+      </div>
+      <button class="tag gtalk-back" type="button">← до села</button>
       <form class="gtalk-say">
         <input class="gtalk-input" type="text" maxlength="300" autocomplete="off"
-               placeholder="сказати своє… (клік по людині — пошептати їй)">
-        <button class="gtalk-send" type="button">Сказати</button>
+               placeholder="сказати своє селу вголос…">
+        <button class="tag gtalk-send" type="button">Сказати</button>
       </form>
+      <div class="gtalk-count"></div>
       <div class="gtalk-hint">клік — далі</div>`;
     this.sides = {
       left: this.root.querySelector(".gtalk-side.left") as HTMLElement,
@@ -60,6 +63,7 @@ export class GroupTalk {
     this.plate = this.root.querySelector(".gtalk-plate") as HTMLElement;
     this.name = this.root.querySelector(".gtalk-name") as HTMLElement;
     this.theme = this.root.querySelector(".gtalk-theme") as HTMLElement;
+    this.count = this.root.querySelector(".gtalk-count") as HTMLElement;
     this.root.querySelector(".gtalk-back")!.addEventListener("click", (e) => {
       e.stopPropagation();
       this.onClose();
@@ -73,12 +77,18 @@ export class GroupTalk {
       this.send();
     });
     this.input.addEventListener("keydown", (e) => {
+      // Як на Дошці й у кімнаті: Escape із набраним словом відпускає поле, порожнє — виходить.
+      if (e.key === "Escape") {
+        if (!this.input.value.trim()) return;
+        e.stopPropagation();
+        this.input.blur();
+        return;
+      }
       e.stopPropagation();
       if (e.key === "Enter") {
         e.preventDefault();
         this.send();
       }
-      if (e.key === "Escape") this.aim(null);
     });
     this.root.addEventListener("click", () => this.advance());
     document.getElementById("stage")!.appendChild(this.root);
@@ -158,11 +168,7 @@ export class GroupTalk {
       }
       const el = document.createElement("div");
       el.className = "gtalk-p";
-      el.style.backgroundImage = `url(/assets/roles/${p.role}/0.png)`;
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this.aim({ id: p.id, name: p.name });
-      });
+      el.style.backgroundImage = `url(${assetUrl(`/assets/roles/${p.role}/0.png`)})`;
       this.sides[side].appendChild(el);
       // окремий кадр — інакше браузер не побачить переходу з початкового стану в `here`
       requestAnimationFrame(() => el.classList.add("here"));
@@ -185,6 +191,10 @@ export class GroupTalk {
   }
 
   private render(): void {
+    // Скільки вже сказано: у живому режимі кінець невідомий, тож показуємо лічильник, а не «з N».
+    this.count.textContent = this.lines.length
+      ? `${this.i + 1} / ${this.lines.length}${this.live ? " · гомонять" : ""}`
+      : "";
     const ln = this.lines[this.i];
     if (!ln) {
       for (const el of this.pEls.values()) el.classList.remove("active");
@@ -198,23 +208,11 @@ export class GroupTalk {
     this.plate.textContent = ln.text;
   }
 
-  /** Куди піде наступне слово: вголос усім чи на вухо одному. */
-  private aim(target: { id: string; name: string } | null): void {
-    this.whisperTo = target;
-    this.form.classList.toggle("whisper", target !== null);
-    this.input.placeholder = target
-      ? `пошептати на вухо: ${target.name}…  (Esc — вголос)`
-      : "сказати своє…  (клік по людині — пошептати їй)";
-    this.input.focus();
-  }
-
   private send(): void {
     const text = this.input.value.trim();
     if (!text) return;
     this.input.value = "";
-    const target = this.whisperTo;
-    this.aim(null);
-    this.onSay(text, target?.id);
+    this.onSay(text);
   }
 
   /** Прогін завершився: далі реплік не буде, тож клік знову означає «вийти». */

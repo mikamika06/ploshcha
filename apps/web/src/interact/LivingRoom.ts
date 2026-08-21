@@ -1,3 +1,4 @@
+import { assetUrl } from "../util/gfx";
 export interface RoomCast {
   id: string; // роль (для спрайта /assets/roles/<id>/)
   name: string;
@@ -20,6 +21,9 @@ interface RV {
   bob: number;
   bubble: HTMLElement | null;
   bubbleT: number;
+  /** Розмір бульбашки, зміряний ОДИН раз при появі: щокадрове читання розкладки — це смикання. */
+  bw: number;
+  bh: number;
 }
 
 const AMBIENT = [
@@ -78,9 +82,19 @@ export class LivingRoom {
   private mgw = 0;
   private mgh = 0;
 
+  /** Живе віче в цій локації: гомін-заповнювач мовчить, бо говорять справжні репліки ядра. */
+  private live = false;
+  private say2: HTMLInputElement | null = null;
+  private sayForm: HTMLElement | null = null;
+  /** Черга реплік ядра. У живому режимі глядач гортає їх сам — клік за кліком. */
+  private queue: { vid: string; text: string; deed?: string; toward?: string }[] = [];
+  /** Де поле кімнати лежить НА ЕКРАНІ. Оновлюємо зрідка: читання розкладки щокадру — це смикання. */
+  private view = { left: 0, top: 0, t: 0 };
+  private shown = 0;
+
   constructor(
     private onClose: () => void,
-    private onInspect?: (vid: string) => void,
+    private onSay?: (text: string) => void,
   ) {
     this.root = document.createElement("div");
     this.root.className = "room";
@@ -91,11 +105,40 @@ export class LivingRoom {
       </div>
       <button class="room-back" type="button">← до села</button>
       <div class="room-name"></div>
-      <div class="room-empty">— тут зараз нікого —</div>`;
+      <div class="room-notice plaq"></div>
+      <form class="room-say gtalk-say">
+        <input class="room-input gtalk-input" type="text" maxlength="300" autocomplete="off"
+               placeholder="сказати своє селу вголос…">
+        <button class="tag room-send gtalk-send" type="button">Сказати</button>
+      </form>`;
     this.bg = this.root.querySelector(".room-bg") as HTMLImageElement;
     this.field = this.root.querySelector(".room-field") as HTMLElement;
     this.nameEl = this.root.querySelector(".room-name") as HTMLElement;
     this.root.querySelector(".room-back")!.addEventListener("click", () => this.onClose());
+    // Клік по кімнаті = «далі». Форма й кнопки свій клік з'їдають самі, клік по людині —
+    // це прицілювання шепоту, тож гортання туди не лізе.
+    this.root.addEventListener("click", () => this.advance());
+    this.sayForm = this.root.querySelector(".room-say") as HTMLElement;
+    this.say2 = this.root.querySelector(".room-input") as HTMLInputElement;
+    this.sayForm.addEventListener("submit", (e) => e.preventDefault());
+    this.sayForm.addEventListener("click", (e) => e.stopPropagation());
+    this.root.querySelector(".room-back")!.addEventListener("click", (e) => e.stopPropagation());
+    this.root.querySelector(".room-send")!.addEventListener("click", () => this.send());
+    this.say2.addEventListener("keydown", (e) => {
+      // Те саме, що на Дошці: Escape із набраним словом лише відпускає поле (слово лишається),
+      // а порожнє поле його не тримає — інакше з локації взагалі не вийти клавіатурою.
+      if (e.key === "Escape") {
+        if (!this.say2?.value.trim()) return;
+        e.stopPropagation();
+        this.say2?.blur();
+        return;
+      }
+      e.stopPropagation();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.send();
+      }
+    });
     document.getElementById("stage")!.appendChild(this.root);
   }
 
@@ -108,10 +151,18 @@ export class LivingRoom {
     opts?: { cover?: boolean; token?: { verb: string; lines: string[] }; figScale?: number },
   ): void {
     this.figScale = opts?.figScale ?? 1;
+    // ★ Нова локація — нова розмова. Чергу й лічильник показаного скидали лише в `close()`, тож
+    // після відкриття кімнати поверх кімнати (віче слідом за віче) свіжа репліка ставала в хвіст
+    // за старими: `shown` уже 1, і `enqueue` мовчки нічого не показував. Заміряно: 0 бульбашок
+    // замість 1 і 3 чужі репліки в черзі.
+    this.queue = [];
+    this.shown = 0;
     // стейдж бере аспект самої картинки → field 0-1 == image 0-1 (маска не з'їжджає)
     const stage = this.root.querySelector(".room-stage") as HTMLElement;
     this.bg.onload = (): void => {
-      if (this.bg.naturalWidth) stage.style.aspectRatio = `${this.bg.naturalWidth} / ${this.bg.naturalHeight}`;
+      // числом, а не `aspect-ratio`: тим самим `--ar` CSS рахує ще й граничну ширину, щоб у
+      // низькому вікні низ кімнати не зрізало (див. `.room-stage`)
+      if (this.bg.naturalWidth) stage.style.setProperty("--ar", String(this.bg.naturalWidth / this.bg.naturalHeight));
     };
     this.bg.src = bgUrl;
     this.root.classList.toggle("room--cover", !!opts?.cover);
@@ -127,24 +178,21 @@ export class LivingRoom {
       const el = document.createElement("img");
       el.className = "rv";
       el.draggable = false;
-      const frames = [0, 1, 2].map((n) => `/assets/roles/${c.id}/${n}.png`);
+      const frames = [0, 1, 2].map((n) => assetUrl(`/assets/roles/${c.id}/${n}.png`));
       el.src = frames[0];
       const [x, y] = this.randFloor();
       const rv: RV = {
         cast: c, el, frames, cur: 0, x, y, tx: x, ty: y,
-        state: "idle", timer: rand(0.5, 3), face: 1, bob: 0, bubble: null, bubbleT: 0,
+        state: "idle", timer: rand(0.5, 3), face: 1, bob: 0, bubble: null, bubbleT: 0, bw: 0, bh: 0,
       };
       el.addEventListener("click", (e) => {
         e.stopPropagation();
-        // клік по селянину в локації → аналітика (як на головній карті); без vid — амбієнтна репліка
-        if (rv.cast.vid && this.onInspect) this.onInspect(rv.cast.vid);
-        else this.say(rv, AMBIENT[(Math.random() * AMBIENT.length) | 0]);
+        this.advance(); // клік по людині — те саме «далі», що й по кімнаті
       });
       this.field.appendChild(el);
       return rv;
     });
     if (opts?.token) this.placeToken(opts.token);
-    (this.root.querySelector(".room-empty") as HTMLElement).style.opacity = this.vs.length ? "0" : "1";
     this.root.classList.add("on");
     this.last = performance.now();
     cancelAnimationFrame(this.raf);
@@ -224,16 +272,27 @@ export class LivingRoom {
     this.last = now;
     const W = this.field.clientWidth;
     const H = this.field.clientHeight;
+    // Положення поля на екрані читаємо двічі на секунду: воно міняється лише від зміни вікна.
+    if (now - this.view.t > 500) {
+      const r = this.field.getBoundingClientRect();
+      this.view = { left: r.left, top: r.top, t: now };
+    }
+    // Жодних поправок на розмір екрана: людина мусить бути тієї частки кімнати, якої вона є на
+    // малюнку. Доти фігури «підтягувались» під висоту коробки — і на телефоні виходили велетнями,
+    // бо кімната лежала смужкою. Тепер смужки немає (сцена заповнює кадр), тож і поправка зайва.
     for (const v of this.vs) {
       if (v.state === "idle") {
         v.timer -= dt;
-        if (v.timer <= 0) {
+        // Під час ЖИВОЇ розмови ніхто не тиняється сам: людина рухається тільки тоді, коли того
+        // вимагає такт («підходить», «відступає», «ходить»). Доти всі снували підлогою на
+        // власному таймері, і будь-яка постановка тонула в цьому броунівському русі.
+        if (v.timer <= 0 && !this.live) {
           const [tx, ty] = this.randFloor();
           v.tx = tx;
           v.ty = ty;
           v.state = "walk";
         }
-        if (!v.bubble && Math.random() < dt * 0.05) this.say(v, AMBIENT[(Math.random() * AMBIENT.length) | 0]);
+        if (!this.live && !v.bubble && Math.random() < dt * 0.05) this.say(v, AMBIENT[(Math.random() * AMBIENT.length) | 0]);
       } else {
         const dx = v.tx - v.x;
         const dy = v.ty - v.y;
@@ -268,20 +327,34 @@ export class LivingRoom {
       }
       const px = v.x * W;
       const py = v.y * H;
-      const sprH = H * (0.18 + 0.06 * v.y) * this.figScale; // глибинний масштаб × масштаб сцени
+      const sprH = H * (0.18 + 0.06 * v.y) * this.figScale; // глибина × масштаб сцени
       v.el.style.height = `${sprH}px`;
       v.el.style.left = `${px}px`;
       v.el.style.top = `${py}px`;
       v.el.style.transform = `translate(-50%,-100%) scaleX(${v.face})`;
       v.el.style.zIndex = String(Math.round(v.y * 1000));
       if (v.bubble) {
-        v.bubbleT -= dt;
-        v.bubble.style.left = `${px}px`;
-        v.bubble.style.top = `${py - sprH}px`;
+        // ★ Репліку тримаємо У ВИДИМОМУ кадрі, а не просто в межах кімнати.
+        //
+        // На телефоні кімната ШИРША за екран (боки навмисно під обрізом), тож «усередині поля» і
+        // «видно» — різні речі: бульбашка людини скраю чесно лежала в кімнаті й при цьому за
+        // краєм екрана. Прочитати її було нічим — камери в локації немає, як на мапі. Тому межі
+        // рахуємо від вікна, перетнутого з полем.
+        const half = v.bw / 2;
+        const loX = Math.max(half + 6, -this.view.left + half + 6);
+        const hiX = Math.min(W - half - 6, window.innerWidth - this.view.left - half - 6);
+        const loY = Math.max(v.bh + 6, -this.view.top + v.bh + 6);
+        const hiY = Math.min(H - 6, window.innerHeight - this.view.top - 6);
+        const bx = hiX > loX ? Math.min(Math.max(px, loX), hiX) : px;
+        const by = hiY > loY ? Math.min(Math.max(py - sprH, loY), hiY) : py - sprH;
+        v.bubble.style.left = `${bx}px`;
+        v.bubble.style.top = `${by}px`;
         v.bubble.style.zIndex = String(Math.round(v.y * 1000) + 1);
-        if (v.bubbleT <= 0) {
-          v.bubble.remove();
-          v.bubble = null;
+        // `Infinity` = репліка з черги: висить, доки не клікнеш далі. Гомін-заповнювач і твій
+        // відгомін мають скінченний час і гаснуть самі.
+        if (v.bubbleT !== Infinity) {
+          v.bubbleT -= dt;
+          if (v.bubbleT <= 0) this.clearBubble(v);
         }
       }
     }
@@ -309,17 +382,206 @@ export class LivingRoom {
     this.field.appendChild(btn);
   }
 
-  private say(v: RV, text: string): void {
+  /**
+   * Повідомлення сцені — видимою плашкою, а не тишею.
+   *
+   * Слово, послане в скінчене віче, поверталось помилкою в консоль: на екрані не мінялось нічого,
+   * і виглядало це як «шепіт не працює».
+   */
+  notice(text: string): void {
+    const el = this.root.querySelector(".room-notice") as HTMLElement | null;
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("on", Boolean(text));
+    if (text) window.setTimeout(() => el.classList.remove("on"), 5200);
+  }
+
+  /** Живий режим: гомін вимикається, зʼявляється смуга «сказати своє». */
+  setLive(on: boolean): void {
+    this.live = on;
+    this.root.classList.toggle("room--live", on);
+  }
+
+  /**
+   * Хтось заговорив, а його в кімнаті ще немає — він ПРИХОДИТЬ.
+   *
+   * Мовчазний `return` тут був би тією самою давньою поламкою: подія доїхала, механізм працює,
+   * а на екрані нічого — і виглядає, ніби ядро мовчить.
+   */
+  addPerson(c: RoomCast, text?: string): void {
+    if (this.vs.some((r) => r.cast.vid === c.vid)) return;
+    const el = document.createElement("img");
+    el.className = "rv";
+    el.draggable = false;
+    const frames = [0, 1, 2].map((n) => assetUrl(`/assets/roles/${c.id}/${n}.png`));
+    el.src = frames[0];
+    const [x, y] = this.randFloor();
+    const rv: RV = {
+      cast: c, el, frames, cur: 0, x, y, tx: x, ty: y,
+      state: "idle", timer: rand(0.5, 3), face: 1, bob: 0, bubble: null, bubbleT: 0, bw: 0, bh: 0,
+    };
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.advance();
+    });
+    this.field.appendChild(el);
+    this.vs.push(rv);
+    if (text) this.sayBy(c.vid ?? c.id, text);
+  }
+
+  /**
+   * Дія тіла з партитури: людина не тиняється, а РОБИТЬ те, що каже такт.
+   *
+   * Ходьба сама по собі нічого не означала — усі просто снували підлогою. Тепер крок «підходить»
+   * веде до співрозмовника, «відступає» — від нього, і в кадрі видно, хто наступає, а хто здає.
+   */
+  deed(vid: string, deed: string, towardVid?: string): void {
+    const v = this.vs.find((r) => r.cast.vid === vid || r.cast.id === vid);
+    if (!v) return;
+    const other = towardVid
+      ? this.vs.find((r) => r.cast.vid === towardVid || r.cast.id === towardVid)
+      : undefined;
+    const stand = (): void => {
+      v.tx = v.x;
+      v.ty = v.y;
+      v.state = "idle";
+    };
+    const step = (kx: number, ky: number): boolean => {
+      const nx = Math.max(this.bbox.x0, Math.min(this.bbox.x1, v.x + kx));
+      const ny = Math.max(this.bbox.y0, Math.min(this.bbox.y1, v.y + ky));
+      if (!this.inFloor(nx, ny)) return false;
+      v.tx = nx;
+      v.ty = ny;
+      v.state = "walk";
+      return true;
+    };
+    /**
+     * Крок до співрозмовника (sign=1) або від нього (−1).
+     *
+     * Якщо в лоба не вийшло (стіна, лава), пробуємо збоку; а як і так нікуди — СТАЄМО. Мовчазне
+     * «нічого не сталось» тут гірше за все: людина далі йшла зі старою ціллю, тобто «відступив»
+     * виглядало як «підійшов». Заміряно: 0.186 → 0.166 → 0.146 замість 0.186 → 0.166 → 0.21.
+     */
+    const toward = (sign: number): void => {
+      if (!other) return stand();
+      const dx = other.x - v.x;
+      const dy = other.y - v.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const d = Math.min(0.16, Math.max(0.06, len * 0.35));
+      const base = Math.atan2(dy, dx) + (sign < 0 ? Math.PI : 0);
+      for (const turn of [0, 0.6, -0.6, 1.2, -1.2]) {
+        if (step(Math.cos(base + turn) * d, Math.sin(base + turn) * d * 0.75)) {
+          if (Math.abs(dx) > 0.005) v.face = dx * sign < 0 ? -1 : 1;
+          return;
+        }
+      }
+      stand();
+    };
+    switch (deed) {
+      case "підходить":
+        toward(1);
+        break;
+      case "відступає":
+        toward(-1);
+        break;
+      case "ходить": {
+        const a = Math.random() * Math.PI * 2;
+        step(Math.cos(a) * 0.12, Math.sin(a) * 0.08);
+        break;
+      }
+      case "відвертається":
+        if (other) v.face = other.x > v.x ? -1 : 1;
+        v.timer = 2.5;
+        break;
+      case "розводить_руками":
+        v.el.animate(
+          [{ transform: "scaleX(1)" }, { transform: "scaleX(1.16)" }, { transform: "scaleX(1)" }],
+          { duration: 420, easing: "ease-in-out" },
+        );
+        break;
+      default: // «стоїть» — саме це й треба: спинитись і слухати
+        stand();
+        v.timer = 2.5;
+        if (other && Math.abs(other.x - v.x) > 0.005) v.face = other.x < v.x ? -1 : 1;
+    }
+  }
+
+  /**
+   * Репліка ядра стає в ЧЕРГУ, а не вискакує сама.
+   *
+   * Ядро віддає такти пачками й швидше, ніж їх встигаєш прочитати: без черги розмова
+   * пробігала повз, і в кадрі лишався тільки хвіст. Тепер темп задає глядач кліком.
+   */
+  enqueue(vid: string, text: string, deed?: string, toward?: string): void {
+    this.queue.push({ vid, text, deed, toward });
+    if (this.shown === 0 && this.queue.length === 1) this.advance();
+  }
+
+  /** Показати наступну репліку черги. */
+  advance(): void {
+    const next = this.queue[this.shown];
+    if (!next) return;
+    this.shown++;
+    // Попередню репліку прибираємо тут-таки: місце звільняє наступна, а не годинник.
+    for (const v of this.vs) if (v.bubble) this.clearBubble(v);
+    if (next.deed) this.deed(next.vid, next.deed, next.toward);
+    this.sayBy(next.vid, next.text);
+  }
+
+  /** Справжня репліка ядра — над головою того, хто її сказав. */
+  sayBy(vid: string, text: string): boolean {
+    const v = this.vs.find((r) => r.cast.vid === vid || r.cast.id === vid);
+    if (!v) return false;
+    // ★ Репліка НЕ згасає сама: вона висить, доки не клікнеш далі. Таймер тут означав «не встиг
+    // прочитати — сам винен», хоч темп розмови задає глядач.
+    this.say(v, text);
+    v.bubbleT = Infinity;
+    return true;
+  }
+
+  private clearBubble(v: RV): void {
+    if (!v.bubble) return;
+    v.bubble.remove();
+    v.bubble = null;
+    v.bubbleT = 0;
+  }
+
+  get isOpen(): boolean {
+    return this.root.classList.contains("on");
+  }
+
+  private send(): void {
+    const text = this.say2?.value.trim();
+    if (!text) return;
+    if (this.say2) this.say2.value = "";
+    this.onSay?.(text);
+  }
+
+  private say(v: RV, text: string, kind = ""): void {
     if (v.bubble) v.bubble.remove();
     const b = document.createElement("div");
-    b.className = "rv-bubble";
-    b.textContent = `${v.cast.name}: ${text}`;
+    b.className = `rv-bubble${kind ? ` rv-${kind}` : ""}`;
+    // Імʼя — ОКРЕМИМ рядком над реплікою, а не «Імʼя: текст» усередині. Вставлене в текст, воно
+    // читалось як частина сказаного, і кожна репліка починалась зі службового слова.
+    const who = document.createElement("div");
+    who.className = "rv-who";
+    who.textContent = v.cast.name;
+    const line = document.createElement("div");
+    line.className = "rv-line";
+    line.textContent = text;
+    b.append(who, line);
     this.field.appendChild(b);
+    // Розмір читаємо раз, одразу після вставлення: далі кадр працює самою арифметикою.
+    v.bw = b.offsetWidth;
+    v.bh = b.offsetHeight;
     v.bubble = b;
     v.bubbleT = 3;
   }
 
   close(): void {
+    this.queue = [];
+    this.shown = 0;
+    this.setLive(false);
     this.root.classList.remove("on");
     cancelAnimationFrame(this.raf);
     this.field.innerHTML = "";

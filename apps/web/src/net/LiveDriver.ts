@@ -1,5 +1,6 @@
 import type { ParsedEvent } from "@ploshcha/contract-ts";
 import type { EventSourcePort } from "./types";
+import { sessionId } from "./session";
 import { parseEnvelope } from "./validate";
 
 /**
@@ -24,7 +25,8 @@ export class LiveDriver implements EventSourcePort {
   private queue: ParsedEvent[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private url: string) {}
+  /** `sid` — чиє село слухаємо. Ядро фільтрує потік ним, тож без нього прилетіли б чужі розмови. */
+  constructor(private url: string, private sid: string = sessionId()) {}
 
   private drain(onEvent: (ev: ParsedEvent) => void): void {
     if (this.timer !== undefined || this.stopped) return;
@@ -41,7 +43,11 @@ export class LiveDriver implements EventSourcePort {
   subscribe(onEvent: (ev: ParsedEvent) => void, onEnd?: () => void): () => void {
     const open = () => {
       if (this.stopped) return;
-      const url = this.cursor === undefined ? this.url : `${this.url}?since=${this.cursor}`;
+      const query = new URLSearchParams();
+      if (this.sid) query.set("sid", this.sid);
+      if (this.cursor !== undefined) query.set("since", String(this.cursor));
+      const tail = query.toString();
+      const url = tail ? `${this.url}?${tail}` : this.url;
       const source = new EventSource(url);
       this.source = source;
 
@@ -80,13 +86,37 @@ export class LiveDriver implements EventSourcePort {
   }
 }
 
-/** Команда назад у ядро. Джерело істини — черга ядра, локальний стан лише оптимістичний. */
+/**
+ * Команда назад у ядро. Джерело істини — черга ядра, локальний стан лише оптимістичний.
+ *
+ * `sid` підставляється ТУТ, а не в кожному місці виклику: забути його означало б тихо змінити
+ * спільне село замість свого, і помітно це стало б лише в чужій вкладці.
+ */
 export async function sendCommand(baseUrl: string, body: Record<string, unknown>): Promise<unknown> {
   const res = await fetch(`${baseUrl}/command`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ sid: sessionId(), ...body }),
   });
   if (!res.ok) throw new Error(`команда відхилена: ${res.status}`);
   return res.json();
+}
+
+/** Стан ядра: чи воно взагалі працює. Без цього «село думає» триває вічно й мовчки. */
+export interface Health {
+  state: string;
+  stoppedReason?: string | null;
+  lastError?: string | null;
+  queue?: { pending?: number; done?: number };
+  spend?: { tokens?: number };
+  caps?: { maxTokens?: number };
+}
+
+export async function fetchHealth(baseUrl: string): Promise<Health | null> {
+  try {
+    const res = await fetch(`${baseUrl}/health`);
+    return res.ok ? ((await res.json()) as Health) : null;
+  } catch {
+    return null;
+  }
 }
