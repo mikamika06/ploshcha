@@ -1,0 +1,12 @@
+{
+  "name": "Площа",
+  "team": "Oleksandr Savkov",
+  "description_uk": "Українське село, яке вголос обговорює новину. Кидаєш тему на дошку — громада сходиться в шинку чи біля дзвону, сперечається, змінює думку й доходить ухвали голосуванням. Mamay розписує порядок віча хвилями, Lapa говорить репліками; кожен крок на екрані — справжній крок ядра.",
+  "description_en": "A Ukrainian village that discusses the news out loud. Pin a topic and the community gathers, argues, shifts position, and settles it by vote. Mamay plans the assembly in waves, Lapa speaks the lines; every step on screen is a real step of the core.",
+  "website": "https://ploshcha.org",
+  "demo": "https://ploshcha.org",
+  "github": "https://github.com/mikamika06/ploshcha",
+  "logo": "assets/logo.png",
+  "cover": "assets/cover.png",
+  "contact_email": "oleksandrrsavkov@gmail.com"
+}

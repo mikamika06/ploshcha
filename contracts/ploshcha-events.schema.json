@@ -228,7 +228,7 @@
         },
         "name": {
           "type": "string",
-          "description": "назва села, напр. «Верболози»"
+          "description": "назва села"
         }
       },
       "required": [

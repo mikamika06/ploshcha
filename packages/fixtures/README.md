@@ -5,7 +5,7 @@
 
 | Файл | Що це |
 |---|---|
-| `scenes/verbolozy.scene.json` | SceneSpec села Верболози (4 реальні POI + 5 провізорних, калібруються у 2c) |
+| `scenes/verbolozy.scene.json` | SceneSpec села (4 реальні POI + 5 провізорних, калібруються у 2c) |
 | `runs/quiet-day.jsonl` | Тихий літній день, 8 селян, емерджентна лінія сватання (Іван↔Оксана, баба Горпина). 11 «щасливих» типів подій |
 | `runs/edge-cases.jsonl` | `run.degraded` + `run.error` — UI-стани деградації/помилки |
 

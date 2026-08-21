@@ -1,27 +1,109 @@
 {
   "id": "verbolozy",
-  "name": "Верболози",
-  "size": { "w": 2816, "h": 1536 },
+  "name": "Площа",
+  "size": {
+    "w": 2816,
+    "h": 1536
+  },
   "background": "assets/backgrounds/ground2_baked.webp",
   "masks": {
     "walk": "assets/backgrounds/walk2.png",
     "zone": "assets/backgrounds/zone2.png",
     "keepout": "assets/backgrounds/keepout2.png",
     "flow": "assets/backgrounds/flow_map2.png",
-    "space": { "w": 1408, "h": 768 }
+    "space": {
+      "w": 1408,
+      "h": 768
+    }
   },
   "pois": [
-    { "id": "doshka", "name": "Дошка-вісник", "kind": "board", "x": 1199, "y": 764, "meaning": "тут оголошуються події дня" },
-    { "id": "dzvin", "name": "Дзвіниця", "kind": "bell", "x": 1614, "y": 777, "meaning": "відбиває час і скликає громаду" },
-    { "id": "stavok", "name": "Ставок", "kind": "pond", "x": 1790, "y": 1227, "meaning": "вода, млин, спокій" },
-    { "id": "ploshcha", "name": "Площа", "kind": "square", "x": 1438, "y": 863 },
-    { "id": "tserkva", "name": "Церква", "kind": "church", "x": 1489, "y": 657, "meaning": "віра, злагода" },
-    { "id": "mlyn", "name": "Млин", "kind": "mill", "x": 1924, "y": 1101, "meaning": "господарка, чутки" },
-    { "id": "kuznya", "name": "Кузня", "kind": "forge", "x": 1294, "y": 1085 },
-    { "id": "shynok", "name": "Шинок", "kind": "tavern", "x": 1190, "y": 965, "meaning": "розмови, гостина" }
+    {
+      "id": "doshka",
+      "name": "Дошка-вісник",
+      "kind": "board",
+      "x": 1199,
+      "y": 764,
+      "meaning": "тут оголошуються події дня"
+    },
+    {
+      "id": "dzvin",
+      "name": "Дзвіниця",
+      "kind": "bell",
+      "x": 1614,
+      "y": 777,
+      "meaning": "відбиває час і скликає громаду"
+    },
+    {
+      "id": "stavok",
+      "name": "Ставок",
+      "kind": "pond",
+      "x": 1790,
+      "y": 1227,
+      "meaning": "вода, млин, спокій"
+    },
+    {
+      "id": "ploshcha",
+      "name": "Площа",
+      "kind": "square",
+      "x": 1438,
+      "y": 863
+    },
+    {
+      "id": "tserkva",
+      "name": "Церква",
+      "kind": "church",
+      "x": 1489,
+      "y": 657,
+      "meaning": "віра, злагода"
+    },
+    {
+      "id": "mlyn",
+      "name": "Млин",
+      "kind": "mill",
+      "x": 1924,
+      "y": 1101,
+      "meaning": "господарка, чутки"
+    },
+    {
+      "id": "kuznya",
+      "name": "Кузня",
+      "kind": "forge",
+      "x": 1294,
+      "y": 1085
+    },
+    {
+      "id": "shynok",
+      "name": "Шинок",
+      "kind": "tavern",
+      "x": 1190,
+      "y": 965,
+      "meaning": "розмови, гостина"
+    }
   ],
   "props": [
-    { "sprite": "10_mill/00", "x": 1927, "y": 1147, "scale": 0.29, "rot": 0, "anchor": [0.5, 1], "z": 1147 },
-    { "sprite": "10_mill/01", "x": 1896, "y": 1023, "scale": 0.24, "rot": 0, "anchor": [0.5, 0.5], "z": 1148 }
+    {
+      "sprite": "10_mill/00",
+      "x": 1927,
+      "y": 1147,
+      "scale": 0.29,
+      "rot": 0,
+      "anchor": [
+        0.5,
+        1
+      ],
+      "z": 1147
+    },
+    {
+      "sprite": "10_mill/01",
+      "x": 1896,
+      "y": 1023,
+      "scale": 0.24,
+      "rot": 0,
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "z": 1148
+    }
   ]
 }
