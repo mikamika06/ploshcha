@@ -242,6 +242,8 @@ async function boot(): Promise<void> {
    * бульбашками. Лишається тільки те, що справді треба: порти не ловлять клік, підказка гасне.
    */
   const enterDive = (_p: POI): void => {
+    // Підказка своє сказала: гість уже кудись зайшов, а висіла вона й над локацією.
+    hideHint();
     inspector.close();
     ports.setEnabled(false);
     whisper.classList.remove("on");

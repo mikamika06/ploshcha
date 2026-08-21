@@ -108,6 +108,7 @@ export class LivingRoom {
       <button class="room-back" type="button">← до села</button>
       <div class="room-name"></div>
       <div class="room-notice plaq"></div>
+      <div class="room-wait plaq">Село думу думає…</div>
       <div class="room-end plaq">
         <div class="room-end-title"></div>
         <div class="room-end-body"></div>
@@ -361,7 +362,12 @@ export class LivingRoom {
         const by = hiY > loY ? Math.min(Math.max(py - sprH, loY), hiY) : py - sprH;
         v.bubble.style.left = `${bx}px`;
         v.bubble.style.top = `${by}px`;
-        v.bubble.style.zIndex = String(Math.round(v.y * 1000) + 1);
+        // ★ Репліка над УСІМА людьми, а не лише над своїм господарем.
+        //
+        // Глибина в кімнаті рахується з `y`, тож той, хто стоїть ближче до глядача, перекривав
+        // чужу бульбашку: людина буквально залазила на текст. Репліки живуть окремим ярусом
+        // вище за будь-який спрайт, а між собою впорядковані так само за глибиною.
+        v.bubble.style.zIndex = String(500_000 + Math.round(v.y * 1000));
         // `Infinity` = репліка з черги: висить, доки не клікнеш далі. Гомін-заповнювач і твій
         // відгомін мають скінченний час і гаснуть самі.
         if (v.bubbleT !== Infinity) {
@@ -395,6 +401,18 @@ export class LivingRoom {
   }
 
   /**
+   * Що зараз робиться, коли на екрані тихо.
+   *
+   * Глядач дочитав чергу, тицяє — і нічого не рухається, бо оркестратор саме складає наступну
+   * хвилю тактів. Без слова це читається як поламка, і саме так його й прочитали.
+   */
+  waiting(on: boolean): void {
+    const el = this.root.querySelector(".room-wait") as HTMLElement | null;
+    if (!el) return;
+    el.classList.toggle("on", on && this.live && this.shown >= this.queue.length && !this.end);
+  }
+
+  /**
    * Чим скінчилось віче — окремою карткою, коли черга дочитана.
    *
    * Доти остання репліка просто обривалась: ані ухвали, ані підсумку, ані знаку, що розмова
@@ -407,6 +425,7 @@ export class LivingRoom {
   }
 
   private showEndIfRead(): void {
+    this.waiting(false);
     const el = this.root.querySelector(".room-end") as HTMLElement | null;
     if (!el || !this.end) return;
     if (this.shown < this.queue.length) return; // ще є що читати
@@ -547,6 +566,7 @@ export class LivingRoom {
    */
   enqueue(vid: string, text: string, deed?: string, toward?: string): void {
     this.queue.push({ vid, text, deed, toward });
+    this.waiting(false); // приїхала репліка — чекати більше нема чого
     if (this.shown === 0 && this.queue.length === 1) this.advance();
   }
 
@@ -555,6 +575,7 @@ export class LivingRoom {
     const next = this.queue[this.shown];
     if (!next) {
       this.showEndIfRead(); // дочитав усе — саме час показати, чим скінчилось
+      this.waiting(true);   // а якщо кінця ще немає — сказати, що ядро думає
       return;
     }
     this.shown++;
@@ -616,6 +637,7 @@ export class LivingRoom {
   }
 
   close(): void {
+    this.waiting(false);
     this.end = null;
     (this.root.querySelector(".room-end") as HTMLElement | null)?.classList.remove("on");
     this.queue = [];

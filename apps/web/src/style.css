@@ -964,6 +964,25 @@ body {
   width: min(720px, 76%);
   z-index: 100000; /* спрайти отримують zIndex від свого y — інакше люди ходять по формі */
 }
+/* «ядро думає» — тихий рядок НАД смугою слова, щоб не лягав на назву локації */
+.room-wait {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(74px, 11vh, 116px);
+  transform: translateX(-50%);
+  padding: 7px 16px;
+  font: italic 500 13px/1.2 var(--serif);
+  z-index: 100001;
+  cursor: default;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease;
+}
+.room-wait.on {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* картка кінця: чим скінчилось віче, коли глядач дочитав чергу */
 .room-end {
   position: absolute;
