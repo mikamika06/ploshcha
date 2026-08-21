@@ -98,6 +98,25 @@ MOVES: tuple[str, ...] = (
     "піти_питати", "пожалітись", "пожартувати", "піддакнути", "заперечити",
 )
 
+# Дія тіла на такті. Це ПОСТАНОВКА, а не рішення: вибір лишається закритим списком, тож його
+# можна довірити моделі, не даючи їй жодної влади над змістом розмови.
+DEEDS: tuple[str, ...] = (
+    "стоїть", "підходить", "відступає", "ходить", "розводить_руками", "відвертається",
+)
+# Якщо Мамай дії не дав — беремо ту, що випливає з самого ходу. Крок, визначений даними,
+# належить коду, а не моделі.
+DEED_OF_MOVE: dict[str, str] = {
+    "згадати": "стоїть",
+    "засумніватись": "відступає",
+    "спитати_діло": "підходить",
+    "порахувати": "стоїть",
+    "піти_питати": "ходить",
+    "пожалітись": "розводить_руками",
+    "пожартувати": "стоїть",
+    "піддакнути": "підходить",
+    "заперечити": "підходить",
+}
+
 MOVE_HINT: dict[str, str] = {
     "згадати": "пригадай схожий випадок з минулого села",
     "засумніватись": "усумнись у сказаному, але не грубо",
@@ -121,6 +140,7 @@ class Beat(BaseModel):
 
     хто: str
     хід: str
+    дія: str = ""
     у_відповідь: int | None = None
     інструмент: str | None = None
     запит: str | None = None
@@ -289,6 +309,8 @@ def score_schema(roles: list[str], tools: list[str],
         "properties": {
             "хто": {"type": "string", "enum": list(roles)},
             "хід": {"type": "string", "enum": list(MOVES)},
+            # Дія тіла на цьому такті: закритий енум, тож «вигадати» жест неможливо.
+            "дія": {"type": "string", "enum": list(DEEDS)},
             "у_відповідь": {"type": ["integer", "null"]},
             "інструмент": {"type": ["string", "null"], "enum": [*tools, None]},
             # ★ `maxLength` тут не косметика. Замір на 8 сідах: без нього партитура зривалась у
@@ -297,7 +319,7 @@ def score_schema(roles: list[str], tools: list[str],
             # і нескінченні пробіли на числовому полі). Два різні дефекти, і плутати їх не можна.
             "запит": {"type": ["string", "null"], "maxLength": 60},
         },
-        "required": ["хто", "хід", "у_відповідь", "інструмент", "запит"],
+        "required": ["хто", "хід", "дія", "у_відповідь", "інструмент", "запит"],
         "additionalProperties": False,
     }
     low, high = beats or (MIN_BEATS, MAX_BEATS)
@@ -307,6 +329,100 @@ def score_schema(roles: list[str], tools: list[str],
                                  "maxItems": high, "items": beat}},
         "required": ["такти"],
         "additionalProperties": False,
+    }
+
+
+# ── позиції: віче мусить ЩОСЬ вирішувати ────────────────────────────────────────────────────
+#
+# Доти розмова нічого не міняла: ухвала наприкінці була переказом стенограми одним викликом, тобто
+# резюме, а не результатом. Тепер у кожного є ПОЗИЦІЯ як дані, і її рухає код за тим, що сталось у
+# такті. Рішення випадає з підрахунку, а не з судження моделі про власну ж розмову.
+STANCE_MIN, STANCE_MAX = -1.0, 1.0
+VOTES: tuple[str, ...] = ("за", "проти", "утримуюсь")
+
+
+def stance_label(v: float) -> str:
+    if v >= 0.34:
+        return "за"
+    if v <= -0.34:
+        return "проти"
+    return "вагається"
+
+
+def stance_start(roles: list[str]) -> dict[str, float]:
+    return {r: 0.0 for r in roles}
+
+
+def stance_after(beat: Beat, stances: dict[str, float], standing: dict[str, float] | None,
+                 fact_found: bool | None) -> dict[str, float]:
+    """Як такт зрушив позиції. Правила ДЕТЕРМІНОВАНІ: це визначено даними, тож належить коду.
+
+    Вага мовця — його репутація: кому спростували чутку, того й слухають менше. Той самий принцип,
+    що вже ріже йому час слова, тут ріже і вплив на чужу думку.
+    """
+    out = dict(stances)
+    who = beat.хто
+    if who not in out:
+        return out
+    w = max(0.4, min(1.4, (standing or {}).get(who, 1.0)))
+
+    def move(role: str, delta: float) -> None:
+        out[role] = max(STANCE_MIN, min(STANCE_MAX, out.get(role, 0.0) + delta))
+
+    move_kind = beat.хід
+    if move_kind == "заперечити":
+        move(who, -0.34 * w)
+    elif move_kind == "піддакнути":
+        move(who, +0.30 * w)
+    elif move_kind == "засумніватись":
+        move(who, -0.16 * w if out.get(who, 0.0) > 0 else +0.10 * w)
+    elif move_kind == "пожалітись":
+        move(who, -0.26 * w)
+    elif move_kind == "спитати_діло":
+        move(who, +0.08 * w)
+    elif move_kind in ("згадати", "порахувати"):
+        # Факт важить більше за слово: знайдена довідка тягне мовця до «за», ненайдена — назад.
+        move(who, (+0.28 if fact_found else -0.10) * w)
+    return out
+
+
+def stance_view(stances: dict[str, float], cast_names: dict[str, str] | None = None) -> str:
+    """Позиції словами — саме це бачить Мамай, плануючи наступну хвилю."""
+    if not stances:
+        return ""
+    parts = [f"{(cast_names or {}).get(r, r)}: {stance_label(v)}" for r, v in stances.items()]
+    return "ПОЗИЦІЇ ЗАРАЗ: " + " | ".join(parts)
+
+
+def vote_schema() -> dict:
+    """Голос — закритий енум плюс короткий рядок причини: рівно те, що виконавець тягне."""
+    return {
+        "type": "object",
+        "properties": {
+            "голос": {"type": "string", "enum": list(VOTES)},
+            "чому": {"type": "string", "maxLength": 90},
+        },
+        "required": ["голос", "чому"],
+        "additionalProperties": False,
+    }
+
+
+def tally(votes: list[tuple[str, str]]) -> dict:
+    """Підрахунок. Ухвала — це число, а не переказ."""
+    counts = {v: 0 for v in VOTES}
+    for _, v in votes:
+        if v in counts:
+            counts[v] += 1
+    total = sum(counts.values())
+    if not total:
+        return {"ухвалено": False, "лічба": counts, "підсумок": "віче не дійшло голосу"}
+    passed = counts["за"] > counts["проти"]
+    return {
+        "ухвалено": passed,
+        "лічба": counts,
+        "підсумок": (f"{'ухвалили' if passed else 'відхилили'}: "
+                     f"за {counts['за']}, проти {counts['проти']}, "
+                     f"утримались {counts['утримуюсь']}"),
     }
 
 
@@ -349,7 +465,10 @@ def repair_score(raw: dict | None, roles: list[str], tools: list[str],
         index = int(reply) if isinstance(reply, int) and 1 <= reply <= len(beats) else None
         tool = item.get("інструмент")
         tool = str(tool) if tool in tools else None
-        beats.append(Beat(хто=who, хід=move, у_відповідь=index, інструмент=tool,
+        deed = str(item.get("дія") or "")
+        if deed not in DEEDS:
+            deed = DEED_OF_MOVE.get(move, "стоїть")  # дію, визначену ходом, ставить код
+        beats.append(Beat(хто=who, хід=move, дія=deed, у_відповідь=index, інструмент=tool,
                           запит=str(item.get("запит")) if item.get("запит") else None))
         if len(beats) >= MAX_BEATS:
             break
@@ -367,7 +486,7 @@ def guest_beats(said_index: int, roles: list[str], recent: list[str], seed: int,
     rng = random.Random(f"{seed}:guest:{said_index}:{text[:40]}")
     fresh = [r for r in roles if r not in recent[-2:]] or list(roles)
     rng.shuffle(fresh)
-    return [Beat(хто=r, хід=ANSWER_GUEST, у_відповідь=said_index)
+    return [Beat(хто=r, хід=ANSWER_GUEST, дія="підходить", у_відповідь=said_index)
             for r in fresh[:GUEST_REPLIES]]
 
 
@@ -408,5 +527,5 @@ def scatter(beats: list[Beat], roles: list[str], seed: int, topic: str,
         else:
             who = rng.choice(others)
         added += 1
-        out.append(Beat(хто=who, хід=INTERRUPT_MOVE, у_відповідь=len(out)))
+        out.append(Beat(хто=who, хід=INTERRUPT_MOVE, дія="підходить", у_відповідь=len(out)))
     return out

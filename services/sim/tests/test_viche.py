@@ -18,7 +18,7 @@ from ploshcha_sim.adapters.projector import POI_OF_TOOL, StreamProjector, villag
 from ploshcha_sim.adapters.router_profile import single_model_router
 from ploshcha_sim.adapters.tools_lexis import LEXIS_TOOLS
 from ploshcha_sim.adapters.tools_fake import FakeToolbox
-from ploshcha_sim.agents.viche import Viche
+from ploshcha_sim.agents.viche import MAX_WAVES, Viche
 from ploshcha_sim.domain.task import Budget
 from ploshcha_sim.domain.viche import (
     MAX_BEATS,
@@ -66,8 +66,49 @@ VARIED = [
 def lines(n: int) -> list[str]:
     return [line(VARIED[i % len(VARIED)] + " " + "*" * i) for i in range(n)]
 
+class WaveLlm(FakeLlm):
+    """Фейк, що роздає відповіді ЗА ПРИЗНАЧЕННЯМ, а не однією чергою.
+
+    Партитуру тепер просять кілька разів (хвилі), тож лінійний скрипт зсувався: хвиля зʼїдала
+    рядок із реплік, і до літописця доїжджало не те. Тут кожен вид виклику має свою чергу —
+    рівно як у справжнього шлюзу, де виклики незалежні. Партитура, коли черга вичерпалась,
+    повторює останню вдалу: це й означає «хвиля не принесла нового», тобто розмова добігає кінця.
+    """
+
+    def __init__(self, responses, model: str = "fake", finish_reason: str = "stop",
+                 strict: bool = False):
+        super().__init__(responses, model=model, finish_reason=finish_reason, strict=strict)
+        self.q: dict[str, list[str]] = {"score": [], "line": [], "chron": []}
+        for r in responses:
+            self.q[_kind_of(r)].append(r)
+
+    def _next(self, prompt, system, structured, schema, seed, temperature=0.0, max_tokens=0):
+        props = (schema or {}).get("properties") if isinstance(schema, dict) else None
+        kind = ("score" if props and "такти" in props
+                else "vote" if props and "голос" in props
+                else "chron" if props and "заголовок" in props
+                else "line")
+        if kind == "vote":
+            self._responses = ['{"голос": "за", "чому": "бо село так вирішило"}']
+        elif kind == "score":
+            self._responses = [self.q["score"].pop(0)] if self.q["score"] else [""]
+        else:
+            self._responses = [self.q[kind].pop(0)] if self.q[kind] else []
+        return super()._next(prompt, system, structured, schema, seed, temperature, max_tokens)
+
+
+def _kind_of(raw: str) -> str:
+    if "такти" in raw:
+        return "score"
+    if '"репліка"' in raw:
+        return "line"
+    if "заголовок" in raw:
+        return "chron"
+    return "line"  # решта скрипта — репліки, зокрема навмисно биті («{}»)
+
+
 def build(replies, *, tools=None, width=3, trace=None):
-    llm = FakeLlm(replies, model="fake")
+    llm = WaveLlm(replies, model="fake")
     return Viche(single_model_router(llm), PresetEffort(), tools, width=width, trace=trace,
                  run_id="r"), llm
 
@@ -231,7 +272,11 @@ def test_the_expensive_slot_is_called_a_handful_of_times_not_per_line():
     agent = Viche(profile_router(lapa, mamay), PresetEffort(), None, width=2, run_id="r")
     result = agent.run(NEWS, seed=1, budget=Budget(max_steps=30, max_tokens=99_999))
     assert result.tokens_by_lane.get("lapa", 0) > 0
-    assert len(mamay.calls) <= 3, "Mamay — партитура, підсумок, сумнів; не по виклику на репліку"
+    # Економіка змінилась свідомо: партитура тепер не одна на прогін, а ХВИЛЯМИ — інакше
+    # аргументи ні на що не впливали, бо черга була написана до першого слова. Але межа лишається
+    # тією самою за суттю: оркестратор коштує кілька викликів на розмову, а не виклик на репліку.
+    assert len(mamay.calls) <= MAX_WAVES + 3, "хвилі + підсумок + сумнів + літопис — і не більше"
+    assert len(mamay.calls) < len(lapa.calls), "виконавця кличуть на кожну репліку, оркестратора — ні"
     assert len(lapa.calls) >= 2
 
 
@@ -590,8 +635,8 @@ def test_a_flaky_structured_call_is_retried_once():
 
     pair = [p.role for p in cast_for(NEWS, 2)]
     trace = InMemoryTrace()
-    agent, _ = build(["обірваний {", score(beat(pair[0]))] + lines(3)
-                     + ["теж обірваний {", chron((pair[0], "Отак."))], width=2, trace=trace)
+    agent, _ = build(["такти обірваний {", score(beat(pair[0]))] + lines(3)
+                     + ["заголовок обірваний {", chron((pair[0], "Отак."))], width=2, trace=trace)
     result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
 
     assert "viche_score_retry" in result.incidents
@@ -1213,3 +1258,189 @@ def test_bonds_do_not_run_away(tmp_path):
     for _ in range(40):
         mem.bond("did", "pip", -1.0)
     assert mem.between("did", "pip") == -BOND_CAP
+
+
+# ── позиції й голос: віче мусить ЩОСЬ вирішувати ──────────────────────────────
+
+def test_a_move_shifts_the_stance_by_code_not_by_judgement():
+    """Позицію рухає КОД: це визначено ходом і фактом, а не судженням моделі про власну розмову."""
+    from ploshcha_sim.domain.viche import stance_after, stance_start, stance_label
+
+    st = stance_start(["koval", "pip"])
+    st = stance_after(Beat(хто="koval", хід="заперечити"), st, {}, None)
+    st = stance_after(Beat(хто="pip", хід="піддакнути"), st, {}, None)
+    assert stance_label(st["koval"]) == "проти"
+    assert st["pip"] > 0
+
+    # знайдений факт важить більше за слово, ненайдений — тягне назад
+    plus = stance_after(Beat(хто="koval", хід="порахувати"), stance_start(["koval"]), {}, True)
+    minus = stance_after(Beat(хто="koval", хід="порахувати"), stance_start(["koval"]), {}, False)
+    assert plus["koval"] > 0 > minus["koval"]
+
+
+def test_reputation_scales_how_much_a_voice_moves_others():
+    """Кому спростували чутку, того слухають менше — не метафорично, а меншим зрушенням позиції."""
+    from ploshcha_sim.domain.viche import stance_after, stance_start
+
+    strong = stance_after(Beat(хто="koval", хід="заперечити"), stance_start(["koval"]),
+                          {"koval": 1.4}, None)
+    weak = stance_after(Beat(хто="koval", хід="заперечити"), stance_start(["koval"]),
+                        {"koval": 0.4}, None)
+    assert abs(strong["koval"]) > abs(weak["koval"])
+
+
+def test_the_decision_is_a_count_not_a_retelling():
+    from ploshcha_sim.domain.viche import tally
+
+    out = tally([("koval", "за"), ("pip", "за"), ("did", "проти")])
+    assert out["ухвалено"] is True
+    assert out["лічба"] == {"за": 2, "проти": 1, "утримуюсь": 0}
+    assert "за 2" in out["підсумок"]
+    assert tally([])["ухвалено"] is False
+
+
+def test_the_next_wave_is_planned_KNOWING_what_was_already_said():
+    """Головне в хвилях: друга партитура бачить стенограму й позиції. Інакше це та сама
+    написана наперед черга, тільки в кілька викликів."""
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    agent, llm = build([score(beat(pair[0])), score(beat(pair[1], "заперечити", 1))]
+                       + lines(6) + [chron((pair[0], "Отак."))], width=2)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    scores = [c for c in llm.calls
+              if isinstance(c["schema"], dict) and "такти" in (c["schema"].get("properties") or {})]
+    assert len(scores) >= 2, "партитура мусить плануватись хвилями, а не одна на весь прогін"
+    assert "ЩО ВЖЕ СКАЗАНО" in scores[1]["prompt"]
+    assert "ПОЗИЦІЇ ЗАРАЗ" in scores[1]["prompt"]
+
+
+def test_every_voice_votes_and_the_vote_is_spoken_aloud():
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    trace = InMemoryTrace()
+    agent, _ = build([score(beat(pair[0]), beat(pair[1], "піддакнути", 1))] + lines(6)
+                     + [chron((pair[0], "Отак."))], width=2, trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    said = [e["payload"]["text"] for e in _events(trace) if e["type"] == "utterance.spoken"]
+    assert any(t.startswith(("за", "проти", "утримуюсь")) for t in said), \
+        "голос мусить ЗВУЧАТИ: інакше підрахунок — ще одне приховане число"
+
+
+# ── тихі шляхи помилок: збій мусить бути ЧУТНИЙ ───────────────────────────────
+#
+# Три з чотирьох схем уже мали гучний провал (`viche_score_lost`, `viche_chronicle_lost`,
+# `viche_scout_failed`). Зведення старости й сумнів попа — не мали: вони йшли на сцену БЕЗ
+# перевірки, тобто нерозбірний вивід шлюзу ставав голосом дослівно.
+
+
+def _one_voice(script, *, system_match=None, finish="stop"):
+    """Виче з ОДНИМ скриптованим викликом: тут перевіряється не розмова, а її шлях помилки."""
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    trace = InMemoryTrace()
+    llm = FakeLlm(script, model="fake", finish_reason=finish)
+    agent = Viche(single_model_router(llm), PresetEffort(), None, width=3, trace=trace, run_id="r")
+    return agent, trace
+
+
+SAID = [(PERSONAS[0], "Кажу вам, вовк то не жарт, і кошару треба латати негайно.")]
+
+
+def test_a_truncated_summary_is_never_spoken_as_the_starostas_word():
+    """Живий випадок: шлюз обірвав вивід на стелі, і староста промовив `{"репліка": "Отак воно і`.
+    Перевірку мала кожна репліка, крім цієї, — тому дефект був невидимий саме в кінці розмови."""
+    agent, trace = _one_voice(['{"репліка": "Отак воно і'])
+    incidents: list[str] = []
+    assert agent._summary(NEWS, SAID, 1, Budget(max_tokens=9999), incidents) is None
+    assert incidents == ["viche_summary_lost"]
+    assert not [e for e in _events(trace) if e["type"] == "utterance.spoken"], \
+        "забракована спроба не має звучати на сцені"
+
+
+def test_a_summary_the_gateway_never_sent_is_named_not_counted_as_a_voice():
+    """Порожня відповідь давала німого мовця в стенограмі, який ще й накручував `voices=`."""
+    agent, _ = _one_voice([""])
+    incidents: list[str] = []
+    assert agent._summary(NEWS, SAID, 1, Budget(max_tokens=9999), incidents) is None
+    assert "viche_summary_lost" in incidents
+
+
+def test_a_good_summary_still_gets_through_and_is_spoken():
+    """Гучність не має коштувати робочого шляху: справне зведення лишається голосом старости."""
+    agent, trace = _one_voice([line("Зійшлись на тому, що кошару треба латати всім гуртом.")])
+    incidents: list[str] = []
+    who, text = agent._summary(NEWS, SAID, 1, Budget(max_tokens=9999), incidents)
+    assert who.role == "starosta" and "кошару" in text and incidents == []
+    said = [e["payload"]["text"] for e in _events(trace) if e["type"] == "utterance.spoken"]
+    assert said == [text]
+
+
+def test_a_rejected_doubt_never_reaches_the_stage():
+    """Сумнів емітився ДО перевірки: `{}` уже прозвучало вустами попа, а зі стенограми випадало —
+    тобто сцена й підсумок розходились, і жодне число про це не казало."""
+    agent, trace = _one_voice(["{}"])
+    incidents: list[str] = []
+    assert agent._doubt(NEWS, SAID, 1, Budget(max_tokens=9999), incidents) is None
+    assert incidents == ["viche_doubt_lost"]
+    assert not [e for e in _events(trace) if e["type"] == "utterance.spoken"]
+
+
+def test_a_real_doubt_is_still_heard():
+    agent, trace = _one_voice([line("А хто те бачив на власні очі? Самі перекази ходять.")])
+    incidents: list[str] = []
+    who, text = agent._doubt(NEWS, SAID, 1, Budget(max_tokens=9999), incidents)
+    assert who.role == "pip" and incidents == []
+    said = [e["payload"]["text"] for e in _events(trace) if e["type"] == "utterance.spoken"]
+    assert said == [text]
+
+
+def test_a_vote_the_gateway_garbled_is_named_not_silently_dropped():
+    """Загублений голос МІНЯЄ ухвалу. Доти лічба чесно показувала нулі, але причина не лишалась
+    ніде, і «віче не дійшло голосу» читалось як рішення села, а не як збій шлюзу."""
+    from ploshcha_sim.domain.viche import stance_start
+
+    agent, _ = _one_voice(["{обірвано"] * 6)
+    cast = cast_for(NEWS, 3)
+    said = [(p, "щось сказав про справу") for p in cast]
+    incidents: list[str] = []
+    out = agent._vote(NEWS, cast, said, stance_start([p.role for p in cast]), 1,
+                      Budget(max_tokens=9999), incidents)
+
+    assert out["підсумок"] == "віче не дійшло голосу"
+    assert len(incidents) == len(cast), "кожен загублений голос мусить бути названий"
+    assert all(i.startswith("viche_vote_lost:") for i in incidents)
+
+
+def test_a_ceiling_cut_is_told_apart_from_a_model_writing_nonsense():
+    """Обидва дають той самий нерозбірний JSON. Без `finish_reason` інцидент казав `score_lost`, а
+    справжня причина — замала стеля виводу — не лишалась ніде, тобто лагодили не те."""
+    agent, _ = _one_voice(['{"такти": [{"хто": "kova'], finish="length")
+    result = agent.run(NEWS, seed=1, budget=Budget(max_steps=6, max_tokens=9999))
+    assert any(i.startswith("viche_cut:") for i in result.incidents)
+
+
+def test_a_gateway_that_answered_with_nothing_is_named_too():
+    """Мовчання шлюзу й порожня відповідь моделі — різні поламки з однаковим наслідком."""
+    agent, _ = _one_voice([""])
+    result = agent.run(NEWS, seed=1, budget=Budget(max_steps=6, max_tokens=9999))
+    assert any(i.startswith("viche_empty:") for i in result.incidents)
+
+
+def test_a_healthy_call_raises_no_channel_flag():
+    """Доказ, що прапорці каналу не вмикаються самі: інакше вони були б шумом, а не сигналом."""
+    agent, _ = _one_voice([line("Кажу вам, лихо буде, і не мале зовсім.")])
+    agent._call("speak", "п", "с", line_schema(), 1, Budget(max_tokens=9999))
+    assert agent._flaws == []
+
+
+def test_the_finish_reason_reaches_the_trace_not_just_the_incident():
+    """Траса — прилад: якщо обрив видно лише в інцидентах, у пакетних вимірах його немає взагалі."""
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    trace = InMemoryTrace()
+    llm = FakeLlm([line("Кажу вам, лихо буде.")], model="fake", finish_reason="length")
+    agent = Viche(single_model_router(llm), PresetEffort(), None, width=3, trace=trace, run_id="r")
+    agent._call("speak", "п", "с", line_schema(), 1, Budget(max_tokens=9999), span="r/viche/did/1")
+    assert [r.finish_reason for r in trace.records] == ["length"]

@@ -8,7 +8,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from openai import OpenAI
 
 BASE_URL = "http://127.0.0.1:8080/v1"
-OUT = Path.home() / "ploshcha" / "docs" / "research" / ".local_grid.jsonl"
+# Шлях рахуємо від файлу, а не від $HOME: репо не зобовʼязане лежати в ~/ploshcha.
+ROOT = Path(__file__).resolve().parents[3]
+OUT = ROOT / "docs" / "research" / ".local_grid.jsonl"
 
 PROMPTS = [
     ("оцінка", "Оціни від 1 до 10, наскільки важливо для селянина, що сусід позичив сокиру. Лише число."),
@@ -67,6 +69,7 @@ def main():
 
     row = {"label": label, "uk_mean": round(uk_mean, 4), "en_mean": round(en_mean, 4),
            "by_prompt": [{"kind": k, "ent": round(e, 4), "margin": round(m, 2)} for k, e, m in uk]}
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
     print(f"\n  дописано у {OUT.name}")

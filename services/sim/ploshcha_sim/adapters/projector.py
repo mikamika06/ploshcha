@@ -185,6 +185,15 @@ class StreamProjector:
         # Три типи, які фронт умів малювати від початку, а ядро ніколи не надсилало: план дня,
         # рефлексія, хроніка. Вони приходили ЛИШЕ з фікстури — та сама дірка, що з `casting.done`,
         # тільки з іншого боку. Тепер їх виробляє ядро.
+        if record.agent == "deed":
+            payload = record.parsed or {}
+            who, deed = str(payload.get("agentId") or ""), str(payload.get("дія") or "")
+            if who and deed and self.emit_motion:
+                out.append(self._envelope("agent.moved", {
+                    "agentId": who, "to": {"poi": self._poi.get(who, DEFAULT_POI)},
+                    "activity": deed}, tick))
+            return out
+
         if record.agent == "planner":
             payload = record.parsed or {}
             if payload.get("agentId") and payload.get("summary"):
@@ -207,8 +216,13 @@ class StreamProjector:
             payload = record.parsed or {}
             claim, who = str(payload.get("claim") or ""), str(payload.get("who") or "")
             if claim:
+                # `description` — ОБОВʼЯЗКОВЕ поле контракту. Без нього конверт не проходив
+                # валідацію, а строгий парсер фронта мовчки викидав подію: чутки й ухвали просто
+                # не доїжджали на Дошку. Заміряно на живому потоці: 33 з 33 `event.happened`
+                # були невалідні.
                 out.append(self._envelope("event.happened", {"event": {
                     "id": f"rumour-{self.run_id}", "kind": "rumour", "label": claim,
+                    "description": f"чутку пустив {who}" if who else "чутка ходить селом",
                     **({"involves": [who]} if who else {}),
                 }}, tick))
             return out
@@ -220,6 +234,8 @@ class StreamProjector:
             if label and poi:
                 out.append(self._envelope("event.happened", {"event": {
                     "id": f"decision-{self.run_id}", "kind": "decision", "label": label,
+                    "description": (f"ухвалено вічем, доручено: {who}" if who
+                                    else "ухвалено вічем"),
                     "place": {"poi": poi},
                     **({"involves": [who]} if who else {}),
                 }}, tick))

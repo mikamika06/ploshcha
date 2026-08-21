@@ -235,3 +235,105 @@ def test_batch_projection_still_passes_the_contract(validator):
 
     seen = check(validator, project_run(records, Result(), run_id="r", ts=TS, scene=SCENE))
     assert not (LIVE_ONLY & seen), "пакетний режим мусить лишатись байт-сумісним"
+
+
+# ── подія села: ловилось лише на ЖИВОМУ потоці ────────────────────────────────
+
+def test_every_village_event_carries_a_description(validator):
+    """`event.happened` мусить нести `description` — контракт вимагає його як обовʼязкове.
+
+    Це не формальність. Строгий парсер фронта відкидає невалідний конверт МОВЧКИ, тож ухвали й
+    чутки просто не доїжджали на Дошку: механізм працює, шлях спостереження бреше. Заміряно на
+    живому потоці — 33 з 33 таких подій були невалідні, а юніт-тести цього не бачили, бо
+    перевіряли лише прогін без ухвал.
+    """
+    from ploshcha_sim.ports.trace import StepRecord
+
+    proj = StreamProjector("r", TS, scene=SCENE)
+    rumour = proj.feed(StepRecord(
+        run_id="r", tick=1, agent="rumour", stage="report", model="m", lane="mamay",
+        prompt="", raw_output="", parsed={"claim": "за річкою вили вовки", "who": "koval"}))
+    decision = proj.feed(StepRecord(
+        run_id="r", tick=1, agent="council", stage="report", model="m", lane="mamay",
+        prompt="", raw_output="", parsed={"label": "поставити сторожа", "who": "koval",
+                                          "poi": "dzvin"}))
+    events = [e for e in rumour + decision if e["type"] == "event.happened"]
+    assert len(events) == 2, "і чутка, і ухвала мусять дати подію села"
+    for event in events:
+        assert event["payload"]["event"].get("description"), "без опису конверт невалідний"
+    check(validator, events)
+
+
+# ── шляхи помилок теж мусять проходити контракт ───────────────────────────────
+
+def test_the_terminal_outcome_of_a_crashed_run_passes_the_contract(validator, tmp_path):
+    """Падіння тепер ЗАКРИВАЄ прогін (`task.outcome` з `failure`), а не лише скаржиться. Якщо цей
+    конверт невалідний, `.strict()` на фронті мовчки викине його — і причини знову не буде видно."""
+    import time
+
+    bus, runner = _runner(tmp_path, tokens=10_000)
+    runner.queue.put("k", {"task": "тема"})
+    runner.make_orchestrator = lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("двигун упав"))
+    runner.resume()
+    runner.start()
+    deadline = time.time() + 3.0
+    while time.time() < deadline and not [e for e in bus.since(0)[0] if e["type"] == "run.error"]:
+        time.sleep(0.05)
+    runner.stop()
+
+    events = bus.since(0)[0]
+    outcome = [e for e in events if e["type"] == "task.outcome"]
+    assert outcome, "прогін, що впав, мусить мати термінальний стан"
+    assert outcome[0]["payload"]["outcome"] == "failure"
+    assert outcome[0]["payload"]["incidents"], "причина їде саме тут"
+    check(validator, events)
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_the_dead_worker_event_passes_the_contract(validator, tmp_path):
+    """Смерть робітника — новий `stage` тієї самої події; енум там вільний, але конверт ні."""
+    import time
+
+    from ploshcha_sim.domain.governor import Governor
+
+    class _Doom(BaseException):
+        pass
+
+    class _DoomedGovernor(Governor):
+        def stop_reason(self, **kw):
+            raise _Doom()
+
+    bus, runner = _runner(tmp_path, tokens=10_000)
+    runner.governor = _DoomedGovernor()
+    runner.resume()
+    runner.start()
+    deadline = time.time() + 3.0
+    while time.time() < deadline and not [e for e in bus.since(0)[0]
+                                          if e["type"] == "run.degraded"]:
+        time.sleep(0.05)
+
+    # Дочекатись САМОЇ смерті, а не лише її оголошення: інакше виняток потоку спливає вже в
+    # наступному тесті й приписується не тому місцю.
+    runner.join()
+    degraded = [e for e in bus.since(0)[0] if e["type"] == "run.degraded"]
+    assert degraded and degraded[0]["payload"]["stage"] == "worker"
+    check(validator, degraded)
+
+
+def test_a_body_activity_is_carried_by_the_move_event(validator):
+    """Дія тіла їде полем `activity` у `agent.moved`, а не окремим типом: фронт малює її
+    просто на місці, де людина стоїть."""
+    proj = StreamProjector("r", TS)
+    proj._walk("koval", "forge", 1)
+    events = proj.feed(StepRecord(
+        run_id="r", tick=1, agent="deed", span="", stage="speak", model="viche", lane="lapa",
+        prompt="", raw_output="", parsed={"agentId": "koval", "дія": "кує"}))
+    assert [e["payload"]["activity"] for e in events if e["type"] == "agent.moved"] == ["кує"]
+    check(validator, events)
+
+
+def test_a_move_without_a_destination_would_have_been_rejected(validator):
+    """Доказ, що валідатор ловить саму поламку: `activity` не рятує конверт без `to`."""
+    broken = StreamProjector("r", TS)._walk("koval", "forge", 1)[0]
+    broken["payload"] = {"agentId": "koval", "activity": "кує"}
+    assert list(validator.iter_errors(broken))

@@ -1,9 +1,11 @@
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
-MODELS = Path.home() / "models"
+# Ваги лежать поза репо; ~/models — лише дефолт, бо на чужій машині тека інша.
+MODELS = Path(os.environ.get("PLOSHCHA_MODELS_DIR", Path.home() / "models"))
 
 GRID = {
     "lapa": "lapa/lapa-v0.1.2-instruct-Q8_0.gguf",

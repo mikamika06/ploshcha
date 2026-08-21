@@ -37,6 +37,7 @@ from ploshcha_sim.adapters.village_sqlite import SqliteVillage  # noqa: E402
 from ploshcha_sim.agents.forge import forge_village  # noqa: E402
 from ploshcha_sim.domain.viche import PERSONAS, public_cast  # noqa: E402
 from ploshcha_sim.live import EventBus, LiveRunner, serve  # noqa: E402
+from ploshcha_sim.live.sessions import Session, SessionRegistry  # noqa: E402
 
 SCENE = {"id": "ploshcha", "name": "Площа"}
 # Сід села. Змінити — інше село; те саме число — ті самі сусіди.
@@ -52,7 +53,9 @@ def parse_args(argv):
     p.add_argument("--max-tokens", type=int, default=200_000, help="стеля токенів на весь прогін")
     p.add_argument("--max-usd", type=float, default=1.0)
     p.add_argument("--max-items", type=int, default=50)
-    p.add_argument("--db", default=str(ROOT / "docs" / "research" / "eval-runs" / "ploshcha.db"))
+    # Стан прода — у data/ploshcha/: docs/ навмисно поза репозиторієм, тож на свіжому
+    # клоні дефолт із docs/ вказував би в неіснуючу теку.
+    p.add_argument("--db", default=str(ROOT / "data" / "ploshcha" / "ploshcha.db"))
     p.add_argument("--kill-file", default=str(ROOT / "STOP"))
     p.add_argument("--seed-topic", action="append", default=[],
                    help="тема, покладена в чергу на старті; можна кілька разів")
@@ -60,6 +63,10 @@ def parse_args(argv):
                    help="корінь збірки фронта; порожньо — не роздавати статику")
     p.add_argument("--resume", action="store_true",
                    help="стартувати одразу; за замовчуванням сервер стоїть на ПАУЗІ")
+    # Звідки вітрині дозволено ходити по потік. Порожньо = лише свій домен; зірочка й пароль
+    # несумісні, тому список мусить бути явним.
+    p.add_argument("--origins", default=os.environ.get("PLOSHCHA_ORIGINS", ""),
+                   help="через кому: дозволені джерела для CORS")
     return p.parse_args(argv)
 
 
@@ -98,52 +105,82 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
                 system=resolve("viche/forge").render_system())
             store.save(VILLAGE_SEED, village)
 
-    talk = SqliteRumours(db) if spec.mode == "viche" else None
-    memory = SqliteMemory(db) if spec.mode == "viche" else None
-
     bus = EventBus()
     Path(db).parent.mkdir(parents=True, exist_ok=True)
+    # Черга лишається ОДНА на всіх: виконавець один, і робити чергу на сесію означало б або потік
+    # на гостя, або обхід сотні файлів на кожен ліз. `sid` їде в самому айтемі.
     queue = SqliteQueue(db)
     governor = Governor(max_tokens=max_tokens, max_usd=max_usd, max_items=max_items,
                         kill_file=kill_file)
 
-    def make_agent(trace, run_id, place=None):
-        kw = dict(system=system, tail=variant.tail or None, prompt_id=variant.id,
-                  prompt_sha=variant.sha256, answer_instruction=answer_instruction)
-        if spec.mode == "viche":
-            agent = build_viche(spec, lapa=lapa, mamay=mamay, trace=trace, run_id=run_id,
-                                system=system, prompt_id=variant.id, prompt_sha=variant.sha256,
-                                line_system=variant.render_system(),
-                                score_system=resolve("viche/score").render_system(),
-                                summary_system=resolve("viche/summary").render_system(),
-                                doubt_system=resolve("viche/doubt").render_system(),
-                                chronicle_system=resolve("viche/chronicle").render_system(),
-                                village=village,
-                                standing={p.role: talk.standing(p.role) for p in village}
-                                         if talk else None,
-                                rumours=talk.open() if talk else None,
-                                place=place, memory=memory,
-                                scout=build_scout(
-                                    CONDITIONS["ref@8"], lapa=lapa, mamay=mamay,
-                                    system=resolve("agent/v2-ref").render_system(),
-                                    answer_instruction=answer_instruction,
-                                    prompt_id="agent/v2-ref"))
+    def agent_factory(people: list, talk, memory):
+        """Фабрика агентів, ПРИВʼЯЗАНА до сховищ конкретної сесії.
+
+        Доти сховища захоплювались замиканням раз на старті — тобто всі гості міняли те саме село.
+        Тут вони приходять параметром, і кожна сесія дістає свою пару «чутки + памʼять».
+        """
+
+        def make_agent(trace, run_id, place=None):
+            kw = dict(system=system, tail=variant.tail or None, prompt_id=variant.id,
+                      prompt_sha=variant.sha256, answer_instruction=answer_instruction)
+            if spec.mode == "viche":
+                agent = build_viche(spec, lapa=lapa, mamay=mamay, trace=trace, run_id=run_id,
+                                    system=system, prompt_id=variant.id, prompt_sha=variant.sha256,
+                                    line_system=variant.render_system(),
+                                    score_system=resolve("viche/score").render_system(),
+                                    summary_system=resolve("viche/summary").render_system(),
+                                    doubt_system=resolve("viche/doubt").render_system(),
+                                    chronicle_system=resolve("viche/chronicle").render_system(),
+                                    village=people,
+                                    standing={p.role: talk.standing(p.role) for p in people}
+                                             if talk else None,
+                                    rumours=talk.open() if talk else None,
+                                    place=place, memory=memory,
+                                    scout=build_scout(
+                                        CONDITIONS["ref@8"], lapa=lapa, mamay=mamay,
+                                        system=resolve("agent/v2-ref").render_system(),
+                                        answer_instruction=answer_instruction,
+                                        prompt_id="agent/v2-ref"))
+                agent.budget_template = budget
+                return agent
+            if spec.graph:
+                agent = build_graph(spec, lapa=lapa, mamay=mamay, trace=trace, run_id=run_id, **kw)
+            else:
+                agent = build_orchestrator(spec, lapa=lapa, mamay=mamay, **kw)
+                agent.trace = trace
+                agent.run_id = run_id
             agent.budget_template = budget
             return agent
-        if spec.graph:
-            agent = build_graph(spec, lapa=lapa, mamay=mamay, trace=trace, run_id=run_id, **kw)
-        else:
-            agent = build_orchestrator(spec, lapa=lapa, mamay=mamay, **kw)
-            agent.trace = trace
-            agent.run_id = run_id
-        agent.budget_template = budget
-        return agent
 
-    runner = LiveRunner(bus, queue, make_agent, governor=governor, scene=SCENE,
-                        paused=paused,
-                        cast=public_cast(village) if spec.mode == "viche" else None,
-                        decisions=SqliteDecisions(db) if spec.mode == "viche" else None,
-                        rumours=talk)
+        return make_agent
+
+    def build_session(path: str, sid: str | None) -> Session:
+        """Село під один файл. Викликається на ВИМОГУ — під айтем черги, а не на старті."""
+        if spec.mode != "viche":
+            return Session(sid=sid, path=path, make_agent=agent_factory([], None, None))
+        store = SqliteVillage(path)
+        people = store.load(VILLAGE_SEED)
+        if not people:
+            # ★ Склад — функція СІДА, а не гостя: перековувати село на кожну вкладку означало б
+            # виклик Mamay на кожного відвідувача. Тому базовий склад КОПІЮЄМО, і сесія лишається
+            # самодостатнім файлом, який можна видалити цілком.
+            people = list(village)
+            if people:
+                store.save(VILLAGE_SEED, people)
+        talk = SqliteRumours(path)
+        memory = SqliteMemory(path)
+        return Session(sid=sid, path=path, make_agent=agent_factory(people, talk, memory),
+                       cast=public_cast(people), decisions=SqliteDecisions(path),
+                       rumours=talk, memory=memory)
+
+    # Спільне село — те, що на самому `--db`: у нього падають теми без `sid` (CLI, соак, старий
+    # клієнт), і його події бачать усі.
+    base = build_session(db, None)
+    sessions = SessionRegistry(Path(db).parent / "sessions", build_session, base=base)
+
+    runner = LiveRunner(bus, queue, base.make_agent, governor=governor, scene=SCENE,
+                        paused=paused, cast=base.cast, decisions=base.decisions,
+                        rumours=base.rumours, sessions=sessions)
     return spec, bus, queue, runner
 
 
@@ -170,13 +207,17 @@ def main(argv=None) -> int:
         # як поламка ядра.
         print(f"  ⚠ збірки немає: {static}/index.html — зроби `pnpm build`, або став --static ''")
         static = None
-    httpd = serve(bus, runner, port=args.port, static=static)
+    httpd = serve(bus, runner, port=args.port, static=static,
+          origins=tuple(o.strip() for o in args.origins.split(',') if o.strip()))
     runner.start()
     print(f"ПЛОЩА онлайн: http://127.0.0.1:{args.port}"
           + ("" if static else "  (лише API — статику не роздаємо)"))
     print(f"  умова     {args.condition} (spec={spec.sha256})")
     print(f"  стелі     токени {args.max_tokens} · ${args.max_usd} · айтемів {args.max_items}")
     print(f"  kill-file {args.kill_file}  (створи файл — цикл зупиниться)")
+    if runner.sessions is not None:
+        print(f"  сесії     {runner.sessions.count()} у {runner.sessions.root}"
+              f"  ·  TTL {runner.sessions.ttl_s / 86400:.3g} діб  ·  стеля {runner.sessions.limit}")
     state_note = "ПРАЦЮЄ" if args.resume else "ПАУЗА (POST /command kind=resume)"
     print(f"  стан      {state_note}")
     print(f"  черга     {json.dumps(queue.stats(), ensure_ascii=False)}")
