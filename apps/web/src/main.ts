@@ -160,6 +160,25 @@ async function boot(): Promise<void> {
     думка.classList.toggle("on", Boolean(text));
   };
 
+  // Перша підказка: стрілка на Дошку. Показуємо рівно один раз на пристрій — правило про
+  // «предмети замість кнопок» треба сказати вголос лише доти, доки воно невідоме.
+  const HINT_SEEN = "ploshcha.hint.board";
+  const firstHint = document.createElement("div");
+  firstHint.className = "first-hint";
+  firstHint.innerHTML = `<div class="first-hint-plaq">Тисни на Дошку-вісник</div>
+                         <div class="first-hint-arrow"></div>`;
+  stageEl.appendChild(firstHint);
+  let hintPoi: POI | null = null;
+  const hideHint = (): void => {
+    hintPoi = null;
+    firstHint.classList.remove("on");
+    try {
+      localStorage.setItem(HINT_SEEN, "1");
+    } catch {
+      /* приватний режим: підказка просто зʼявиться ще раз */
+    }
+  };
+
   const loc = document.createElement("div");
   loc.className = "loccard";
   loc.innerHTML = `<div class="loc-name"></div><div class="loc-mean"></div><button class="loc-back" type="button">← до села</button>`;
@@ -395,6 +414,7 @@ async function boot(): Promise<void> {
     onSelect: (p) => {
       enterDive(p);
       if (p.kind === "board") {
+        hideHint();
         board.open();
       } else if (SOCIAL_ROOM[p.kind]) {
         const r = SOCIAL_ROOM[p.kind];
@@ -560,6 +580,24 @@ async function boot(): Promise<void> {
   // Директор мусить знати зум: бульбашка тримає сталий розмір НА ЕКРАНІ, а не у світі.
   renderer.app.ticker.add(() => director.setZoom(renderer.camera?.zoom ?? 1));
 
+  // Підказка тримається САМОГО предмета: камера рухається, стрілка лишається на Дошці.
+  renderer.app.ticker.add(() => {
+    if (!hintPoi || !renderer.camera) return;
+    // Вістря лягає майже на сам предмет: із запасом 70 воно висіло над порожньою травою.
+    const c = renderer.camera.worldToClient(hintPoi.x, hintPoi.y - 18);
+    firstHint.style.left = `${c.x}px`;
+    firstHint.style.top = `${c.y}px`;
+    // Плашку тримаємо В КАДРІ, а стрілку — на предметі. На вузькому екрані Дошка часто збоку, і
+    // підказка вилазила за край (заміряно: left −52 при ширині 213). Тому зсуваємо саме плашку,
+    // а вістря лишається там, куди треба тиснути.
+    const plaq = firstHint.firstElementChild as HTMLElement | null;
+    if (!plaq) return;
+    const half = plaq.offsetWidth / 2;
+    const lo = half + 10 - c.x;
+    const hi = window.innerWidth - half - 10 - c.x;
+    plaq.style.transform = `translateX(${Math.round(Math.min(Math.max(0, lo), Math.max(0, hi)))}px)`;
+  });
+
   renderer.app.ticker.add(() => {
     const rawMs = renderer.app.ticker.deltaMS;
     if (resumeSkips > 0 && rawMs > 34) {
@@ -645,6 +683,24 @@ async function boot(): Promise<void> {
     new Promise<void>((res) => setTimeout(res, 250)),
   ]);
   renderer.dissipateIntro();
+
+  // Підказку показуємо ПІСЛЯ хмар: під завісою її однаково не видно, а поява разом із селом
+  // читається як частина відкриття, а не як спливне вікно.
+  let seen = "1";
+  try {
+    seen = localStorage.getItem(HINT_SEEN) ?? "";
+  } catch {
+    seen = "";
+  }
+  if (!seen) {
+    const board = scene.pois.find((p) => p.kind === "board");
+    if (board) {
+      hintPoi = board;
+      window.setTimeout(() => firstHint.classList.add("on"), 2600);
+      // Підказка не має жити вічно: якщо гість пішов гуляти селом, вона своє сказала.
+      window.setTimeout(hideHint, 22000);
+    }
+  }
 }
 
 boot().catch((e: unknown) => {

@@ -1251,3 +1251,55 @@ body {
 .gtalk-back {
   top: calc(clamp(20px, 4vh, 40px) + var(--safe-t));
 }
+
+/* ── перша підказка: куди тиснути ────────────────────────────────────────────
+   Село нічого не пояснює саме: HUD тут заборонений, а предмети мовчать, поки на них не наведеш.
+   Тому новому гостю один раз показуємо, з чого почати — стрілкою на сам предмет, а не написом
+   у кутку. Далі підказка не повертається: вона потрібна рівно доти, доки правило невідоме. */
+.first-hint {
+  position: fixed;
+  z-index: 64;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  animation: hint-bob 2.4s ease-in-out infinite;
+}
+.first-hint.on {
+  opacity: 1;
+}
+.first-hint-plaq {
+  padding: 8px 16px;
+  transition: transform 0.2s ease;
+  border: 1.5px solid var(--plaq-edge);
+  border-radius: var(--plaq-r);
+  background: var(--plaq);
+  color: var(--plaq-ink);
+  font: 600 14px/1.25 var(--serif);
+  white-space: nowrap;
+  box-shadow: var(--plaq-sh);
+}
+/* стрілка — та сама хмарка, лише хвостиком униз, як у репліки над головою */
+.first-hint-arrow {
+  width: 0;
+  height: 0;
+  margin: -1px auto 0;
+  border: 11px solid transparent;
+  border-top: 15px solid var(--plaq);
+  border-bottom: 0;
+  filter: drop-shadow(0 2px 1px rgba(108, 76, 38, 0.5));
+}
+@keyframes hint-bob {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .first-hint { animation: none; }
+}
+@media (max-width: 700px) {
+  /* На долоні напис коротший і дрібніший: довга плашка на 390px їде через пів екрана. */
+  .first-hint-plaq {
+    padding: 7px 13px;
+    font-size: 13px;
+  }
+}

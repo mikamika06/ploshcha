@@ -156,6 +156,12 @@ export class Camera {
     return { x: (cx - r.left - this.x) / this.scale, y: (cy - r.top - this.y) / this.scale };
   }
 
+  /** Світ → екран. Потрібне вказівнику, який мусить триматись предмета, а не місця на екрані. */
+  worldToClient(wx: number, wy: number): { x: number; y: number } {
+    const r = this.frame.getBoundingClientRect();
+    return { x: r.left + wx * this.scale + this.x, y: r.top + wy * this.scale + this.y };
+  }
+
   /** Поточний зум — сцені й директору треба знати, наскільки все наближено. */
   get zoom(): number {
     return this.scale;
