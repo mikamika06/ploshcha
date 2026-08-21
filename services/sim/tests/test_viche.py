@@ -1444,3 +1444,31 @@ def test_the_finish_reason_reaches_the_trace_not_just_the_incident():
     agent = Viche(single_model_router(llm), PresetEffort(), None, width=3, trace=trace, run_id="r")
     agent._call("speak", "п", "с", line_schema(), 1, Budget(max_tokens=9999), span="r/viche/did/1")
     assert [r.finish_reason for r in trace.records] == ["length"]
+
+
+def test_a_lost_chronicle_still_closes_the_viche():
+    """Одна невдала відповідь шлюзу не має лишати віче без кінця.
+
+    Заміряно на живому прогоні: `viche_chronicle_lost` — і зникає геть усе закриття (ухвала,
+    чутка, думки, настрій, підсумок). Глядач дочитував останню репліку й лишався ні з чим, ніби
+    розмову обірвало. Підрахунок голосів рахує КОД, від моделі він не залежить, тож закрити віче
+    можна завжди.
+    """
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    trace = InMemoryTrace()
+    # літопис двічі віддає непотріб → `viche_chronicle_lost`
+    agent, _ = build([score(beat(pair[0]), beat(pair[1], "піддакнути", 1))] + lines(6)
+                     + ["заголовок битий {", "заголовок теж битий {"], width=2, trace=trace)
+    result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    assert "viche_chronicle_lost" in result.incidents
+    events = _events(trace)
+    report = [e for e in events if e["type"] == "report.compiled"]
+    assert report, "без літопису сцена мусить дістати бодай сухий підсумок"
+    assert report[0]["payload"]["chronicle"]["narration"], "підсумок не може бути порожнім"
+    decision = [e for e in events if e["type"] == "event.happened"
+                and e["payload"]["event"]["kind"] == "decision"]
+    assert decision, "лічба голосів дає ухвалу навіть без літописця"
+    assert "за" in decision[0]["payload"]["event"]["label"]

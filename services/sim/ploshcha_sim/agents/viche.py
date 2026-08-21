@@ -673,7 +673,14 @@ class Viche(AgentPort):
             data = _safe_json(self._call("synthesize", prompt, self.chronicle_system, schema,
                                          seed + 101, budget, max_tokens=CHRONICLE_TOKENS))
         if not data:
+            # ★ Втрачений літопис НЕ має лишати віче без кінця.
+            #
+            # Заміряно на живому прогоні: одна невдала відповідь шлюзу — і зникає геть усе
+            # закриття: ухвала, чутка, думки, настрій, підсумок. Глядач дочитував останню репліку
+            # й лишався ні з чим, ніби розмова обірвалась. А підрахунок голосів у нас ВЖЕ Є — він
+            # порахований кодом і від моделі не залежить. Тому закриваємо тим, що знаємо напевно.
             incidents.append("viche_chronicle_lost")
+            self._emit_closing(task, said, votes)
             return
         for item in data.get("думки") or []:
             thought = str(item.get("думка") or "").strip()
@@ -700,6 +707,26 @@ class Viche(AgentPort):
                     "mood": mood_view(str(data.get("настрій") or "спокій"),
                                       data.get("сила") or "помірно"),
                     "highlights": [t for _, t in said[:3]]},
+            schema_valid=True, world_valid=True))
+
+    def _emit_closing(self, task: str, said: list[tuple[Persona, str]], votes: dict | None) -> None:
+        """Мінімальне закриття без літописця: ухвала з лічби і сухий підсумок замість оповіді."""
+        if self.trace is None:
+            return
+        tally_line = (votes or {}).get("підсумок") or "віче розійшлось без ухвали"
+        if votes and votes.get("лічба"):
+            self.trace.emit(StepRecord(
+                run_id=self.run_id, tick=0, agent="council", stage="report", model="viche",
+                lane=self.router.lane("synthesize"), prompt="", raw_output="",
+                parsed={"label": tally_line[:140], "who": (votes.get("голоси") or [("", "", "")])[0][0],
+                        "poi": self.mode.place},
+                schema_valid=True, world_valid=True))
+        self.trace.emit(StepRecord(
+            run_id=self.run_id, tick=0, agent="chronicler", stage="report", model="viche",
+            lane=self.router.lane("synthesize"), prompt="", raw_output="",
+            parsed={"day": 1, "title": task[:120], "narration": tally_line[:600],
+                    "mood": mood_view("спокій", "помірно"),
+                    "highlights": [t for _, t in said[-3:]]},
             schema_valid=True, world_valid=True))
 
     def _emit_rumour(self, raw, roles: list[str]) -> None:

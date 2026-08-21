@@ -90,6 +90,8 @@ export class LivingRoom {
   private queue: { vid: string; text: string; deed?: string; toward?: string }[] = [];
   /** Де поле кімнати лежить НА ЕКРАНІ. Оновлюємо зрідка: читання розкладки щокадру — це смикання. */
   private view = { left: 0, top: 0, t: 0 };
+  /** Чим скінчилось віче: тримаємо, доки глядач не дочитає чергу. */
+  private end: { title: string; body: string } | null = null;
   private shown = 0;
 
   constructor(
@@ -106,6 +108,11 @@ export class LivingRoom {
       <button class="room-back" type="button">← до села</button>
       <div class="room-name"></div>
       <div class="room-notice plaq"></div>
+      <div class="room-end plaq">
+        <div class="room-end-title"></div>
+        <div class="room-end-body"></div>
+        <button class="tag room-end-go" type="button">← до села</button>
+      </div>
       <form class="room-say gtalk-say">
         <input class="room-input gtalk-input" type="text" maxlength="300" autocomplete="off"
                placeholder="сказати своє селу вголос…">
@@ -123,6 +130,11 @@ export class LivingRoom {
     this.sayForm.addEventListener("submit", (e) => e.preventDefault());
     this.sayForm.addEventListener("click", (e) => e.stopPropagation());
     this.root.querySelector(".room-back")!.addEventListener("click", (e) => e.stopPropagation());
+    const go = this.root.querySelector(".room-end-go") as HTMLElement;
+    go.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.onClose();
+    });
     this.root.querySelector(".room-send")!.addEventListener("click", () => this.send());
     this.say2.addEventListener("keydown", (e) => {
       // Те саме, що на Дошці: Escape із набраним словом лише відпускає поле (слово лишається),
@@ -383,6 +395,27 @@ export class LivingRoom {
   }
 
   /**
+   * Чим скінчилось віче — окремою карткою, коли черга дочитана.
+   *
+   * Доти остання репліка просто обривалась: ані ухвали, ані підсумку, ані знаку, що розмова
+   * взагалі скінчилась. Картку показуємо не за подією ядра, а коли глядач ДОЧИТАВ — інакше вона
+   * вискакує посеред розмови, бо ядро завершує прогін раніше, ніж прочитано чергу.
+   */
+  finale(title: string, body: string): void {
+    this.end = { title, body };
+    this.showEndIfRead();
+  }
+
+  private showEndIfRead(): void {
+    const el = this.root.querySelector(".room-end") as HTMLElement | null;
+    if (!el || !this.end) return;
+    if (this.shown < this.queue.length) return; // ще є що читати
+    (el.querySelector(".room-end-title") as HTMLElement).textContent = this.end.title;
+    (el.querySelector(".room-end-body") as HTMLElement).textContent = this.end.body;
+    el.classList.add("on");
+  }
+
+  /**
    * Повідомлення сцені — видимою плашкою, а не тишею.
    *
    * Слово, послане в скінчене віче, поверталось помилкою в консоль: на екрані не мінялось нічого,
@@ -520,12 +553,16 @@ export class LivingRoom {
   /** Показати наступну репліку черги. */
   advance(): void {
     const next = this.queue[this.shown];
-    if (!next) return;
+    if (!next) {
+      this.showEndIfRead(); // дочитав усе — саме час показати, чим скінчилось
+      return;
+    }
     this.shown++;
     // Попередню репліку прибираємо тут-таки: місце звільняє наступна, а не годинник.
     for (const v of this.vs) if (v.bubble) this.clearBubble(v);
     if (next.deed) this.deed(next.vid, next.deed, next.toward);
     this.sayBy(next.vid, next.text);
+    if (this.shown >= this.queue.length) this.showEndIfRead();
   }
 
   /** Справжня репліка ядра — над головою того, хто її сказав. */
@@ -579,6 +616,8 @@ export class LivingRoom {
   }
 
   close(): void {
+    this.end = null;
+    (this.root.querySelector(".room-end") as HTMLElement | null)?.classList.remove("on");
     this.queue = [];
     this.shown = 0;
     this.setLive(false);

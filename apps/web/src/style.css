@@ -1007,6 +1007,39 @@ body {
   width: min(720px, 76%);
   z-index: 100000; /* спрайти отримують zIndex від свого y — інакше люди ходять по формі */
 }
+/* картка кінця: чим скінчилось віче, коли глядач дочитав чергу */
+.room-end {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, 84%);
+  padding: 22px 26px 18px;
+  text-align: center;
+  z-index: 100002;
+  cursor: default;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s ease;
+}
+.room-end.on {
+  opacity: 1;
+  visibility: visible;
+}
+.room-end-title {
+  font: 600 clamp(16px, 1.6vw, 21px) / 1.3 var(--serif);
+  margin-bottom: 10px;
+}
+.room-end-body {
+  font: 400 clamp(14px, 1.4vw, 17px) / 1.5 var(--serif);
+  color: #4a3a1c;
+  margin-bottom: 16px;
+}
+.room-end-go {
+  padding: 8px 18px;
+  font: 600 13px/1 var(--serif);
+}
+
 /* повідомлення сцені (віче скінчилось, слово не доїхало) */
 .room-notice {
   position: absolute;

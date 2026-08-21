@@ -538,9 +538,16 @@ async function boot(): Promise<void> {
         });
         break;
       }
-      case "report.compiled":
+      case "report.compiled": {
         renderer.weather?.setMood(ev.payload.chronicle.mood.valence);
+        // Підсумок Оповідача — це і є кінець розмови. Тримаємо його в кімнаті, доки глядач не
+        // дочитає чергу: ядро завершує прогін раніше, ніж прочитано останню репліку.
+        const ch = ev.payload.chronicle;
+        if (talkRoom && room.isOpen) {
+          room.finale(ch.title || "Віче скінчилось", ch.narration || "");
+        }
         break;
+      }
       case "reflection.formed":
         // Рефлексія — це ВНУТРІШНЄ; її місце в інспекторі людини, а не в літописі. «Хтось
         // лишився при своєму» нічого не означало для того, хто дивиться на село.
