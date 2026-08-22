@@ -173,11 +173,20 @@ export class LivingRoom {
     // стейдж бере аспект самої картинки → field 0-1 == image 0-1 (маска не з'їжджає)
     const stage = this.root.querySelector(".room-stage") as HTMLElement;
     this.bg.onload = (): void => {
+      this.bg.style.visibility = "visible";
       // числом, а не `aspect-ratio`: тим самим `--ar` CSS рахує ще й граничну ширину, щоб у
       // низькому вікні низ кімнати не зрізало (див. `.room-stage`)
       if (this.bg.naturalWidth) stage.style.setProperty("--ar", String(this.bg.naturalWidth / this.bg.naturalHeight));
     };
+    // ★ Стару картинку прибираємо ДО того, як почне вантажитись нова.
+    //
+    // `<img>` тримає попередній кадр, доки не приїде наступний, тож на пів секунди в новій
+    // локації світилась попередня — а виглядало це як «кімната не та». Ховаємо, і показуємо
+    // назад аж коли нова готова.
+    this.bg.style.visibility = "hidden";
+    this.bg.removeAttribute("src");
     this.bg.src = bgUrl;
+    if (this.bg.complete && this.bg.naturalWidth) this.bg.style.visibility = "visible";
     this.root.classList.toggle("room--cover", !!opts?.cover);
     this.nameEl.textContent = name;
     this.floor = floor;

@@ -30,6 +30,7 @@ from ..domain.viche import (
     GUEST,
     guest_beats,
     chronicle_schema,
+    thoughts_schema,
     mood_view,
     plan_steps,
     DOUBT_MOVE,
@@ -86,7 +87,7 @@ SCORE_SYSTEM = """Ти — Мамай, розпорядник сільськог
 Ти НЕ пишеш їхніх слів. Ти розписуєш ПОРЯДОК: хто говорить, за ким, яким ходом і кому відповідає.
 Розмова мусить бути ДОВГА і розвиватись: спершу реакції, потім суперечка з переходом на конкретику,
 потім хтось згадує схожий випадок, і аж наприкінці — до чого дійшли. Не менше дванадцяти тактів.
-Якщо для розмови бракує факту — постав такт із ходом «піти_питати» й запитом до довідника."""
+Якщо для розмови бракує факту — постав такт із ходом «спитати_діло» або «згадати»."""
 
 LINE_SYSTEM = """Ти — селянин українського села. Кажеш ОДНУ репліку вголос, від першої особи.
 Живою розмовною українською. Одне-два речення.
@@ -535,7 +536,7 @@ class Viche(AgentPort):
                             if told else "Скажи це вголос ЯК СВОЮ думку, не згадуючи, хто сказав."))
         if beat.хід == INTERRUPT_MOVE:
             parts.append("ТВІЙ ХІД: перебий і встав своє, коротко")
-        elif beat.хід == "піти_питати":
+        elif beat.хід == "спитати_діло":
             parts.append(f"ТВІЙ ХІД: скажи, що йдеш дізнатись про «{beat.запит or task[:40]}»")
         else:
             parts.append(f"ТВІЙ ХІД: {MOVE_HINT.get(beat.хід, beat.хід)}")
@@ -682,14 +683,9 @@ class Viche(AgentPort):
             incidents.append("viche_chronicle_lost")
             self._emit_closing(task, said, votes)
             return
-        for item in data.get("думки") or []:
-            thought = str(item.get("думка") or "").strip()
-            if item.get("хто") in roles and thought:
-                self.trace.emit(StepRecord(
-                    run_id=self.run_id, tick=0, agent="thinker", stage="reflect", model="viche",
-                    lane=self.router.lane("synthesize"), prompt="", raw_output="",
-                    parsed={"agentId": item["хто"], "thought": thought[:MAX_LINE_CHARS]},
-                    schema_valid=True, world_valid=True))
+        # Думки йдуть ЛИШЕ звідси: два джерела означали б, що та сама думка приходить двічі й
+        # різна, залежно від того, чия відповідь уціліла.
+        self._emit_thoughts(task, said, roles, seed, budget, incidents)
         if self.memory is not None:
             self.memory.remember(task, str(data.get("заголовок") or ""),
                                  str(data.get("оповідь") or ""), str(data.get("настрій") or ""))
@@ -708,6 +704,30 @@ class Viche(AgentPort):
                                       data.get("сила") or "помірно"),
                     "highlights": [t for _, t in said[:3]]},
             schema_valid=True, world_valid=True))
+
+    def _emit_thoughts(self, task: str, said: list[tuple[Persona, str]], roles: list[str],
+                       seed: int, budget: Budget, incidents: list[str]) -> None:
+        """Думки окремим маленьким викликом: у спільній схемі їх зрізало першими (19 із 57)."""
+        # Стеля кроків обмежує РОЗМОВУ, а не її закриття — те саме правило, що для літопису.
+        # Інакше думки зникали б саме на довгих вічах, де їх найцікавіше читати.
+        if self.trace is None or not roles:
+            return
+        prompt = (f"НОВИНА: {task}\n\nРОЗМОВА:\n"
+                  + "\n".join(f"- {p.name} ({p.role}): {t}" for p, t in said[-12:])
+                  + "\n\nЩо кожен лишив при собі — по одному реченню.")
+        data = _safe_json(self._call("synthesize", prompt, self.chronicle_system,
+                                     thoughts_schema(roles), seed + 7, budget, max_tokens=420))
+        if not data:
+            incidents.append("viche_thoughts_lost")
+            return
+        for item in data.get("думки") or []:
+            thought = str(item.get("думка") or "").strip()
+            if item.get("хто") in roles and thought:
+                self.trace.emit(StepRecord(
+                    run_id=self.run_id, tick=0, agent="thinker", stage="reflect", model="viche",
+                    lane=self.router.lane("synthesize"), prompt="", raw_output="",
+                    parsed={"agentId": item["хто"], "thought": thought[:MAX_LINE_CHARS]},
+                    schema_valid=True, world_valid=True))
 
     def _emit_closing(self, task: str, said: list[tuple[Persona, str]], votes: dict | None) -> None:
         """Мінімальне закриття без літописця: ухвала з лічби і сухий підсумок замість оповіді."""

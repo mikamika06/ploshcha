@@ -78,7 +78,7 @@ class WaveLlm(FakeLlm):
     def __init__(self, responses, model: str = "fake", finish_reason: str = "stop",
                  strict: bool = False):
         super().__init__(responses, model=model, finish_reason=finish_reason, strict=strict)
-        self.q: dict[str, list[str]] = {"score": [], "line": [], "chron": []}
+        self.q: dict[str, list[str]] = {"score": [], "line": [], "chron": [], "thoughts": []}
         for r in responses:
             self.q[_kind_of(r)].append(r)
 
@@ -87,6 +87,7 @@ class WaveLlm(FakeLlm):
         kind = ("score" if props and "такти" in props
                 else "vote" if props and "голос" in props
                 else "chron" if props and "заголовок" in props
+                else "thoughts" if props and "думки" in props
                 else "line")
         if kind == "vote":
             self._responses = ['{"голос": "за", "чому": "бо село так вирішило"}']
@@ -104,6 +105,8 @@ def _kind_of(raw: str) -> str:
         return "line"
     if "заголовок" in raw:
         return "chron"
+    if '"думки"' in raw:
+        return "thoughts"
     return "line"  # решта скрипта — репліки, зокрема навмисно биті («{}»)
 
 
@@ -528,10 +531,14 @@ def test_the_executor_lane_is_visible_not_only_the_orchestrator():
 # ── план, хроніка, думки: типи, які фронт умів малювати, а ядро не надсилало ───
 
 def chron(*thoughts, mood="тривога", force=0.8) -> str:
+    """Хроніка БЕЗ думок: вони пішли окремим викликом, бо в спільній схемі їх зрізало першими."""
     return json.dumps({"заголовок": "Вовк за річкою", "оповідь": "Село погомоніло й розійшлось.",
-                       "настрій": mood, "сила": force,
-                       "думки": [{"хто": r, "думка": t} for r, t in thoughts]},
-                      ensure_ascii=False)
+                       "настрій": mood, "сила": force}, ensure_ascii=False)
+
+
+def dumky(*thoughts) -> str:
+    """Відповідь окремого виклику думок."""
+    return json.dumps({"думки": [{"хто": r, "думка": t} for r, t in thoughts]}, ensure_ascii=False)
 
 
 def _events(trace):
@@ -561,7 +568,7 @@ def test_the_chronicler_gives_a_day_and_a_mood():
     trace = InMemoryTrace()
     pair = [p.role for p in cast_for(NEWS, 2)]
     agent, _ = build([score(beat(pair[0]))] + lines(3)
-                     + [chron((pair[0], "Лишилось тривожно."))], width=2, trace=trace)
+                     + [chron(), dumky((pair[0], "Лишилось тривожно."))], width=2, trace=trace)
     agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
 
     report = next(e for e in _events(trace) if e["type"] == "report.compiled")
@@ -576,7 +583,7 @@ def test_reflections_reach_the_inspector():
     trace = InMemoryTrace()
     pair = [p.role for p in cast_for(NEWS, 2)]
     agent, _ = build([score(beat(pair[0]))] + lines(3)
-                     + [chron((pair[0], "А я ж казав."))], width=2, trace=trace)
+                     + [chron(), dumky((pair[0], "А я ж казав."))], width=2, trace=trace)
     agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
 
     thought = next(e for e in _events(trace) if e["type"] == "reflection.formed")
@@ -619,7 +626,7 @@ def test_the_finale_is_not_starved_by_the_conversation_budget():
     trace = InMemoryTrace()
     pair = [p.role for p in cast_for(NEWS, 2)]
     agent, _ = build([score(*[beat(pair[i % 2]) for i in range(6)])] + lines(3)
-                     + [chron((pair[0], "Лишилось тривожно."))], width=2, trace=trace)
+                     + [chron(), dumky((pair[0], "Лишилось тривожно."))], width=2, trace=trace)
     result = agent.run(NEWS, seed=1, budget=Budget(max_steps=3, max_tokens=99_999))
 
     assert "viche_budget" in result.incidents, "розмова МУСИТЬ обрізатись стелею"
@@ -1499,3 +1506,37 @@ def test_a_truncated_answer_keeps_what_the_model_already_said():
 
     assert _safe_json("зовсім не json") is None
     assert _safe_json("") is None
+
+
+def test_thoughts_come_in_their_own_small_call():
+    """Думки стояли останнім полем найбільшої відповіді — і зникали разом із її хвостом.
+
+    Заміряно на 57 живих вічах: хроніка доїжджала 57 разів, думки — 19. Схема на два поля
+    ламається значно рідше за схему на сім, а коштує копійки проти самої розмови.
+    """
+    from ploshcha_sim.adapters import InMemoryTrace
+    from ploshcha_sim.domain.viche import chronicle_schema, thoughts_schema
+
+    assert "думки" not in chronicle_schema(["koval"])["required"]
+    assert thoughts_schema(["koval"])["required"] == ["думки"]
+
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    trace = InMemoryTrace()
+    thought = json.dumps({"думки": [{"хто": pair[0], "думка": "Лишився при своєму."}]},
+                         ensure_ascii=False)
+    agent, _ = build([score(beat(pair[0]), beat(pair[1], "піддакнути", 1))] + lines(6)
+                     + [chron(), thought], width=2, trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    thoughts = [e for e in _events(trace) if e["type"] == "reflection.formed"]
+    assert thoughts, "думка мусить доїхати окремим викликом"
+    assert thoughts[0]["payload"]["thought"] == "Лишився при своєму."
+
+
+def test_the_move_that_brought_nothing_is_gone():
+    """«піти_питати» вертався порожнім 288 разів на 57 вічах — і коштував дитину-агента щоразу."""
+    from ploshcha_sim.domain.viche import MOVES, MOVE_HINT, DEED_OF_MOVE
+
+    assert "піти_питати" not in MOVES
+    assert "піти_питати" not in MOVE_HINT
+    assert "піти_питати" not in DEED_OF_MOVE
