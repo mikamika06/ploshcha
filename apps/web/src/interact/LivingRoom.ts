@@ -58,6 +58,8 @@ function inPoly(x: number, y: number, poly: Pt[]): boolean {
 /** Діамант відкритої підлоги шинку (частки): ближній/правий/дальній/лівий. */
 /** Скільки тримати перше слово після відкриття: рівно стільки, скільки розходяться хмари. */
 const OPEN_HOLD_MS = 1500;
+/** Пів ширини фігури в частках кадру: спрайт ~0.42 своєї висоти, висота ~0.2 кадру. */
+const BODY_HALF = 0.022;
 
 const DEFAULT_FLOOR: Pt[] = [
   [0.55, 0.93],
@@ -348,6 +350,17 @@ export class LivingRoom {
     this.cells = out.length ? Float32Array.from(out) : null;
   }
 
+  /**
+   * Чи стане тут ФІГУРА, а не точка.
+   *
+   * Ноги стоять у точці, але спрайт росте вбік: на телефоні кімната вужча за екран у пікселях, і
+   * пів фігури звисало з бруківки в темряву, хоч ноги формально були в зоні. Тому перевіряємо ще
+   * й плечі — ліворуч і праворуч на пів ширини спрайта в частках кадру.
+   */
+  private fits(x: number, y: number): boolean {
+    return this.inFloor(x, y) && this.inFloor(x - BODY_HALF, y) && this.inFloor(x + BODY_HALF, y);
+  }
+
   private inFloor(x: number, y: number): boolean {
     if (this.mask) {
       const gx = Math.min(this.mgw - 1, Math.max(0, (x * this.mgw) | 0));
@@ -364,6 +377,13 @@ export class LivingRoom {
     // (кузня — два відсотки кадру) спроби вигоряли, і код повертав ЦЕНТР кадру, тобто ставив
     // людину просто в стіну. Саме так вона й «телепортувалась за зону».
     if (this.cells && this.cells.length) {
+      // Кілька спроб: беремо клітину, куди влазить ціла фігура, а не лише ноги.
+      for (let k = 0; k < 24; k++) {
+        const i = (Math.random() * (this.cells.length / 2)) | 0;
+        const x = this.cells[i * 2];
+        const y = this.cells[i * 2 + 1];
+        if (this.fits(x, y)) return [x, y];
+      }
       const i = (Math.random() * (this.cells.length / 2)) | 0;
       return [this.cells[i * 2], this.cells[i * 2 + 1]];
     }
@@ -416,8 +436,8 @@ export class LivingRoom {
         } else {
           const nx = v.x + (dx / d) * step;
           const ny = v.y + (dy / d) * step;
-          if (this.inFloor(nx, ny)) {
-            // крок дозволений лише якщо лишаємось на масці (СТРОГО по зоні)
+          if (this.fits(nx, ny)) {
+            // крок дозволений лише якщо на масці лишається ВСЯ фігура, а не самі ноги
             v.x = nx;
             v.y = ny;
             if (Math.abs(dx) > 0.0008) v.face = dx < 0 ? -1 : 1;
@@ -613,7 +633,7 @@ export class LivingRoom {
     const step = (kx: number, ky: number): boolean => {
       const nx = Math.max(this.bbox.x0, Math.min(this.bbox.x1, v.x + kx));
       const ny = Math.max(this.bbox.y0, Math.min(this.bbox.y1, v.y + ky));
-      if (!this.inFloor(nx, ny)) return false;
+      if (!this.fits(nx, ny)) return false;
       v.tx = nx;
       v.ty = ny;
       v.state = "walk";
