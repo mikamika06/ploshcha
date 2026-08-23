@@ -168,7 +168,7 @@ export class GroupTalk {
       }
       const el = document.createElement("div");
       el.className = "gtalk-p";
-      el.style.backgroundImage = `url(${assetUrl(`/assets/roles/${p.role}/0.png`)})`;
+      el.style.backgroundImage = `url(${assetUrl(`/assets/roles/${p.role}/0.webp`)})`;
       this.sides[side].appendChild(el);
       // окремий кадр — інакше браузер не побачить переходу з початкового стану в `here`
       requestAnimationFrame(() => el.classList.add("here"));

@@ -19,19 +19,59 @@ export async function loadGraded(url: string, maxH?: number, grade: string = GRA
   const key = `${url}|${maxH ?? 0}|${grade}`;
   const hit = texCache.get(key);
   if (hit) return hit;
-  const img = await loadImage(url);
-  const nw = img.naturalWidth;
-  const nh = img.naturalHeight;
-  const sc = maxH ? Math.min(1, maxH / nh) : 1;
-  const c = document.createElement("canvas");
-  c.width = Math.max(1, Math.round(nw * sc));
-  c.height = Math.max(1, Math.round(nh * sc));
-  const ctx = c.getContext("2d")!;
-  ctx.filter = grade;
-  ctx.drawImage(img, 0, 0, c.width, c.height);
-  const tex = Texture.from(c);
+  const src = await loadImage(url);
+  const tex = await sliced(() => {
+    const nw = src.naturalWidth;
+    const nh = src.naturalHeight;
+    const sc = maxH ? Math.min(1, maxH / nh) : 1;
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(nw * sc));
+    c.height = Math.max(1, Math.round(nh * sc));
+    const ctx = c.getContext("2d")!;
+    ctx.filter = grade;
+    ctx.drawImage(src, 0, 0, c.width, c.height);
+    return Texture.from(c);
+  });
   texCache.set(key, tex);
   return tex;
+}
+
+/**
+ * Черга дрібної роботи з бюджетом на кадр.
+ *
+ * ★ Заміряно двічі, обидва «очевидні» шляхи виявились гіршими:
+ *   • порціями по 6 із `setTimeout` між ними — 15-18 с замість 5-7, бо порція чекає на СВОЮ
+ *     мережу, і паралельне завантаження втрачається;
+ *   • `img.decode()` перед `drawImage` — 10 с замість 5, бо браузер уміє розкодувати одразу в
+ *     потрібному масштабі, а примусовий `decode()` робить спершу повний кадр.
+ * Тому: качаємо ВСЕ паралельно, як і доти, а на головному потоці ріжемо лише канву й вивантаження
+ * текстур — не більше `SLICE_MS` на кадр. Загальний час лишається, а кадри перестають зникати.
+ */
+const SLICE_MS = 6;
+let sliceQueue: (() => void)[] = [];
+let sliceRunning = false;
+
+function drainSlice(): void {
+  const t0 = performance.now();
+  while (sliceQueue.length && performance.now() - t0 < SLICE_MS) sliceQueue.shift()!();
+  if (sliceQueue.length) requestAnimationFrame(drainSlice);
+  else sliceRunning = false;
+}
+
+function sliced<T>(work: () => T): Promise<T> {
+  return new Promise((resolve, reject) => {
+    sliceQueue.push(() => {
+      try {
+        resolve(work());
+      } catch (e) {
+        reject(e);
+      }
+    });
+    if (!sliceRunning) {
+      sliceRunning = true;
+      requestAnimationFrame(drainSlice);
+    }
+  });
 }
 
 // Піксель-дані маски (для walk-grid): малюємо у canvas і читаємо RGBA.

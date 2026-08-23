@@ -27,7 +27,9 @@ usage() {
   ./ploshcha logs      останні рядки логу
 
 Змінні: PLOSHCHA_PORT (8765) · PLOSHCHA_CONDITION (viche) · PLOSHCHA_DB
-        PLOSHCHA_MAX_TOKENS (300000) · PLOSHCHA_MAX_USD (0.50) · PLOSHCHA_MAX_ITEMS (60)
+        PLOSHCHA_MAX_TOKENS (0 = без стелі) · PLOSHCHA_MAX_USD (0) · PLOSHCHA_MAX_ITEMS (0)
+        Стеля знята за рішенням власника: ліміти ключа Lapathoniia підняті. Аварійний стоп
+        лишається — файл kill-switch і `./ploshcha stop`.
 
 БЕЗПЕКА: ядро слухає ЛИШЕ 127.0.0.1 і не має автентифікації, а POST /command витрачає гроші.
 Не виставляй порт у мережу й не пробрасуй його тунелем.
@@ -47,9 +49,9 @@ start() {
   mkdir -p "$(dirname "$DB")"
   nohup "$PY" "$ROOT/services/sim/scripts/serve_ploshcha.py" \
     --port "$PORT" --condition "$COND" --resume --db "$DB" \
-    --max-tokens "${PLOSHCHA_MAX_TOKENS:-300000}" \
-    --max-usd "${PLOSHCHA_MAX_USD:-0.50}" \
-    --max-items "${PLOSHCHA_MAX_ITEMS:-60}" \
+    --max-tokens "${PLOSHCHA_MAX_TOKENS:-0}" \
+    --max-usd "${PLOSHCHA_MAX_USD:-0}" \
+    --max-items "${PLOSHCHA_MAX_ITEMS:-0}" \
     > "$ROOT/.ploshcha.log" 2>&1 &
   # Перший старт нового села = виклик моделі до відкриття порту, тож чекаємо довше.
   for _ in $(seq 1 120); do

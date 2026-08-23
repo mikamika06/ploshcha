@@ -28,6 +28,7 @@ export class SceneRenderer {
   camera?: Camera;
 
   private t = 0;
+  private t0 = performance.now();
   private waterFilter?: Filter;
   private wind?: Wind;
   private intro?: Intro;
@@ -110,7 +111,7 @@ export class SceneRenderer {
     if (!props?.length) return;
     await Promise.all(
       props.map(async (p) => {
-        const tex = await loadGraded(assetUrl(`assets/nb/${p.sprite}.png`)).catch(() => null);
+        const tex = await loadGraded(assetUrl(`assets/nb/${p.sprite}.webp`)).catch(() => null);
         if (!tex) return;
         const [ax, ay] = p.anchor;
         const sp = new Sprite(tex);
@@ -154,11 +155,22 @@ export class SceneRenderer {
 
   /** Амбієнт кожен кадр: течія води, вітер, інтро, погода. */
   update(dt: number): void {
-    this.t += dt;
+    // ★ Час сцени — це ГОДИННИК, а не сума кроків.
+    //
+    // Доти він накопичувався з `dt`, обрізаного зверху 0.05 с. Поки кадри йдуть рівно, різниці
+    // немає; але варто браузерові зрідити кадри (сторінка постояла, дисплей знизив частоту) — і
+    // фаза колихання перестає збігатися з реальним часом, а на екрані це видно як ривки й
+    // «раптом швидко загойдалось». Годинник такої заборгованості не має за побудовою.
+    this.t = (performance.now() - this.t0) / 1000;
     if (this.waterFilter) this.waterFilter.uniforms.t = this.t;
-    this.wind?.update(this.t, this.camera?.visibleWorldRect(220)); // кулінг рослин поза кадром
+    this.wind?.update(this.t, this.camera?.visibleWorldRect(220), dt); // кулінг рослин поза кадром
     this.intro?.update(dt);
     this.weather?.update(dt);
+  }
+
+  /** Тікер стояв (глядач був у локації) — не даємо годиннику стрибнути на цю паузу. */
+  resumeClock(pausedMs: number): void {
+    this.t0 += pausedMs;
   }
 
   blast(): void {

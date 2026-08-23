@@ -56,6 +56,9 @@ function inPoly(x: number, y: number, poly: Pt[]): boolean {
 }
 
 /** Діамант відкритої підлоги шинку (частки): ближній/правий/дальній/лівий. */
+/** Скільки тримати перше слово після відкриття: рівно стільки, скільки розходяться хмари. */
+const OPEN_HOLD_MS = 1500;
+
 const DEFAULT_FLOOR: Pt[] = [
   [0.55, 0.93],
   [0.73, 0.62],
@@ -67,6 +70,37 @@ const DEFAULT_FLOOR: Pt[] = [
  * Жива кімната: iso-box-сцена (contain) + наші спрайти-селяни ходять по ДІАМАНТУ підлоги,
  * тиняються й перекидаються репліками. Все DOM, поза Pixi-камерою.
  */
+interface MaskGrid {
+  grid: Uint8Array;
+  gw: number;
+  gh: number;
+}
+
+/** Картинка маски → сітка прохідності. `null` = маски фактично немає (бита, 404, порожня). */
+function parseMask(img: HTMLImageElement): MaskGrid | null {
+  const gw = 160;
+  const gh = Math.max(1, Math.round((gw * img.height) / img.width));
+  const cv = document.createElement("canvas");
+  cv.width = gw;
+  cv.height = gh;
+  const ctx = cv.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, gw, gh);
+  const d = ctx.getImageData(0, 0, gw, gh).data;
+  const grid = new Uint8Array(gw * gh);
+  for (let i = 0; i < gw * gh; i++) {
+    const r = d[i * 4];
+    const g = d[i * 4 + 1];
+    const b = d[i * 4 + 2];
+    grid[i] = g > 110 && r < 130 && b < 130 ? 1 : 0; // зелене = прохідне
+  }
+  // приймаємо маску, якщо в ній є бодай трохи зеленого (маленькі легітимні зони, як-от кузня, теж
+  // валідні); поріг лише відсіює зовсім биту/незавантажену маску (~0%)
+  let green = 0;
+  for (let i = 0; i < grid.length; i++) green += grid[i];
+  return green > gw * gh * 0.012 ? { grid, gw, gh } : null;
+}
+
 export class LivingRoom {
   private root: HTMLElement;
   private bg: HTMLImageElement;
@@ -81,6 +115,14 @@ export class LivingRoom {
   private mask: Uint8Array | null = null; // прохідна маска з Nano Banana (зелене=1); null → полігон
   private mgw = 0;
   private mgh = 0;
+  /** Прохідні клітини маски парами (x, y) у частках кадру. `null` — маски немає, ходить полігон. */
+  private cells: Float32Array | null = null;
+  /** Маски живуть довше за кімнату: локації відкривають по колу, а вантажити щоразу — це чекання. */
+  private static MASKS = new Map<string, MaskGrid | null>();
+  private static LOADING = new Map<string, Promise<MaskGrid | null>>();
+  /** Чи вже розсаджено каст. Доти прибульці чекають у `pending`, а не сідають на полігон-запасник. */
+  private seated = false;
+  private pending: RoomCast[] = [];
 
   /** Живе віче в цій локації: гомін-заповнювач мовчить, бо говорять справжні репліки ядра. */
   private live = false;
@@ -93,6 +135,8 @@ export class LivingRoom {
   /** Чим скінчилось віче: тримаємо, доки глядач не дочитає чергу. */
   private end: { title: string; body: string } | null = null;
   private shown = 0;
+  /** Коли кімнату відкрито: перше слово тримаємо, поки розходяться хмари. */
+  private openedAt = 0;
 
   constructor(
     private onClose: () => void,
@@ -170,10 +214,11 @@ export class LivingRoom {
     // замість 1 і 3 чужі репліки в черзі.
     this.queue = [];
     this.shown = 0;
+    this.openedAt = performance.now();
     // стейдж бере аспект самої картинки → field 0-1 == image 0-1 (маска не з'їжджає)
     const stage = this.root.querySelector(".room-stage") as HTMLElement;
     this.bg.onload = (): void => {
-      this.bg.style.visibility = "visible";
+      this.bg.style.opacity = "1";
       // числом, а не `aspect-ratio`: тим самим `--ar` CSS рахує ще й граничну ширину, щоб у
       // низькому вікні низ кімнати не зрізало (див. `.room-stage`)
       if (this.bg.naturalWidth) stage.style.setProperty("--ar", String(this.bg.naturalWidth / this.bg.naturalHeight));
@@ -183,10 +228,14 @@ export class LivingRoom {
     // `<img>` тримає попередній кадр, доки не приїде наступний, тож на пів секунди в новій
     // локації світилась попередня — а виглядало це як «кімната не та». Ховаємо, і показуємо
     // назад аж коли нова готова.
-    this.bg.style.visibility = "hidden";
+    //
+    // Ховаємо ПРОЗОРІСТЮ, а не `visibility`: інлайновий `visibility: visible` на картинці
+    // перебивав успадковане `visibility: hidden` закритої кімнати, і невидимий `<img>` на весь
+    // екран далі ловив кліки — по локаціях на мапі після першого ж виходу неможливо було влучити.
+    this.bg.style.opacity = "0";
     this.bg.removeAttribute("src");
     this.bg.src = bgUrl;
-    if (this.bg.complete && this.bg.naturalWidth) this.bg.style.visibility = "visible";
+    if (this.bg.complete && this.bg.naturalWidth) this.bg.style.opacity = "1";
     this.root.classList.toggle("room--cover", !!opts?.cover);
     this.nameEl.textContent = name;
     this.floor = floor;
@@ -194,79 +243,109 @@ export class LivingRoom {
     const ys = floor.map((p) => p[1]);
     this.bbox = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
     this.mask = null;
-    if (maskUrl) this.loadMask(maskUrl);
+    this.cells = null;
     this.field.innerHTML = "";
-    this.vs = cast.map((c) => {
-      const el = document.createElement("img");
-      el.className = "rv";
-      el.draggable = false;
-      const frames = [0, 1, 2].map((n) => assetUrl(`/assets/roles/${c.id}/${n}.png`));
-      el.src = frames[0];
-      const [x, y] = this.randFloor();
-      const rv: RV = {
-        cast: c, el, frames, cur: 0, x, y, tx: x, ty: y,
-        state: "idle", timer: rand(0.5, 3), face: 1, bob: 0, bubble: null, bubbleT: 0, bw: 0, bh: 0,
-      };
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this.advance(); // клік по людині — те саме «далі», що й по кімнаті
-      });
-      this.field.appendChild(el);
-      return rv;
-    });
-    if (opts?.token) this.placeToken(opts.token);
+    this.vs = [];
+    this.pending = [];
+    this.seated = false;
+    // ★ Розсаджуємо людей ЛИШЕ коли відома прохідна зона.
+    //
+    // Маска вантажиться асинхронно, і доти єдина відома підлога — грубий полігон-запасник. Селян
+    // ставили по ньому одразу, а коли маска приїздила, кожного, хто опинився поза зеленим, код
+    // пересаджував на валідну клітину — тобто на очах у глядача людину смикало через півкімнати.
+    // Заміряно: чотири фігури, стрибки 0.08-0.50 частки кадру (до 606px) в одному кадрі на 126-й
+    // мілісекунді — рівно тоді, коли завершувалось завантаження маски. На повільному звʼязку
+    // маска приїздить уже посеред розмови, і це виглядає як телепорт «за локацію й назад».
+    //
+    // Тому: маска в кеші — садимо одразу; немає — чекаємо на неї (і на помилку теж), а поле доти
+    // прозоре. Кеш статичний, бо локації відкривають по колу: телепорт мусив би зникнути з
+    // першого ж разу, а не «здебільшого».
+    const seat = (): void => {
+      this.spawn(cast);
+      if (opts?.token) this.placeToken(opts.token);
+      this.field.style.opacity = "1";
+    };
+    const cached = maskUrl ? LivingRoom.MASKS.get(maskUrl) : undefined;
+    if (!maskUrl || cached !== undefined) {
+      if (cached) this.useMask(cached);
+      seat();
+    } else {
+      this.field.style.opacity = "0";
+      this.loadMask(maskUrl, seat);
+    }
     this.root.classList.add("on");
     this.last = performance.now();
     cancelAnimationFrame(this.raf);
     this.raf = requestAnimationFrame(this.loop);
   }
 
-  /** Завантажує walk-маску з Nano Banana у сітку (зелене=прохідне). Поки не завантажилась — полігон. */
-  private loadMask(url: string): void {
-    const img = new Image();
-    img.onload = (): void => {
-      const gw = 160;
-      const gh = Math.max(1, Math.round((gw * img.height) / img.width));
-      const cv = document.createElement("canvas");
-      cv.width = gw;
-      cv.height = gh;
-      const ctx = cv.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0, gw, gh);
-      const d = ctx.getImageData(0, 0, gw, gh).data;
-      const grid = new Uint8Array(gw * gh);
-      for (let i = 0; i < gw * gh; i++) {
-        const r = d[i * 4];
-        const g = d[i * 4 + 1];
-        const b = d[i * 4 + 2];
-        grid[i] = g > 110 && r < 130 && b < 130 ? 1 : 0; // зелене = прохідне
-      }
-      // приймаємо маску, якщо в ній є бодай трохи зеленого (маленькі легітимні зони, як-от кузня,
-      // теж валідні); поріг лише відсіює зовсім биту/незавантажену маску (~0%)
-      let green = 0;
-      for (let i = 0; i < grid.length; i++) green += grid[i];
-      if (green > gw * gh * 0.012) {
-        this.mask = grid;
-        this.mgw = gw;
-        this.mgh = gh;
-        this.bbox = { x0: 0, x1: 1, y0: 0, y1: 1 };
-        // маска вантажиться асинхронно — селян встигли розставити по полігону (fallback),
-        // і хтось міг стати поза зоною (напр. на воді). Строга поstorкрокова перевірка їх
-        // би там і замкнула. Тому пересаджуємо всіх, хто опинився не на масці, на валідну клітину.
-        for (const v of this.vs) {
-          if (!this.inFloor(v.x, v.y)) {
-            const [x, y] = this.randFloor();
-            v.x = x;
-            v.y = y;
-            v.tx = x;
-            v.ty = y;
-            v.state = "idle";
-            v.timer = rand(0.3, 2);
-          }
+  /**
+   * Маска локації з кешу; чого немає — вантажимо один раз.
+   *
+   * `warm` кличеться після старту села: маски всіх локацій разом важать 100 КБ, а без них перший
+   * вхід у кімнату мусить чекати на завантаження, доки люди ще не сіли.
+   */
+  static mask(url: string): Promise<MaskGrid | null> {
+    const have = LivingRoom.MASKS.get(url);
+    if (have !== undefined) return Promise.resolve(have);
+    const inflight = LivingRoom.LOADING.get(url);
+    if (inflight) return inflight;
+    const job = new Promise<MaskGrid | null>((resolve) => {
+      const img = new Image();
+      const finish = (grid: MaskGrid | null): void => {
+        LivingRoom.MASKS.set(url, grid);
+        LivingRoom.LOADING.delete(url);
+        resolve(grid);
+      };
+      img.onerror = (): void => finish(null);
+      img.onload = (): void => finish(parseMask(img));
+      img.src = url;
+    });
+    LivingRoom.LOADING.set(url, job);
+    return job;
+  }
+
+  static warm(urls: string[]): void {
+    for (const url of urls) void LivingRoom.mask(url);
+  }
+
+  /** Спрайти касту на вже відомій підлозі. Окремо від `open`, бо чекає на маску. */
+  private spawn(cast: RoomCast[]): void {
+    this.seated = true;
+    for (const c of cast) this.addPerson(c);
+    for (const c of this.pending.splice(0)) this.addPerson(c);
+    if (this.shown === 0 && this.queue.length) this.advance(); // слово, що чекало підлоги
+  }
+
+  /**
+   * Завантажує walk-маску з Nano Banana у сітку (зелене=прохідне) і кладе в кеш.
+   *
+   * `done` кличеться в БУДЬ-ЯКОМУ разі — і на битій масці, і на 404: інакше локація, чия маска не
+   * доїхала, лишилась би назавжди порожньою, а це та сама давня поламка «механізм працює, а на
+   * екрані нічого».
+   */
+  private loadMask(url: string, done: () => void): void {
+    void LivingRoom.mask(url).then((grid) => {
+      if (grid) this.useMask(grid);
+      done();
+    });
+  }
+
+  private useMask(m: MaskGrid): void {
+    this.mask = m.grid;
+    this.mgw = m.gw;
+    this.mgh = m.gh;
+    this.bbox = { x0: 0, x1: 1, y0: 0, y1: 1 };
+    // Список прохідних клітин — щоб посадка була вибором із того, що є, а не лотереєю.
+    const out: number[] = [];
+    for (let gy = 0; gy < m.gh; gy++) {
+      for (let gx = 0; gx < m.gw; gx++) {
+        if (m.grid[gy * m.gw + gx] === 1) {
+          out.push((gx + 0.5) / m.gw, (gy + 0.5) / m.gh);
         }
       }
-    };
-    img.src = url;
+    }
+    this.cells = out.length ? Float32Array.from(out) : null;
   }
 
   private inFloor(x: number, y: number): boolean {
@@ -279,6 +358,15 @@ export class LivingRoom {
   }
 
   private randFloor(): Pt {
+    // ★ З МАСКИ беремо клітину, а не тичемо навмання.
+    //
+    // Вісімдесят спроб по всьому кадру — це ставка на те, що прохідного багато. У тісній кімнаті
+    // (кузня — два відсотки кадру) спроби вигоряли, і код повертав ЦЕНТР кадру, тобто ставив
+    // людину просто в стіну. Саме так вона й «телепортувалась за зону».
+    if (this.cells && this.cells.length) {
+      const i = (Math.random() * (this.cells.length / 2)) | 0;
+      return [this.cells[i * 2], this.cells[i * 2 + 1]];
+    }
     for (let k = 0; k < 80; k++) {
       const x = rand(this.bbox.x0, this.bbox.x1);
       const y = rand(this.bbox.y0, this.bbox.y1);
@@ -479,10 +567,17 @@ export class LivingRoom {
    */
   addPerson(c: RoomCast, text?: string): void {
     if (this.vs.some((r) => r.cast.vid === c.vid)) return;
+    // Поки не знаємо підлоги, прибулець чекає: посадити його на запасний полігон означало б
+    // смикнути через півкімнати, щойно приїде маска.
+    if (!this.seated) {
+      if (!this.pending.some((q) => q.vid === c.vid)) this.pending.push(c);
+      if (text) this.enqueue(c.vid ?? c.id, text);
+      return;
+    }
     const el = document.createElement("img");
     el.className = "rv";
     el.draggable = false;
-    const frames = [0, 1, 2].map((n) => assetUrl(`/assets/roles/${c.id}/${n}.png`));
+    const frames = [0, 1, 2].map((n) => assetUrl(`/assets/roles/${c.id}/${n}.webp`));
     el.src = frames[0];
     const [x, y] = this.randFloor();
     const rv: RV = {
@@ -589,6 +684,17 @@ export class LivingRoom {
 
   /** Показати наступну репліку черги. */
   advance(): void {
+    // Доки люди не сіли (чекаємо маску), показувати нікому: репліка мовчки зникала б, бо мовця
+    // ще немає в кімнаті, а лічильник показаного вже зрушив би.
+    if (!this.seated) return;
+    // ★ Перше слово чекає, поки розійдуться хмари.
+    //
+    // Ядро тепер віддає його за секунду з невеликим, і репліка вискакувала ще під завісою — тобто
+    // повз глядача. Тримаємо її, доки завіса не догорнулась; наступні йдуть по кліку, як і доти.
+    if (this.shown === 0 && performance.now() < this.openedAt + OPEN_HOLD_MS) {
+      window.setTimeout(() => this.advance(), OPEN_HOLD_MS / 3);
+      return;
+    }
     const next = this.queue[this.shown];
     if (!next) {
       this.showEndIfRead(); // дочитав усе — саме час показати, чим скінчилось
@@ -659,6 +765,7 @@ export class LivingRoom {
     (this.root.querySelector(".room-end") as HTMLElement | null)?.classList.remove("on");
     this.queue = [];
     this.shown = 0;
+    this.openedAt = performance.now();
     this.setLive(false);
     this.root.classList.remove("on");
     cancelAnimationFrame(this.raf);

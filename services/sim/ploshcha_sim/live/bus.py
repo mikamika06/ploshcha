@@ -65,17 +65,30 @@ class EventBus:
         with self._cond:
             return self._closed
 
-    def _visible(self, cursor: int, sid: str | None) -> tuple[list[tuple[int, dict]], int]:
+    def _visible(self, cursor: int, sid: str | None,
+                 shared_from: int | None = None) -> tuple[list[tuple[int, dict]], int]:
+        """`shared_from` — позиція, з якої глядач слухає НАЖИВО.
+
+        Усе, що раніше, він домальовує з історії, і там йому належать лише ВЛАСНІ події. Спільні
+        (мітка `None`) — це стан ядра й прогони, запущені без сесії: доки вони йдуть, їх видно
+        всім, але відтворювати їх новому глядачеві не можна. Доти фронт просив історію з нуля, і
+        кожен, хто заходив із будь-якого пристрою, діставав чужі прогони як свої — на Дошці це
+        виглядало купою сміттєвих тем, яких він ніколи не кидав.
+        """
         start = max(cursor, self._first_seq)
         end = self._first_seq + len(self._events)
         out: list[tuple[int, dict]] = []
         for i in range(start - self._first_seq, len(self._events)):
             own = self._sids[i]
+            seq = self._first_seq + i
+            if sid is not None and shared_from is not None and seq < shared_from and own != sid:
+                continue
             if sid is None or own is None or own == sid:
-                out.append((self._first_seq + i, self._events[i]))
+                out.append((seq, self._events[i]))
         return out, end
 
-    def since_ids(self, cursor: int, sid: str | None = None) -> tuple[list[tuple[int, dict]], int]:
+    def since_ids(self, cursor: int, sid: str | None = None,
+                  shared_from: int | None = None) -> tuple[list[tuple[int, dict]], int]:
         """Те саме, що `since`, але з АБСОЛЮТНОЮ позицією кожної події.
 
         Позиція потрібна SSE як `id:`: після фільтрації подій менше, ніж просунувся курсор, тож
@@ -83,12 +96,13 @@ class EventBus:
         мовчки губив би чужі-й-свої події між ними.
         """
         with self._cond:
-            return self._visible(cursor, sid)
+            return self._visible(cursor, sid, shared_from)
 
-    def since(self, cursor: int, sid: str | None = None) -> tuple[list[dict], int]:
+    def since(self, cursor: int, sid: str | None = None,
+              shared_from: int | None = None) -> tuple[list[dict], int]:
         """Події з позиції `cursor` і новий курсор. Курсор — абсолютний індекс, не seq події."""
         with self._cond:
-            pairs, end = self._visible(cursor, sid)
+            pairs, end = self._visible(cursor, sid, shared_from)
         return [ev for _, ev in pairs], end
 
     def wait(self, cursor: int, timeout: float = 15.0,
@@ -97,12 +111,12 @@ class EventBus:
         pairs, end = self.wait_ids(cursor, timeout, sid)
         return [ev for _, ev in pairs], end
 
-    def wait_ids(self, cursor: int, timeout: float = 15.0,
-                 sid: str | None = None) -> tuple[list[tuple[int, dict]], int]:
+    def wait_ids(self, cursor: int, timeout: float = 15.0, sid: str | None = None,
+                 shared_from: int | None = None) -> tuple[list[tuple[int, dict]], int]:
         with self._cond:
             if cursor >= self._first_seq + len(self._events) and not self._closed:
                 self._cond.wait(timeout)
-            return self._visible(cursor, sid)
+            return self._visible(cursor, sid, shared_from)
 
     def tail_cursor(self) -> int:
         """Курсор «з цього місця», щоб новий глядач не отримав усю історію."""

@@ -19,6 +19,9 @@ from .bus import EventBus
 from .sessions import SWEEP_EVERY_S, clean_sid
 
 IDLE_SLEEP_S = 0.4
+# Як часто наглядач дивиться на чергу і як довго порожній робітник живе до згасання.
+SUPERVISE_EVERY_S = 2.0
+WORKER_IDLE_EXIT_S = 120.0
 # Скільки аренда вважається живою. Убитий процес (SIGKILL, перезавантаження) не встигає нічого
 # повернути, і айтем лишається `leased` НАЗАВЖДИ: `lease` бере лише `pending`, а `requeue_dead`
 # бачить лише `dead`. Тобто задача зникала з черги, не потрапивши в жодну статистику провалів.
@@ -71,7 +74,8 @@ class LiveRunner:
                  worker: str = "ploshcha", paused: bool = True,
                  estimate_tokens: int = 2000, cast: list[dict] | None = None,
                  decisions=None, rumours=None, sessions=None, latency=None,
-                 sweep_every_s: float = SWEEP_EVERY_S):
+                 sweep_every_s: float = SWEEP_EVERY_S, workers: int = 1,
+                 max_workers: int | None = None):
         self.bus = bus
         self.queue = queue
         # Прилад тривалості: «чому так довго» мусить мати число, а не здогад.
@@ -86,12 +90,27 @@ class LiveRunner:
         self.sessions = sessions
         self.sweep_every_s = sweep_every_s
         self.worker = worker
+        # ★ Скільки віч ідуть ОДНОЧАСНО.
+        #
+        # Один робітник тримав усе село в один рядок: прогін ≈2 хвилини (шлюз, не процесор —
+        # завантаження сервера 0.07), тож восьмеро гостей означали чергу з десяти тем і двадцять
+        # хвилин очікування під написом «Село думу думає». Робота тут — чекання на мережу, тому
+        # паралельні потоки не б'ються за процесор; черга вже безпечна для них (WAL і
+        # `BEGIN IMMEDIATE` в оренді).
+        self.workers = max(1, int(workers))
+        # ★ Стеля робітників — і зростаємо до неї САМІ, за чергою.
+        #
+        # Фіксоване число завжди або замало (черга з десяти тем і двадцять хвилин очікування), або
+        # забагато (шість голодних потоків на порожньому селі). Робота тут — чекання на шлюз, тож
+        # ціна зайвого потоку майже нульова, а ціна браку — людина дивиться на «Село думу думає».
+        self.max_workers = max(self.workers, int(max_workers if max_workers is not None
+                                                 else self.workers * 4))
         self.estimate_tokens = estimate_tokens
         self._paused = threading.Event()
         if paused:
             self._paused.set()
         self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
+        self._threads: list[threading.Thread] = []
         self._lock = threading.Lock()
         self.state = "paused" if paused else "running"
         self.tick = 0
@@ -101,18 +120,19 @@ class LiveRunner:
         # Скільки покинутих аренд повернуто в чергу на старті. Нуль — теж відповідь, тому число
         # видиме завжди, а не лише коли щось сталось.
         self.recovered = 0
-        # Поточний агент: слово гостя має потрапити в те віче, що ЙДЕ ЗАРАЗ, а не в наступне.
-        self.current = None
-        # ★ Чиє саме віче зараз іде. Без цього гість вкидав би слово в чужу розмову — свого віча
-        # він не бачить, чуже чує, і виглядає це як «моє слово пішло невідомо куди».
-        self.current_sid = None
+        # Хто саме зараз говорить: `sid` гостя → його оркестратор. Мапа, а не одне поле, бо віч
+        # тепер кілька водночас — і слово гостя мусить потрапити в СВОЄ, а не в те, що почалось
+        # останнім. Ключ `""` — прогін без сесії (CLI, соак).
+        self._active: dict[str, object] = {}
         self.sessions_swept = 0
 
         self._last_sweep = 0.0
+        # Робітник, що гасне через простій, не має рахуватись за смерть циклу.
+        self._retiring = False
 
     # ── керування ────────────────────────────────────────────────────────────
     def start(self) -> None:
-        if self._thread is not None:
+        if self._threads:
             return
         # Перед першим лізом підбираємо те, що лишилось від УБИТОГО процесу. Без цього кожен
         # SIGKILL списував по темі: у базі вона лежала `leased`, а виглядало це як «Дошка
@@ -121,8 +141,36 @@ class LiveRunner:
         # (а) Прибирання на СТАРТІ. Процес міг простояти місяць — і тоді періодичний обхід
         # усередині циклу вперше спрацював би лише через пʼять хвилин після підняття порту.
         self._sweep()
-        self._thread = threading.Thread(target=self._loop, name="live-runner", daemon=True)
-        self._thread.start()
+        for _ in range(self.workers):
+            self._spawn()
+        if self.max_workers > self.workers:
+            sup = threading.Thread(target=self._supervise, name="live-supervisor", daemon=True)
+            sup.start()
+
+    def _spawn(self) -> None:
+        """Ще один робітник. Імʼя унікальне, бо воно ж іде в оренду черги."""
+        with self._lock:
+            n = self._spawned = getattr(self, "_spawned", 0) + 1
+            name = self.worker if (self.max_workers == 1) else f"{self.worker}-{n}"
+            t = threading.Thread(target=self._loop, args=(name,), name=f"live-runner-{n}",
+                                 daemon=True)
+            self._threads = [x for x in self._threads if x.is_alive()] + [t]
+        t.start()
+
+    def _supervise(self) -> None:
+        """Додає робітників, поки черга не порожня. Зайві гаснуть самі (див. `_loop`)."""
+        while not self._stop.is_set():
+            time.sleep(SUPERVISE_EVERY_S)
+            if self._paused.is_set() or self.queue is None:
+                continue
+            try:
+                pending = int(self.queue.stats().get("pending", 0))
+            except Exception:
+                continue
+            alive = self._alive_workers()
+            want = min(self.max_workers, alive + pending)
+            for _ in range(max(0, want - alive)):
+                self._spawn()
 
     def _recover_stale(self, older_than_s: float = LEASE_TTL_S) -> int:
         if self.queue is None:
@@ -156,8 +204,33 @@ class LiveRunner:
         self.bus.close()
 
     def join(self, timeout: float = 5.0) -> None:
-        if self._thread is not None:
-            self._thread.join(timeout)
+        for t in self._threads:
+            t.join(timeout)
+
+    # ── доступ до живих віч ──────────────────────────────────────────────────
+    def agent_for(self, sid: str | None):
+        """Оркестратор ЦЬОГО гостя, якщо його віче зараз іде.
+
+        Прогін без сесії чутний усім, тому гість без `sid` дістає будь-яке, що йде.
+        """
+        with self._lock:
+            if sid:
+                return self._active.get(sid) or self._active.get("")
+            return next(iter(self._active.values()), None)
+
+    @property
+    def current(self):
+        """Сумісність зі старим полем: будь-яке віче, що зараз іде."""
+        with self._lock:
+            return next(iter(self._active.values()), None)
+
+    @property
+    def current_sid(self) -> str | None:
+        with self._lock:
+            for key in self._active:
+                if key:
+                    return key
+            return None
 
     # ── стан ─────────────────────────────────────────────────────────────────
     def health(self) -> dict:
@@ -169,11 +242,13 @@ class LiveRunner:
             # ★ Головне поле цього звіту. Фронт чекає розмову доти, доки `state == "running"`, і
             # мертвий потік із написом «running» вішав «Село думу думає…» назавжди — це і є
             # «ядро не відповідає». Живість потоку — факт, а не намір, тож її і питаємо.
-            "alive": self._thread is not None and self._thread.is_alive(),
+            "alive": any(t.is_alive() for t in self._threads),
             "stoppedReason": reason,
             "lastError": err,
             "tick": self.tick,
             "runsDone": self.runs_done,
+            "workers": {"alive": self._alive_workers(), "busy": len(self._active),
+                        "min": self.workers, "max": self.max_workers},
             "recovered": self.recovered,
             # Скільки СПРАВДІ триває виклик кожного ярусу: «чому так довго» має вимірюватись,
             # а не вгадуватись. Тримаємо останні заміри в памʼяті, без окремого сховища.
@@ -217,11 +292,15 @@ class LiveRunner:
         if self.sessions is None:
             return 0
         now = time.time()
-        if now - self._last_sweep < self.sweep_every_s:
-            return 0
-        self._last_sweep = now
+        with self._lock:
+            if now - self._last_sweep < self.sweep_every_s:
+                return 0
+            self._last_sweep = now
+            # Тримаємо бази ВСІХ, чиї віча зараз ідуть, а не лише одного: з кількома робітниками
+            # «поточний» більше не один, і прибиральник міг би видалити базу з-під сусіднього віча.
+            keep = {sid for sid in self._active if sid}
         try:
-            gone = int(self.sessions.sweep(keep={self.current_sid} if self.current_sid else None))
+            gone = int(self.sessions.sweep(keep=keep or None))
         except Exception as exc:
             # Тека може бути недоступна — але це не привід зупиняти село. Причина лягає в
             # `/health`, а не в нікуди.
@@ -230,7 +309,8 @@ class LiveRunner:
         self.sessions_swept += gone
         return gone
 
-    def _loop(self) -> None:
+    def _loop(self, worker: str | None = None) -> None:
+        idle_since = time.time()
         # ★ `finally` тут не косметика. Потік може вмерти й повз `except Exception`: досить
         # `BaseException` або збою в самому обробнику (`print_exc` на закритому stderr у
         # відвʼязаному процесі — саме такий випадок). Тоді робітника вже немає, а `state` далі
@@ -245,12 +325,20 @@ class LiveRunner:
                     if reason is not None:
                         self._degrade(reason)
                         continue
-                    item = self.queue.lease(self.worker) if self.queue is not None else None
+                    item = self.queue.lease(worker or self.worker) if self.queue is not None else None
                     if item is None:
+                        # Зайвий робітник гасне сам: тримати десяток порожніх потоків після
+                        # напливу немає сенсу, а базовий склад лишається завжди.
+                        if (time.time() - idle_since > WORKER_IDLE_EXIT_S
+                                and self._alive_workers() > self.workers):
+                            self._retiring = True   # гасне добровільно, це не поламка
+                            return
                         self._sweep()
                         time.sleep(IDLE_SLEEP_S)
                         continue
+                    idle_since = time.time()
                     self._run_one(item)
+                    idle_since = time.time()
                 except Exception as exc:
                     self.last_error = f"{type(exc).__name__}: {exc}"
                     self._print_exc()
@@ -260,8 +348,15 @@ class LiveRunner:
                                                     {"message": self.last_error}, self.tick))
                     self._degrade(f"цикл упав: {self.last_error}", stage="loop")
         finally:
-            if not self._stop.is_set():
+            # Смерть ОДНОГО робітника з кількох — ще не смерть села: решта тягне чергу далі.
+            # Оголошуємо зупинку лише коли живих не лишилось.
+            # Смерть ОДНОГО робітника з кількох — ще не смерть села, але останній, хто гасне
+            # НЕ добровільно, мусить сказати це вголос.
+            if not self._stop.is_set() and self._alive_workers() <= 1 and not self._retiring:
                 self._died()
+
+    def _alive_workers(self) -> int:
+        return sum(1 for t in self._threads if t.is_alive())
 
     @staticmethod
     def _print_exc() -> None:
@@ -299,11 +394,22 @@ class LiveRunner:
             out += proj._walk(d["who"], d["poi"], 0)
         return out
 
+    @staticmethod
+    def _own(sid: str | None) -> str:
+        """★ Чия це розмова для ШИНИ.
+
+        Мітка `None` означає «спільне», і саме її дістають прогони без сесії — з консолі, з соаку,
+        з `curl`. Такий прогін бачили ВСІ гості одночасно: чужі теми лізли кожному на Дошку, хоч
+        він їх не кидав. Спільними лишаються тільки події стану ядра (стеля витрат, смерть
+        робітника) — вони справді стосуються всіх. Прогін без сесії дістає власну мітку `cli`:
+        інспектор без `sid` усе одно бачить усе (правило шини), а гість — лише своє.
+        """
+        return sid or "cli"
+
     def _run_one(self, item) -> None:
         # ★ Сховища беруться ПІД АЙТЕМ, а не раз на старті: `sid` лежить у самій задачі, тож те
         # саме ядро й той самий цикл ведуть різні села — по одному на гостя.
         sid = clean_sid((item.payload or {}).get("sid"))
-        self.current_sid = sid
         run_id = f"live-{item.key[:8]}-{uuid.uuid4().hex[:6]}"
         proj = StreamProjector(run_id, _now(), scene=self.scene, max_ticks=64, cast=self.cast)
         # ★ Аренду тримає ВЕСЬ метод, а не лише виклик агента. Доти `proj.start()`, чинні ухвали й
@@ -320,7 +426,8 @@ class LiveRunner:
         except Exception as exc:
             self._crashed(item, proj, exc, sid)
         finally:
-            self.current_sid = None
+            with self._lock:
+                self._active.pop(sid or "", None)
 
     def _work(self, item, proj: StreamProjector, run_id: str, sid: str | None = None,
               session=None) -> None:
@@ -328,17 +435,19 @@ class LiveRunner:
         decisions = self.decisions if session is None else session.decisions
         rumours = self.rumours if session is None else session.rumours
         make = self.make_orchestrator if session is None else session.make_agent
-        self.bus.publish(proj.start(), sid)
+        self.bus.publish(proj.start(), self._own(sid))
         # ★ Чинні ухвали повертаються на сцену ДО розмови: інакше «поставили сторожа» жило б рівно
         # один прогін, і рішення знову не мало б наслідку.
-        self.bus.publish(self._restore_decisions(proj, decisions), sid)
-        trace = BusTrace(self.bus, proj, sid)
+        self.bus.publish(self._restore_decisions(proj, decisions), self._own(sid))
+        trace = BusTrace(self.bus, proj, self._own(sid))
         orch = make(trace, run_id, (item.payload or {}).get("place"))
-        self.current = orch
+        with self._lock:
+            self._active[sid or ""] = orch
         template = getattr(orch, "budget_template", None)
         result = orch.run(task, seed=1,
                           budget=template.model_copy(deep=True) if template else None)
-        self.current = None
+        with self._lock:
+            self._active.pop(sid or "", None)
         if rumours is not None:
             for rec in trace.records:
                 if rec.agent == "rumour" and (rec.parsed or {}).get("claim"):
@@ -350,11 +459,13 @@ class LiveRunner:
                     d = rec.parsed
                     decisions.add(task, str(d["label"]), str(d.get("who") or ""),
                                   str(d["poi"]))
-        self.bus.publish(proj.close(result, done=True), sid)
+        self.bus.publish(proj.close(result, done=True), self._own(sid))
         tokens = int(getattr(result, "tokens", 0) or 0) + int(getattr(result, "aux_tokens", 0) or 0)
-        self.governor.record(tokens=tokens)
-        self.tick = max(self.tick, getattr(result, "steps", 0) or 0)
-        self.runs_done += 1
+        # Лічильники спільні для всіх робітників, тож рухаємо їх під замком.
+        with self._lock:
+            self.governor.record(tokens=tokens)
+            self.tick = max(self.tick, getattr(result, "steps", 0) or 0)
+            self.runs_done += 1
         if self.queue is not None:
             self.queue.ack(item.key, {"tokens": tokens,
                                       "outcome": getattr(result, "outcome", "answer")})
@@ -369,12 +480,11 @@ class LiveRunner:
         """
         self.last_error = f"{type(exc).__name__}: {exc}"
         self._print_exc()
-        self.current = None
         try:
-            self.bus.publish(proj.close(_Crash(self.last_error), done=False), sid)
+            self.bus.publish(proj.close(_Crash(self.last_error), done=False), self._own(sid))
         except Exception:
             pass
-        self.bus.publish(proj._envelope("run.error", {"message": self.last_error}, self.tick), sid)
+        self.bus.publish(proj._envelope("run.error", {"message": self.last_error}, self.tick), self._own(sid))
         if self.queue is not None:
             try:
                 self.queue.fail(item.key, self.last_error)

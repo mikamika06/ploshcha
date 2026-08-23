@@ -62,3 +62,6 @@ tmp/
 .claude/settings.local.json
 infra/.env
 !infra/.env.example
+
+# Майстер-копії арту (важкі оригінали до стиснення) — тримаємо локально, у збірку не йдуть.
+assets/masters/png/

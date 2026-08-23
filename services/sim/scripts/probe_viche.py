@@ -96,8 +96,13 @@ def main(argv=None) -> int:
             "новина": news, "outcome": result.outcome, "реплік": len(texts),
             "кроків": result.steps, "стеля_кроків": build_budget(spec).max_steps,
             "голосів": len(set(speakers)), "токенів": result.tokens + result.aux_tokens,
+            "вхідних": sum(result.prompt_by_lane.values()),
+            "згенерованих": result.tokens + result.aux_tokens - sum(result.prompt_by_lane.values()),
             "секунд": round(time.time() - started, 1),
             "по_ярусах": dict(result.tokens_by_lane),
+            "вхідних_по_ярусах": dict(result.prompt_by_lane),
+            "вхідних_по_стадіях": dict(result.prompt_by_stage),
+            "по_стадіях": dict(result.tokens_by_stage),
             "по_ролях": dict(roles),
             "distinct2": round(distinctness(texts, 2), 3),
             "overlap2": round(overlap(texts, 2), 3),
@@ -108,7 +113,7 @@ def main(argv=None) -> int:
 
         print(f"\n{'=' * 78}\nНОВИНА: {news}")
         print(f"  {result.outcome} · {len(texts)} реплік · {result.steps}/{build_budget(spec).max_steps} кроків · {len(set(speakers))} голосів · "
-              f"{report['токенів']} ток · {report['секунд']}s · "
+              f"{report['токенів']} ток (вх {report['вхідних']} / ген {report['згенерованих']}) · {report['секунд']}s · "
               f"яруси {report['по_ярусах']} · distinct2 {report['distinct2']} · "
               f"overlap2 {report['overlap2']}")
         if result.incidents:

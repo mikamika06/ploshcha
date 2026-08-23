@@ -14,6 +14,7 @@
 
 import json
 import mimetypes
+import pathlib
 import threading
 import time
 import traceback
@@ -77,8 +78,11 @@ def allow_new_session(gate: RateGate, sessions, sid: str | None, who: str) -> tu
     return ok, wait
 
 
-def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ...] = ()):
+def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ...] = (),
+                 feedback: Path | None = None):
     gate = RateGate()
+    # Куди лягають скарги гостей. Поруч із базою, бо це стан цього ж села, а не глобальний журнал.
+    feedback_path = Path(feedback) if feedback else Path("data/ploshcha/skargy.jsonl")
     new_sessions = RateGate(window=SESSION_WINDOW_S, limit=SESSION_MAX)
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -106,13 +110,29 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
             self.send_header("Content-Length", str(len(body)))
             self._cors()
             self.end_headers()
-            self.wfile.write(body)
+            self._body(body)
 
         def do_OPTIONS(self):
             self.send_response(204)
             self._cors()
             self.send_header("Content-Length", "0")
             self.end_headers()
+
+        def do_HEAD(self):
+            """Те саме, що GET, але без тіла.
+
+            Базовий обробник відповідав 501, і будь-який зовнішній монітор доступності бачив
+            ПЛОЩУ як зламану, хоч вона працювала: перевірки життя роблять саме HEAD.
+            """
+            self._head_only = True
+            try:
+                self.do_GET()
+            finally:
+                self._head_only = False
+
+        def _body(self, payload: bytes) -> None:
+            if not getattr(self, "_head_only", False):
+                self.wfile.write(payload)
 
         def do_GET(self):
             path = self.path.split("?", 1)[0]
@@ -136,6 +156,15 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
             # Обхід дерева вгору неможливий: усе поза коренем збірки — 404, а не читання диска.
             if not str(target).startswith(str(static.resolve())) or target.is_dir():
                 target = static / INDEX
+            # ★ Файл, якого немає, — це 404, а НЕ index.html.
+            #
+            # Запасний шлях на index потрібен лише маршрутам застосунку. Коли він ловив і шляхи з
+            # розширенням, застарілий `/assets/index-СТАРИЙХЕШ.js` віддавав HTML із кодом 200 —
+            # браузер отримував `text/html` замість скрипта, мовчки його не виконував, і сторінка
+            # лишалась білою. Кожна перезбірка міняє хеш, тож на будь-якому кешованому index.html
+            # гість отримував саме це.
+            if not target.is_file() and pathlib.PurePosixPath(rel).suffix:
+                return self._json(404, {"error": "немає такого файлу"})
             if not target.is_file():
                 target = static / INDEX
             if not target.is_file():
@@ -149,10 +178,30 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(body)
+            self._body(body)
+
+        def _feedback(self, payload: dict, who: str) -> None:
+            """Скарга гостя лягає у файл поруч із базою.
+
+            Окремий шлях, а не `/command`: скарга нічого не запускає й не витрачає ані токена, тож
+            і стеля команд її не має різати. Пишемо рядком JSON — читати можна `tail`, і жоден збій
+            запису не має права завалити відповідь гостеві.
+            """
+            text = str(payload.get("text") or "").strip()[:2000]
+            if not text:
+                raise ValueError("порожня скарга")
+            row = {"коли": time.strftime("%Y-%m-%d %H:%M:%S"), "текст": text,
+                   "сесія": clean_sid(payload.get("sid")),
+                   "звідки": str(payload.get("where") or "")[:80],
+                   "адреса": who,
+                   "браузер": (self.headers.get("User-Agent") or "")[:200]}
+            path = feedback_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
         def do_POST(self):
-            if self.path.split("?", 1)[0] != "/command":
+            if self.path.split("?", 1)[0] not in ("/command", "/feedback"):
                 return self._json(404, {"error": "не знайдено"})
             who = (self.headers.get("X-Forwarded-For") or self.client_address[0] or "?").split(",")[0].strip()
             ok, wait = gate.allow(who)
@@ -172,6 +221,15 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
                                               clean_sid(payload.get("sid")), who)
             if not allowed:
                 return self._json(429, {"error": f"забагато нових сесій — спробуй за {wait} с"})
+            if self.path.split("?", 1)[0] == "/feedback":
+                try:
+                    self._feedback(payload, who)
+                except ValueError as exc:
+                    return self._json(400, {"error": str(exc)})
+                except Exception as exc:
+                    traceback.print_exc()
+                    return self._json(500, {"error": f"скарга не записалась: {exc}"})
+                return self._json(200, {"ok": True})
             # ★ Межа помилки. Доти будь-який виняток у розборі команди летів у `handle_one_request`,
             # і клієнт не діставав ВЗАГАЛІ НІЧОГО — обрив зʼєднання замість відповіді. Саме так
             # виглядає «ядро не відповідає»: воно живе, просто мовчить у відповідь на команду.
@@ -195,6 +253,8 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
             if sid and sessions is not None and sessions.known(sid):
                 sessions.touch(sid)
             cursor = bus.tail_cursor()
+            # Звідси глядач слухає наживо; усе раніше — історія, і з неї йому належить лише своє.
+            shared_from = cursor
             if since:
                 try:
                     cursor = max(0, int(since))
@@ -209,7 +269,7 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
             self.end_headers()
             try:
                 while True:
-                    events, cursor = bus.wait_ids(cursor, HEARTBEAT_S, sid)
+                    events, cursor = bus.wait_ids(cursor, HEARTBEAT_S, sid, shared_from)
                     if not events:
                         self.wfile.write(b": heartbeat\n\n")
                         self.wfile.flush()
@@ -263,11 +323,10 @@ def handle_command(payload_in: dict, runner) -> tuple[int, dict]:
     if kind in ("say", "whisper"):
         # Слово в ЖИВЕ віче. Якщо саме зараз ніхто не гомонить, чесно кажемо це, а не мовчимо в
         # порожнечу: інакше «я написав, і нічого» знову виглядало б як поламка.
-        agent = getattr(runner, "current", None)
+        agent = runner.agent_for(sid) if hasattr(runner, "agent_for") else getattr(runner, "current", None)
         # ★ І віче мусить бути СВОЄ. Гість не бачить чужого прогону в потоці, тож слово, кинуте в
         # нього, зникло б без сліду — а з боку іншого села прилетів би голос нізвідки.
-        mine = getattr(runner, "current_sid", None) in (None, sid) if sid else True
-        if agent is None or not hasattr(agent, "tell") or not mine:
+        if agent is None or not hasattr(agent, "tell"):
             return 409, {"error": "зараз віча немає — кинь тему на Дошку"}
         text = str(payload.get("text") or "").strip()
         if not text:
@@ -313,9 +372,9 @@ class QuietServer(ThreadingHTTPServer):
 
 
 def serve(bus, runner, port: int = 8765, static: Path | None = None,
-          origins: tuple[str, ...] = ()) -> ThreadingHTTPServer:
+          origins: tuple[str, ...] = (), feedback: Path | None = None) -> ThreadingHTTPServer:
     """`origins` — звідки вітрині дозволено ходити по потік. Порожньо = лише свій же домен."""
-    httpd = QuietServer((HOST, port), make_handler(bus, runner, static, origins))
+    httpd = QuietServer((HOST, port), make_handler(bus, runner, static, origins, feedback))
     httpd.daemon_threads = True
     threading.Thread(target=httpd.serve_forever, name="live-http", daemon=True).start()
     return httpd

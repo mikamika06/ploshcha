@@ -105,8 +105,27 @@ export async function sendCommand(baseUrl: string, body: Record<string, unknown>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sid: sessionId(), ...body }),
   });
-  if (!res.ok) throw new Error(`команда відхилена: ${res.status}`);
+  if (!res.ok) {
+    // ★ Причину відмови несе САМЕ ядро, і вона осмислена («зараз віча немає», «занадто часто»).
+    // Доти нагору їхав самий код статусу, а UI перекладав його в «ядро не відповідає» — тобто
+    // казав, що звʼязку немає, тоді як звʼязок був, а слово відхилили з конкретної причини.
+    let reason = "";
+    try {
+      reason = String(((await res.json()) as { error?: string }).error ?? "");
+    } catch {
+      reason = "";
+    }
+    throw new CommandRefused(res.status, reason || `команда відхилена: ${res.status}`);
+  }
   return res.json();
+}
+
+/** Ядро відповіло і ВІДМОВИЛО. Це не те саме, що «ядро мовчить», і плутати їх не можна. */
+export class CommandRefused extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "CommandRefused";
+  }
 }
 
 /** Стан ядра: чи воно взагалі працює. Без цього «село думає» триває вічно й мовчки. */

@@ -1329,3 +1329,68 @@ body {
     font-size: 13px;
   }
 }
+
+/* ── скарга ─────────────────────────────────────────────────────────────────
+   Кнопка в кутку й записка під нею. Той самий матеріал, що й решта підписів
+   села: дощечка, серіф, тепла тінь. Це не HUD, а цидулка на стіні. */
+.gripe {
+  position: fixed;
+  /* Вище за раму села: на телефоні кнопка лягала просто на мальовану рамку й читалась як частина
+     малюнка, а не як кнопка. */
+  right: 20px;
+  bottom: 28px;
+  z-index: 950000;
+  padding: 7px 13px;
+  font: 600 13px/1 var(--serif);
+  color: var(--plaq-ink);
+  background: var(--plaq);
+  border: 1.5px solid var(--plaq-edge);
+  border-radius: var(--plaq-r);
+  box-shadow: var(--plaq-sh);
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 0.2s ease;
+}
+.gripe:hover { opacity: 1; }
+.gripe-note {
+  position: fixed;
+  right: 20px;
+  bottom: 70px;
+  z-index: 950001;
+  width: min(340px, calc(100vw - 24px));
+  padding: 14px;
+  background: var(--plaq);
+  border: 1.5px solid var(--plaq-edge);
+  border-radius: var(--plaq-r);
+  box-shadow: var(--plaq-sh);
+  display: none;
+}
+.gripe-note.on { display: block; }
+.gripe-note textarea {
+  width: 100%;
+  height: 96px;
+  resize: vertical;
+  font: 400 14px/1.35 var(--serif);
+  color: var(--plaq-ink);
+  background: rgba(255, 252, 245, 0.7);
+  border: 1px solid var(--plaq-edge);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.gripe-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.gripe-row button {
+  font: 600 13px/1 var(--serif);
+  color: var(--plaq-ink);
+  background: rgba(255, 252, 245, 0.9);
+  border: 1.5px solid var(--plaq-edge);
+  border-radius: 12px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.gripe-say { font: italic 400 12px/1.3 var(--serif); color: rgba(46, 32, 9, 0.75); }
