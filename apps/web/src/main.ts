@@ -631,15 +631,17 @@ async function boot(): Promise<void> {
         window.setTimeout(() => mapThink(""), 9000);
         break;
       case "event.happened": {
-        // Ухвала — не чергова тема, а СКРІПЛЕНЕ рішення: інший вигляд, і по ній не запускається
-        // новий прогін (клікабельні лише «гарячі»).
-        const decision = ev.payload.event.kind === "decision";
-        const rumour = ev.payload.event.kind === "rumour";
-        board.addTopic({
-          text: ev.payload.event.label,
-          heat: decision ? "sealed" : rumour ? "warm" : "cold",
-          author: decision ? store.state.villagers.get(ev.payload.event.involves?.[0] ?? "")?.name : undefined,
-        });
+        // ★ Дошка — це стіна ТЕМ, а не звіт про прогони.
+        //
+        // Ухвала носить у собі текст теми, з якою прийшов гість, тож на стіні опинялись «ухвалили:
+        // л ри лри» й таке інше. Наслідок ухвали й так видно в селі — доручений стоїть на своєму
+        // місці, — а сам підсумок лишається в хроніці. На Дошку йде лише чутка, і лише така, що
+        // читається як тема: кілька слів, а не набір літер.
+        if (ev.payload.event.kind !== "rumour") break;
+        const label = (ev.payload.event.label ?? "").trim();
+        const words = label.split(/\s+/).filter((w) => /[а-яіїєґА-ЯІЇЄҐa-zA-Z]/.test(w));
+        if (words.length < 3 || label.length < 12) break;
+        board.addTopic({ text: label, heat: "warm" });
         break;
       }
       case "report.compiled": {
@@ -683,7 +685,9 @@ async function boot(): Promise<void> {
     const half = plaq.offsetWidth / 2;
     const lo = half + 10 - c.x;
     const hi = window.innerWidth - half - 10 - c.x;
-    plaq.style.transform = `translateX(${Math.round(Math.min(Math.max(0, lo), Math.max(0, hi)))}px)`;
+    const shift = Math.round(Math.min(Math.max(0, lo), Math.max(0, hi)));
+    // Зсуваємо ЛИШЕ плашку; вістря лишається на предметі, бо живе окремим елементом від точки.
+    plaq.style.transform = `translateX(calc(-50% + ${shift}px))`;
   });
 
   renderer.app.ticker.add(() => {
@@ -795,7 +799,8 @@ async function boot(): Promise<void> {
       hintPoi = board;
       window.setTimeout(() => firstHint.classList.add("on"), 2600);
       // Підказка не має жити вічно: якщо гість пішов гуляти селом, вона своє сказала.
-      window.setTimeout(hideHint, 22000);
+      // Довше, ніж було: 22 секунди не вистачало навіть роздивитись село.
+      window.setTimeout(hideHint, 60000);
     }
   }
 }
