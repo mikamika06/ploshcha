@@ -46,6 +46,17 @@ const PLACE_ROOM: Record<string, string> = {
   ploshcha: "square", shynok: "tavern", tserkva: "church",
   kuznya: "forge", mlyn: "mill", dzvin: "bell", stavok: "pond",
 };
+
+/**
+ * Куди йти говорити. Дошка — не місце для віча, це стіна з темами.
+ *
+ * ★ Без запасного варіанта віче, призначене на Дошку, лишалось НА МАПІ: люди стояли коло криниці,
+ * репліки висіли над селом, а локація не відкривалась узагалі. Виглядало як «розмова мимо
+ * локації». Місця без своєї кімнати тепер ведуть на Площу — туди, де село й збирається.
+ */
+function roomFor(placeId: string): string {
+  return PLACE_ROOM[placeId] ?? "square";
+}
 const SOCIAL_ROOM: Record<string, { bg: string; name: string; floor: Pt[]; mask?: string }> = {
   tavern: { bg: assetUrl("/assets/rooms/tavern.webp"), name: "Шинок", mask: assetUrl("/assets/rooms/tavern_mask.png"), floor: FB },
   mill: { bg: assetUrl("/assets/rooms/mill.webp"), name: "Млин", mask: assetUrl("/assets/rooms/mill_mask.png"), floor: FB },
@@ -57,13 +68,14 @@ const SOCIAL_ROOM: Record<string, { bg: string; name: string; floor: Pt[]; mask?
 };
 
 import { FixtureDriver } from "./net/FixtureDriver";
-import { LiveDriver, sendCommand, fetchHealth } from "./net/LiveDriver";
+import { LiveDriver, sendCommand, fetchHealth, CommandRefused } from "./net/LiveDriver";
+import { Gripe } from "./interact/Gripe";
 import { parseEnvelope } from "./net/validate";
 import { GRADE_MUTED, loadGraded, assetUrl } from "./util/gfx";
 import { IS_LIVE, LIVE_URL, REPLAY_MS } from "./config";
 
 function tuftUrls(dir: string, count: number): string[] {
-  return Array.from({ length: count }, (_, i) => assetUrl(`/assets/nb/${dir}/0${i}.png`));
+  return Array.from({ length: count }, (_, i) => assetUrl(`/assets/nb/${dir}/0${i}.webp`));
 }
 
 const VEG_SRC: Record<VegType, string[]> = {
@@ -71,8 +83,8 @@ const VEG_SRC: Record<VegType, string[]> = {
   flower: tuftUrls("tuft_flower2", 8),
   reed: tuftUrls("tuft_reed2", 6),
   grass: tuftUrls("tuft_grass", 6),
-  tree: ["1_trees/00", "1_trees/01", "1_trees/02", "v2_trees/00", "v2_trees/01", "v2_trees/02"].map((s) => assetUrl(`/assets/nb/${s}.png`)),
-  bush: ["1_trees/03", "v2_trees/03", "v2_trees/04"].map((s) => assetUrl(`/assets/nb/${s}.png`)),
+  tree: ["1_trees/00", "1_trees/01", "1_trees/02", "v2_trees/00", "v2_trees/01", "v2_trees/02"].map((s) => assetUrl(`/assets/nb/${s}.webp`)),
+  bush: ["1_trees/03", "v2_trees/03", "v2_trees/04"].map((s) => assetUrl(`/assets/nb/${s}.webp`)),
 };
 const VEG_CAP: Partial<Record<VegType, number>> = { tree: 220, bush: 180 };
 
@@ -87,8 +99,8 @@ async function loadVegTextures(): Promise<VegTextures> {
 
 async function loadCharTextures(): Promise<Texture[]> {
   const urls: string[] = [];
-  for (let i = 0; i < 6; i++) urls.push(assetUrl(`/assets/nb/c1_chars_a/0${i}.png`));
-  for (let i = 0; i < 6; i++) urls.push(assetUrl(`/assets/nb/c2_chars_b/0${i}.png`));
+  for (let i = 0; i < 6; i++) urls.push(assetUrl(`/assets/nb/c1_chars_a/0${i}.webp`));
+  for (let i = 0; i < 6; i++) urls.push(assetUrl(`/assets/nb/c2_chars_b/0${i}.webp`));
   const loaded = await Promise.all(urls.map((u) => loadGraded(u, 130).catch(() => null)));
   return loaded.filter((t): t is Texture => t !== null);
 }
@@ -102,12 +114,22 @@ async function loadRoleFrames(): Promise<Map<string, Texture[]>> {
   const map = new Map<string, Texture[]>();
   await Promise.all(
     ROLE_IDS.map(async (id) => {
-      const fr = await Promise.all([0, 1, 2].map((n) => loadGraded(assetUrl(`/assets/roles/${id}/${n}.png`), undefined, GRADE_MUTED).catch(() => null)));
+      const fr = await Promise.all([0, 1, 2].map((n) => loadGraded(assetUrl(`/assets/roles/${id}/${n}.webp`), undefined, GRADE_MUTED).catch(() => null)));
       const valid = fr.filter((t): t is Texture => t !== null);
       if (valid.length === 3) map.set(id, valid);
     }),
   );
   return map;
+}
+
+/** Замір етапу старту: `performance.measure` + рядок у консоль. */
+async function phase<T>(name: string, run: () => Promise<T>): Promise<T> {
+  const t0 = performance.now();
+  const out = await run();
+  const ms = performance.now() - t0;
+  performance.measure(`старт: ${name}`, { start: t0, duration: ms });
+  console.info(`[старт] ${name}: ${Math.round(ms)} мс`);
+  return out;
 }
 
 async function boot(): Promise<void> {
@@ -123,21 +145,23 @@ async function boot(): Promise<void> {
   renderer.mount(document.getElementById("frame")!);
   // Хмарна завіса ОДРАЗУ — ховає сцену, поки все вантажиться й рендериться (з людьми).
   renderer.playIntro();
-  await renderer.loadGround();
-  await renderer.loadObjects(objects);
-  await renderer.loadProps();
+  // ★ Кожен етап старту позначений: «довго вантажиться» без розкладу — це здогад, а не діагноз.
+  // Читається з консолі або `performance.getEntriesByType("measure")`.
+  await phase("земля", () => renderer.loadGround());
+  await phase("будівлі", () => renderer.loadObjects(objects));
+  await phase("реквізит", () => renderer.loadProps());
 
   const grid = new WalkGrid(scene.masks.space.w, scene.masks.space.h, SCL);
   // NB: keepout маска = «не саджати» (стежки+хати+вода), а не «тут хата» — тому для
   // walk-grid її НЕ використовуємо (інакше вирізає всю ходьбу). Ходьба лише за walk2.
-  await grid.load(scene.masks.walk, undefined, scene.masks.zone);
+  await phase("сітка ходьби", () => grid.load(scene.masks.walk, undefined, scene.masks.zone));
   // футпринти хат (реальні bbox зі спрайтів) — щоб селяни не заходили ЗА/ПІД них
   grid.blockObjects(objects);
 
-  const [vegTex, chars, roleFrames] = await Promise.all([
+  const [vegTex, chars, roleFrames] = await phase("текстури зелені й людей", () => Promise.all([
     loadVegTextures(), loadCharTextures(), loadRoleFrames(),
-  ]);
-  await renderer.buildVegetation(vegTex);
+  ]));
+  await phase("зелень у сцену", () => renderer.buildVegetation(vegTex));
   renderer.initWeather();
 
   const pois = new Map<string, POI>();
@@ -214,6 +238,7 @@ async function boot(): Promise<void> {
   /** Репліки, що встигли прозвучати, ПОКИ село ще сходиться: чекають відкриття локації. */
   const preRoom: { who: string; text: string; deed?: string; toward?: string }[] = [];
   let resumeSkips = 0; // після рестарту тікера (вкладка/вихід з кімнати) — відкинути перші «биті» кадри
+  let stoppedAt = 0;   // коли тікер спинили: на цю паузу зсуваємо годинник сцени
   let talkOpen = false; // чи чекає відкрите вікно розмови на репліки з живого потоку
 
   const exitToVillage = (): void => {
@@ -231,6 +256,10 @@ async function boot(): Promise<void> {
     // кімната стопить тікер (опукла оболонка ховає діораму) → на виході прокидаємо сцену
     if (!renderer.app.ticker.started) {
       resumeSkips = 3;
+      // Годинник сцени не має «наздоганяти» те, що глядач простояв у локації: інакше вітер
+      // перестрибує на хвилину вперед одним кадром.
+      if (stoppedAt) renderer.resumeClock(performance.now() - stoppedAt);
+      stoppedAt = 0;
       renderer.app.ticker.start();
     }
   };
@@ -254,7 +283,9 @@ async function boot(): Promise<void> {
     (text) => {
       if (!IS_LIVE) return;
       void sendCommand(LIVE_URL, { kind: "say", text })
-        .catch(() => groupTalk.setStatus("слово не доїхало — віче вже скінчилось"));
+        .catch((err: unknown) => groupTalk.setStatus(err instanceof CommandRefused
+          ? `ядро не взяло слово: ${err.message}`
+          : "слово не доїхало — ядро не відповідає"));
     },
   );
   const board = new Board(
@@ -274,7 +305,7 @@ async function boot(): Promise<void> {
       const parts = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(5, pool.length));
       // Усі СПРАВДІ йдуть на місце віча — своїми ногами, по мапі. Доти це було наближення камери
       // до площі, тобто «зібрались» лише на словах: люди лишались там, де стояли.
-      const talkKind = PLACE_ROOM[board.where];
+      const talkKind = roomFor(board.where);
       const talkPoi = scene.pois.find((q) => q.kind === talkKind) ?? squarePoi;
       if (talkPoi) {
         // Громада ОДРАЗУ на місці: тицьнув тему — і всі там. Хода через усе село була хвилиною
@@ -305,7 +336,9 @@ async function boot(): Promise<void> {
           key: `${t.id}-${Date.now().toString(36)}`,
         }).catch((err: unknown) => {
           console.warn("[board] тема не доїхала в ядро", err);
-          groupTalk.finish("Тема не доїхала в ядро — воно не відповідає.");
+          groupTalk.finish(err instanceof CommandRefused
+            ? `Ядро не взяло тему: ${err.message}`
+            : "Тема не доїхала в ядро — воно не відповідає.");
         });
       } else {
         talkOpen = false;
@@ -324,16 +357,46 @@ async function boot(): Promise<void> {
       const live = talkRoom !== null;
       // Слово завжди ВГОЛОС. Якщо віче йде — воно вклинюється в нього; якщо ні — стає темою
       // тут-таки, інакше поле в тихій локації нічого не робило й читалось як зламане.
-      void sendCommand(LIVE_URL, live
-        ? { kind: "say", text }
-        : { kind: "topic", text, place: openPlace ?? board.where,
-            key: `room-${Date.now().toString(36)}` })
-        .then(() => {
-          if (!live) room.notice("Тему кинуто селу — зараз почнуть.");
-        })
-        .catch(() => room.notice("Слово не доїхало — ядро не відповідає."));
+      const asTopic = (): Promise<unknown> => sendCommand(LIVE_URL, {
+        kind: "topic", text, place: openPlace ?? board.where,
+        key: `room-${Date.now().toString(36)}`,
+      }).then(async (r) => {
+        // ★ Кажемо, СКІЛЬКИ чекати. Виконавець один, і поки він веде чуже віче, слово чесно лежить
+        // у черзі — а на екрані це виглядало як «нічого не сталось». Заміряно: прогін ~2 хв, коли
+        // шлюз повільний (медіана Mamay 6.8 с проти 1.8 с у спокійний час).
+        const h = await fetchHealth(LIVE_URL);
+        const ahead = h?.queue?.pending ?? 0;
+        room.notice(ahead > 0
+          ? `Слово в черзі: перед ним ${ahead}. Село візьметься, щойно звільниться.`
+          : "Тему кинуто селу — зараз почнуть.");
+        return r;
+      });
+      // ★ Слово не має пропадати через те, що віче саме скінчилось.
+      //
+      // Доти рішення «вклинитись у віче чи кинути тему» ухвалював фронт за своєю змінною, а ядро
+      // тим часом уже закрило віче й чесно відповідало 409 «зараз віча немає». Слово гинуло, і
+      // глядач бачив «ядро не відповідає» — хоч ядро відповіло. Тепер відмова саме з цієї
+      // причини означає «те саме слово, але темою».
+      const sent = live
+        ? sendCommand(LIVE_URL, { kind: "say", text })
+            .catch((err) => {
+              if (err instanceof CommandRefused && err.status === 409) return asTopic();
+              throw err;
+            })
+        : asTopic();
+      void sent.catch((err) => room.notice(
+        err instanceof CommandRefused
+          ? `Ядро не взяло слово: ${err.message}`
+          : "Слово не доїхало — ядро не відповідає."));
     },
   );
+  // Маски прохідності всіх локацій (разом 100 КБ) тягнемо наперед: без них перший вхід у кімнату
+  // мусив би чекати на завантаження, доки люди ще не сіли на підлогу.
+  const warmMasks = (): void => LivingRoom.warm(
+    Object.values(SOCIAL_ROOM).map((r) => r.mask).filter((m): m is string => Boolean(m)));
+  const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback;
+  if (idle) idle(warmMasks);
+  else window.setTimeout(warmMasks, 1200);
 
   /**
    * Село затягує хмарами й розводить їх уже над локацією, де сходиться віче.
@@ -342,8 +405,8 @@ async function boot(): Promise<void> {
    * церкві, а на екрані нічого не мінялось. Тепер видно, КУДИ пішли люди.
    */
   const enterTalkRoom = async (placeId: string, parts: TalkPart[]): Promise<void> => {
-    const kind = PLACE_ROOM[placeId];
-    const r = kind ? SOCIAL_ROOM[kind] : undefined;
+    const kind = roomFor(placeId);
+    const r = SOCIAL_ROOM[kind];
     if (!r) return;
     talkRoom = kind;
     openPlace = placeId;
@@ -397,14 +460,25 @@ async function boot(): Promise<void> {
         room.addPerson(castOf(w.who));
         room.enqueue(w.who, w.text, w.deed, w.toward);
       }
+      stoppedAt = performance.now();
       renderer.app.ticker.stop();
     });
   };
+
+  // Скарга — завжди під рукою, у кутку: людина, що впіймала баг, не має шукати, куди про нього
+  // сказати. Місце («де саме») підставляється саме, бо гість його не назве.
+  new Gripe(() => (talkRoom ? `локація:${talkRoom}` : "мапа"));
 
   const ports = new Ports(renderer.world, scene.pois, {
     wasDrag: () => Boolean(renderer.camera?.wasDrag()),
     onHover: (p, x, y) => {
       if (!p) {
+        whisper.classList.remove("on");
+        return;
+      }
+      // Підпис місця — лише поки над ним нікого не чути: доти він накривав саму репліку, і
+      // «Площа» лежала поверх слів. Підпис — підказка, репліка — зміст.
+      if (director.speaking()) {
         whisper.classList.remove("on");
         return;
       }
@@ -436,6 +510,7 @@ async function boot(): Promise<void> {
         for (const v of here) v.location = p.id;
         const cast: RoomCast[] = here.map((v) => ({ id: v.role, name: v.name, vid: v.id }));
         room.open(r.bg, r.name, cast, r.floor, r.mask, { figScale: FIG, token: BLACKBOX[p.kind] });
+        stoppedAt = performance.now();
         renderer.app.ticker.stop(); // опукла кімната ховає діораму → не рендеримо/не колишемо її поки там
       } else {
         (loc.querySelector(".loc-name") as HTMLElement).textContent = p.name;
@@ -495,8 +570,12 @@ async function boot(): Promise<void> {
         // Три голоси — три матеріали: сумнів попа не має виглядати як звичайна репліка, інакше
         // верифікатор знову зливається з рештою, як зливалось усе до цього.
         lastSpeaker = who;
-        director.speak(who, ev.payload.text, who === "pip" ? "doubt" : "voice");
-        // Віче переїхало в локацію → репліка лунає над головою ТАМ, а не над мапою за хмарами.
+        // ★ Поки віче йде в ЛОКАЦІЇ, над мапою не звучить нічого.
+        //
+        // Доти кожна репліка створювала ще й бульбашку на діорамі — невидиму під кімнатою, але
+        // живу свої сім секунд. Вийшовши й наблизивши камеру, глядач ловив на селянинові чужий
+        // голос із щойно закритої розмови («проти. …») — репліку, якої ніхто на мапі не казав.
+        if (!talkRoom) director.speak(who, ev.payload.text, who === "pip" ? "doubt" : "voice");
         planReady = true; // слово вже пролунало — далі чекати порядку нема сенсу
         if (talkRoom) {
           if (room.isOpen) {
@@ -580,7 +659,11 @@ async function boot(): Promise<void> {
   });
 
   // Директор мусить знати зум: бульбашка тримає сталий розмір НА ЕКРАНІ, а не у світі.
-  renderer.app.ticker.add(() => director.setZoom(renderer.camera?.zoom ?? 1));
+  renderer.app.ticker.add(() => {
+    director.setZoom(renderer.camera?.zoom ?? 1);
+    const v = renderer.camera?.visibleWorldRect(0);
+    if (v) director.setView(v);
+  });
 
   // Підказка тримається САМОГО предмета: камера рухається, стрілка лишається на Дошці.
   renderer.app.ticker.add(() => {
@@ -636,6 +719,7 @@ async function boot(): Promise<void> {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       wasRunning = renderer.app.ticker.started;
+      stoppedAt = performance.now();
       renderer.app.ticker.stop();
     } else if (wasRunning) {
       resumeSkips = 3;

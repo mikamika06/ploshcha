@@ -38,7 +38,13 @@ export class Wind {
     this.blastStart = t;
   }
 
-  update(t: number, view?: ViewRect): void {
+  update(t: number, view?: ViewRect, frameS = 0.016): void {
+    // ★ Дрібне тремтіння листя має сенс лише поки кадри часті.
+    //
+    // `rustle` коливається 2.6 рад/с: при 60 кадрах це шелест, при 8 — вибірка потрапляє в
+    // випадкові фази, і замість шелесту виходить сіпання. Тому на рідких кадрах амплітуду гасимо
+    // до нуля: краще спокійний листок, ніж смикання, яке око читає як поламку.
+    const fine = Math.max(0, Math.min(1, (0.055 - frameS) / 0.03));
     const wa = 0.9 * Math.sin(t * 0.06) + 0.5 * Math.sin(t * 0.017 + 2);
     const wdx = Math.cos(wa);
     const wdy = Math.sin(wa);
@@ -78,7 +84,7 @@ export class Wind {
         const along = w.x / this.Wn;
         gust += blastAmt * Math.exp(-Math.pow((along - blastPh) * 2.6, 2)) * 1.3;
       }
-      const rustle = 0.03 * Math.sin(t * 2.6 + w.phase);
+      const rustle = 0.03 * fine * Math.sin(t * 2.6 + w.phase);
       const skew = -((gust * WIND) / w.stiff) * wdx - rustle * (gust > 0.02 ? 1 : 0.25);
       // 4) епсилон-гейт: не бруднимо transform, якщо зміна невидима
       if (Math.abs(skew - w.lastSkew) > 0.004) {

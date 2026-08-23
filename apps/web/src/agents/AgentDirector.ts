@@ -114,6 +114,8 @@ export class AgentDirector {
   /** Кого зараз тримає віче: така людина не тиняється, доки розмова йде. */
   private held = new Set<string>();
   private zoom = 1;
+  /** Що зараз у кадрі (світові координати). Потрібно, щоб репліка не вилазила за екран. */
+  private view: { x0: number; y0: number; x1: number; y1: number } | null = null;
   private nextTex = 0;
 
   constructor(
@@ -306,6 +308,13 @@ export class AgentDirector {
   speak(id: string, text: string, kind: BubbleKind = "voice"): void {
     const r = this.recs.get(id);
     if (!r) return;
+    // ★ На загальному плані репліку не малюємо ВЗАГАЛІ, а не ховаємо.
+    //
+    // Доти бульбашка створювалась і жила свої сім секунд невидимою: варто було наблизити камеру в
+    // цей проміжок — і над селом розкривались репліки, яких ніхто щойно не казав. Виглядало як
+    // «спонтанні бульбашки при наближенні». Слово від цього не гине: воно є в стенограмі й у
+    // хроніці, а на мапі його однаково не було видно.
+    if (this.zoom < BUBBLE_MIN_ZOOM) return;
     // Найстарішу бульбашку прибираємо самі: шість одночасно вже давали стіну тексту над селом.
     const live = [...this.recs.values()].filter((x) => x.bubble && x.id !== id);
     while (live.length >= BUBBLE_AT_ONCE) {
@@ -321,6 +330,17 @@ export class AgentDirector {
   }
 
   /** На загальному плані селянин ~20 px: бульбашка там вища за хату й нічого не пояснює. */
+  /** Видима частина світу — з камери. Без неї репліка з краю села лишалась за кадром. */
+  setView(rect: { x0: number; y0: number; x1: number; y1: number }): void {
+    this.view = rect;
+  }
+
+  /** Чи хтось саме зараз говорить (є жива бульбашка). */
+  speaking(): boolean {
+    for (const r of this.recs.values()) if (r.bubble) return true;
+    return false;
+  }
+
   setZoom(zoom: number): void {
     this.zoom = zoom;
   }
@@ -385,14 +405,39 @@ export class AgentDirector {
       r.shadow.zIndex = (r.y | 0) - 1;
       if (r.bubble) {
         r.bubbleT -= dt;
-        r.bubble.x = r.x;
-        r.bubble.y = r.y - r.tex.height * r.sc - 6 * this.SCL;
-        r.bubble.zIndex = r.y + 2;
+        // ★ Репліка над УСІМ, а не серед спрайтів.
+        //
+        // Глибина рахувалась як `y + 2`, тобто бульбашка стояла в тій самій черзі, що й люди,
+        // хати й дерева: усе, що нижче по екрану, лізло на текст. Репліки живуть окремим ярусом
+        // над сценою (нижче лише невидимі хіт-зони портів на 2e9), а між собою — за глибиною.
+        r.bubble.zIndex = 1_500_000_000 + (r.y | 0);
         // Розмір бульбашки НЕ фіксований: вона мусить лишатись сталою на екрані, а не рости
         // разом зі світом, коли камера віддаляється.
         const k = Math.max(0.55, Math.min(1.25, 1 / Math.max(0.35, this.zoom)));
         r.bubble.scale.set(k);
-        r.bubble.visible = this.zoom >= BUBBLE_MIN_ZOOM;
+        // ★ І тримаємо її В КАДРІ.
+        //
+        // Селянин може стояти скраю села: репліка чесно висіла над ним і при цьому за межею
+        // екрана — прочитати її було нічим, бо камера туди не їде. Тому ставимо над головою, а
+        // тоді заганяємо всередину видимого прямокутника з полем на саму бульбашку.
+        const bx = r.x;
+        const by = r.y - r.tex.height * r.sc - 6 * this.SCL;
+        const v = this.view;
+        if (v) {
+          const b = r.bubble.getLocalBounds();
+          const halfW = (b.width * k) / 2 + 8;
+          const topH = b.height * k + 8;
+          r.bubble.x = Math.min(Math.max(bx, v.x0 + halfW), Math.max(v.x0 + halfW, v.x1 - halfW));
+          r.bubble.y = Math.min(Math.max(by, v.y0 + topH), Math.max(v.y0 + topH, v.y1 - 8));
+        } else {
+          r.bubble.x = bx;
+          r.bubble.y = by;
+        }
+        // Відʼїхали — репліку прибираємо назовсім, щоб вона не «вигулькнула» при поверненні.
+        if (this.zoom < BUBBLE_MIN_ZOOM) {
+          this.clearBubble(r);
+          continue;
+        }
         if (r.bubbleT <= 0) this.clearBubble(r);
       }
     }
