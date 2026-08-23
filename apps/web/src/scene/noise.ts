@@ -4,6 +4,26 @@ export function hash(x: number, y: number): number {
   return n - Math.floor(n);
 }
 
+/**
+ * ★ Хеш для ПОЛЯ ВІТРУ — цілочисловий, без синуса.
+ *
+ * Заміряно, чому листя «з часом починає сіпатись усе швидше»: поле вітру зноситься часом
+ * (`x - вітер·t`), тож із віком сцени координати ростуть, а `frac(sin(великий)·43758)` на великих
+ * аргументах втрачає точність і перетворюється на білий шум. Розворотів напрямку за секунду:
+ *
+ *     вік 10 с      0.0        вік 3600 с   15.6
+ *     вік 600 с     0.3        вік 36000 с  14.1
+ *
+ * Тобто після години сцена смикає рослину пʼятнадцять разів на секунду. Цілочисловий хеш точний
+ * до 2^31 — на будь-якому віці той самий спокійний шелест. Розсів рослин лишається на старому
+ * `hash`: він рахується раз на старті, координати там малі, а міняти його — це пересіяти все село.
+ */
+function ihash(x: number, y: number): number {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
 export function vnoise(x: number, y: number): number {
   const xi = Math.floor(x);
   const yi = Math.floor(y);
@@ -11,9 +31,9 @@ export function vnoise(x: number, y: number): number {
   const yf = y - yi;
   const u = xf * xf * (3 - 2 * xf);
   const v = yf * yf * (3 - 2 * yf);
-  const a = hash(xi, yi);
-  const b = hash(xi + 1, yi);
-  const c = hash(xi, yi + 1);
-  const d = hash(xi + 1, yi + 1);
+  const a = ihash(xi, yi);
+  const b = ihash(xi + 1, yi);
+  const c = ihash(xi, yi + 1);
+  const d = ihash(xi + 1, yi + 1);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }

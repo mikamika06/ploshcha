@@ -394,9 +394,12 @@ async function boot(): Promise<void> {
   // мусив би чекати на завантаження, доки люди ще не сіли на підлогу.
   const warmMasks = (): void => LivingRoom.warm(
     Object.values(SOCIAL_ROOM).map((r) => r.mask).filter((m): m is string => Boolean(m)));
-  const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback;
-  if (idle) idle(warmMasks);
-  else window.setTimeout(warmMasks, 1200);
+  // ★ Гріємо маски ПІСЛЯ хмар, а не «коли буде вільно».
+  //
+  // `requestIdleCallback` спрацьовував рівно тоді, коли головний потік звільнявся, — тобто саме
+  // під час розходження завіси. Сім масок декодуються не миттєво, і ця робота лягала на єдині
+  // секунди, які глядач бачить як рух. Тепер вони чекають, поки хмари догорнуться.
+  window.setTimeout(warmMasks, 5000);
 
   /**
    * Село затягує хмарами й розводить їх уже над локацією, де сходиться віче.
@@ -768,6 +771,14 @@ async function boot(): Promise<void> {
     new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res()))),
     new Promise<void>((res) => setTimeout(res, 250)),
   ]);
+  // ★ Хмари розходяться, коли село СПРАВДІ готове показатись.
+  //
+  // Текстури Pixi вивантажує на GPU лінькувато — під час ПЕРШОГО малювання. Тож завіса починала
+  // розходитись рівно тоді, коли головний потік ще заливав кілька десятків текстур: хмари йшли
+  // ривками, а з-під них проступала недомальована сцена. Тепер спершу мовчки малюємо кадр під
+  // завісою (це й змушує вивантажити все), даємо два кадри на спокій — і аж тоді розводимо.
+  renderer.app.renderer.render(renderer.app.stage);
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
   renderer.dissipateIntro();
 
   // Підказку показуємо ПІСЛЯ хмар: під завісою її однаково не видно, а поява разом із селом

@@ -115,6 +115,8 @@ export class LivingRoom {
   private mask: Uint8Array | null = null; // прохідна маска з Nano Banana (зелене=1); null → полігон
   private mgw = 0;
   private mgh = 0;
+  /** Прохідні клітини маски парами (x, y) у частках кадру. `null` — маски немає, ходить полігон. */
+  private cells: Float32Array | null = null;
   /** Маски живуть довше за кімнату: локації відкривають по колу, а вантажити щоразу — це чекання. */
   private static MASKS = new Map<string, MaskGrid | null>();
   private static LOADING = new Map<string, Promise<MaskGrid | null>>();
@@ -241,6 +243,7 @@ export class LivingRoom {
     const ys = floor.map((p) => p[1]);
     this.bbox = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
     this.mask = null;
+    this.cells = null;
     this.field.innerHTML = "";
     this.vs = [];
     this.pending = [];
@@ -333,6 +336,16 @@ export class LivingRoom {
     this.mgw = m.gw;
     this.mgh = m.gh;
     this.bbox = { x0: 0, x1: 1, y0: 0, y1: 1 };
+    // Список прохідних клітин — щоб посадка була вибором із того, що є, а не лотереєю.
+    const out: number[] = [];
+    for (let gy = 0; gy < m.gh; gy++) {
+      for (let gx = 0; gx < m.gw; gx++) {
+        if (m.grid[gy * m.gw + gx] === 1) {
+          out.push((gx + 0.5) / m.gw, (gy + 0.5) / m.gh);
+        }
+      }
+    }
+    this.cells = out.length ? Float32Array.from(out) : null;
   }
 
   private inFloor(x: number, y: number): boolean {
@@ -345,6 +358,15 @@ export class LivingRoom {
   }
 
   private randFloor(): Pt {
+    // ★ З МАСКИ беремо клітину, а не тичемо навмання.
+    //
+    // Вісімдесят спроб по всьому кадру — це ставка на те, що прохідного багато. У тісній кімнаті
+    // (кузня — два відсотки кадру) спроби вигоряли, і код повертав ЦЕНТР кадру, тобто ставив
+    // людину просто в стіну. Саме так вона й «телепортувалась за зону».
+    if (this.cells && this.cells.length) {
+      const i = (Math.random() * (this.cells.length / 2)) | 0;
+      return [this.cells[i * 2], this.cells[i * 2 + 1]];
+    }
     for (let k = 0; k < 80; k++) {
       const x = rand(this.bbox.x0, this.bbox.x1);
       const y = rand(this.bbox.y0, this.bbox.y1);
