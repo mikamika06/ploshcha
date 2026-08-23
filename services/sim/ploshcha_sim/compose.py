@@ -89,7 +89,8 @@ def build_budget(spec: AppSpec) -> Budget:
 # Усе, що `Viche` приймає понад базове. Тест звіряє цей перелік із сигнатурою, щоб новий параметр
 # не міг знову зникнути дорогою.
 VICHE_KWARGS = ("score_system", "line_system", "summary_system", "doubt_system",
-                "chronicle_system", "village", "standing", "rumours", "place", "scout", "memory")
+                "chronicle_system", "village", "standing", "rumours", "place", "scout", "memory",
+                "plan_ahead")
 
 
 def build_scout(spec: AppSpec, *, lapa, mamay, system: str, answer_instruction: str,

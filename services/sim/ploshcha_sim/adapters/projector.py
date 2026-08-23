@@ -234,8 +234,11 @@ class StreamProjector:
             if label and poi:
                 out.append(self._envelope("event.happened", {"event": {
                     "id": f"decision-{self.run_id}", "kind": "decision", "label": label,
-                    "description": (f"ухвалено вічем, доручено: {who}" if who
-                                    else "ухвалено вічем"),
+                    # Лічба — у поясненні, а не в самій назві: на цидулці має бути ухвала.
+                    "description": " · ".join(x for x in (
+                        str(payload.get("tally") or "") or None,
+                        (f"доручено: {who}" if who else "ухвалено вічем"),
+                    ) if x),
                     "place": {"poi": poi},
                     **({"involves": [who]} if who else {}),
                 }}, tick))
