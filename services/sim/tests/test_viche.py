@@ -118,6 +118,18 @@ def build(replies, *, tools=None, width=3, trace=None):
 
 # ── склад: визначений даними, не моделлю ──────────────────────────────────────
 
+
+def score_call(llm):
+    """Виклик ПАРТИТУРИ серед викликів моделі.
+
+    Перше слово тепер лунає ДО планування (код призначає, кому починати, поки Мамай пише), тож
+    партитура більше не нульовий виклик. Шукаємо її за схемою, а не за номером.
+    """
+    for c in llm.calls:
+        if "такти" in str(c.get("schema") or ""):
+            return c
+    return llm.calls[0]
+
 def test_the_same_topic_always_gathers_the_same_people():
     assert cast_for(NEWS, 4) == cast_for(NEWS, 4)
 
@@ -411,12 +423,19 @@ def test_no_single_voice_may_hog_the_conversation():
 
 
 def test_the_score_gets_its_own_output_budget():
-    """Спільна стеля різала JSON партитури на півслові, парс падав, і план тихо викидався."""
-    from ploshcha_sim.agents.viche import SCORE_TOKENS
+    """Спільна стеля різала JSON партитури на півслові, парс падав, і план тихо викидався.
+
+    ★ Перша хвиля коротка (`FIRST_WAVE`), тож і стеля її виводу менша за повну — але однаково
+    СВОЯ, а не реплікова: саме через спільну стелю партитура й гинула. Повна стеля лишається для
+    довгих хвиль.
+    """
+    from ploshcha_sim.agents.viche import FIRST_WAVE, SCORE_TOKENS
+    from ploshcha_sim.agents.viche import score_cap
 
     agent, llm = build([score(beat(cast_for(NEWS, 2)[0].role))] + lines(8), width=2)
     agent.run(NEWS, seed=1, budget=Budget(max_steps=30, max_tokens=99_999))
-    assert llm.calls[0]["max_tokens"] == SCORE_TOKENS
+    assert score_call(llm)["max_tokens"] == score_cap(FIRST_WAVE)
+    assert score_call(llm)["max_tokens"] > 220, "партитура не влазить у стелю однієї репліки"
     assert SCORE_TOKENS > 800, "дванадцять тактів це ~800 токенів JSON"
 
 
@@ -999,7 +1018,7 @@ def test_open_rumours_reach_the_next_score():
     agent = Viche(single_model_router(llm), PresetEffort(), None, width=2, run_id="r",
                   rumours=[{"who": "shynkar", "claim": "то пес, а не вовк"}])
     agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
-    assert "то пес, а не вовк" in llm.calls[0]["prompt"]
+    assert "то пес, а не вовк" in score_call(llm)["prompt"]
 
 
 def test_the_builder_forwards_every_parameter_viche_accepts():
@@ -1182,8 +1201,8 @@ def test_the_village_remembers_a_related_viche(tmp_path):
     agent.memory = mem
     agent.run("Знову вовк коло кошари.", seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
 
-    assert "Вовча напасть" in llm.calls[0]["prompt"]
-    assert "Гребля" not in llm.calls[0]["prompt"], "пригадують СПОРІДНЕНЕ, а не все підряд"
+    assert "Вовча напасть" in score_call(llm)["prompt"]
+    assert "Гребля" not in score_call(llm)["prompt"], "пригадують СПОРІДНЕНЕ, а не все підряд"
     recalled = [e for e in _events(trace) if e["type"] == "memory.recalled"]
     assert recalled and recalled[0]["payload"]["items"] == ["Вовча напасть"]
 
@@ -1307,18 +1326,25 @@ def test_the_decision_is_a_count_not_a_retelling():
 
 
 def test_the_next_wave_is_planned_KNOWING_what_was_already_said():
-    """Головне в хвилях: друга партитура бачить стенограму й позиції. Інакше це та сама
-    написана наперед черга, тільки в кілька викликів."""
+    """Головне в хвилях: партитура бачить стенограму й позиції. Інакше це та сама написана наперед
+    черга, тільки в кілька викликів.
+
+    ★ Виняток — дві ПЕРШІ хвилі: вони замовляються одночасно, ще до першого слова, бо інакше
+    коротка перша вигоряє швидше, ніж пишеться друга, і на четвертому такті зяє провал 16-19 с
+    (заміряно на живому вічі). Стенограми тоді ще немає ні в кого. Усі наступні хвилі — знають.
+    """
     pair = [p.role for p in cast_for(NEWS, 2)]
-    agent, llm = build([score(beat(pair[0])), score(beat(pair[1], "заперечити", 1))]
-                       + lines(6) + [chron((pair[0], "Отак."))], width=2)
-    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    agent, llm = build([score(beat(pair[0])), score(beat(pair[1], "заперечити", 1)),
+                        score(beat(pair[0], "спитати_діло", 1))]
+                       + lines(12) + [chron((pair[0], "Отак."))], width=2)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=60, max_tokens=99_999))
 
     scores = [c for c in llm.calls
               if isinstance(c["schema"], dict) and "такти" in (c["schema"].get("properties") or {})]
-    assert len(scores) >= 2, "партитура мусить плануватись хвилями, а не одна на весь прогін"
-    assert "ЩО ВЖЕ СКАЗАНО" in scores[1]["prompt"]
-    assert "ПОЗИЦІЇ ЗАРАЗ" in scores[1]["prompt"]
+    assert len(scores) >= 3, "партитура мусить плануватись хвилями, а не одна на весь прогін"
+    knowing = [c for c in scores if "ЩО ВЖЕ СКАЗАНО" in c["prompt"]]
+    assert knowing, "хвиля, замовлена вже під час розмови, мусить бачити стенограму"
+    assert "ПОЗИЦІЇ ЗАРАЗ" in knowing[0]["prompt"]
 
 
 def test_every_voice_votes_and_the_vote_is_spoken_aloud():
@@ -1540,3 +1566,29 @@ def test_the_move_that_brought_nothing_is_gone():
     assert "піти_питати" not in MOVES
     assert "піти_питати" not in MOVE_HINT
     assert "піти_питати" not in DEED_OF_MOVE
+
+
+def test_a_line_never_wears_another_villagers_name():
+    """★ Виконавець ліпив чужий підпис усередину репліки: бульбашка над Миколою починалась
+    «Одарка: …». Ріжемо кодом і лише коли перед двокрапкою стоїть імʼя чи роль цього села —
+    звичайна пряма мова («Кажу так: …») лишається цілою."""
+    from ploshcha_sim.agents.viche import _strip_speaker
+
+    names = {"микола залізний", "одарка"}
+    assert _strip_speaker("Одарка: Та що ви, люди добрі", names) == "Та що ви, люди добрі"
+    assert _strip_speaker("дід Свирид: та було вже таке") == "та було вже таке"
+    assert _strip_speaker("Кажу так: не буде з того діла") == "Кажу так: не буде з того діла"
+    assert _strip_speaker("Одарка:") == "Одарка:", "порожній хвіст — не підпис, а сама репліка"
+
+
+def test_the_first_word_sounds_before_the_score_is_written():
+    """★ Планування — дорогий слот (заміряно 28 с на повну партитуру, 6-11 с на хвилю), а репліка —
+    дешевий. Доти вони йшли послідовно, і глядач дивився на «Село думу думає» весь час планування.
+    Тепер партитуру замовляють у окремий потік, а першу репліку код призначає САМ: перший у касті,
+    хід «реакція». Отже перше, що звучить, — це його слово, а не результат партитури."""
+    llm = FakeLlm(lines(1) + [score(beat(cast_for(NEWS, 2)[0].role))] + lines(6), model="f")
+    agent = Viche(single_model_router(llm), PresetEffort(), None, width=2, run_id="r")
+    result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    first_line = (result.answer or "").splitlines()[0]
+    assert first_line.startswith(cast_for(NEWS, 2)[0].name + ":"), \
+        "починає той, кого призначив код, а не той, кого написала партитура"

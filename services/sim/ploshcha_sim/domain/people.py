@@ -219,6 +219,61 @@ def describe(role: str, traits: dict[str, float], lens: str) -> str:
     return f"- {role}: {lens}. Норов: {marked}"
 
 
+# ★ Стать ролі — властивість СПРАЙТА, а не тексту.
+#
+# Малюнок для кожної ролі фіксований: `did` — дід, `mati` — молодиця. Імена ж вигадує модель, і
+# вона регулярно давала жіноче імʼя чоловічій фігурі («дід Свирид: як я ще дівкою була»). Це
+# видно на екрані як розсинхрон малюнка й підпису, тому вирішує КОД, а не модель.
+GENDER_BY_ROLE = {
+    "did": "ч", "koval": "ч", "mirosh": "ч", "parubok": "ч", "pip": "ч",
+    "starosta": "ч", "chumak": "ч", "diak": "ч",
+    "sheptu": "ж", "shynkar": "ж", "mati": "ж", "divchyna": "ж",
+}
+
+# Слова-титули перед імʼям: рід визначає саме імʼя, а не «дід» чи «баба».
+_TITLES = {"дід", "баба", "бабка", "пан", "пані", "отець", "тітка", "кум", "кума", "дядько",
+           "молодиця", "старий", "стара"}
+# Чоловічі імена на -а/-я — виняток із правила, тож перелічені явно.
+_MALE_A = {"микола", "ілля", "сава", "кузьма", "хома", "лука", "юхим", "гаврило", "гаврила",
+           "данило", "михайло", "марко", "петро", "павло", "дмитро", "богдан", "левко", "василь"}
+# Запасні імена, коли модель промахнулась статтю. Беруться за роллю, тобто стабільно.
+_FALLBACK = {
+    "did": "дід Свирид", "koval": "Остап", "mirosh": "Панас", "parubok": "Іван",
+    "pip": "отець Тарас", "starosta": "Гнат", "chumak": "Мирон", "diak": "Юхим",
+    "sheptu": "баба Горпина", "shynkar": "Одарка", "mati": "Марія", "divchyna": "Оксана",
+}
+
+
+def name_gender(name: str) -> str | None:
+    """`ч`/`ж` за самим імʼям; `None` — не беремось судити.
+
+    Правило просте й українське: імʼя на -а/-я жіноче, крім переліку чоловічих винятків
+    (Микола, Ілля, Сава…). Титул попереду відкидаємо — «дід Марія» має ловитись саме як помилка.
+    """
+    parts = [w for w in name.replace("’", "'").split() if w]
+    while parts and parts[0].lower().strip(".,") in _TITLES:
+        parts.pop(0)
+    if not parts:
+        return None
+    first = parts[0].lower().strip(".,'\"")
+    if first in _MALE_A:
+        return "ч"
+    if first.endswith(("а", "я")):
+        return "ж"
+    return "ч"
+
+
+def fit_gender(role: str, name: str) -> str:
+    """Імʼя, що не свариться з малюнком. Промах моделі міняємо на сталу заміну за роллю."""
+    want = GENDER_BY_ROLE.get(role)
+    if want is None or not name:
+        return name
+    got = name_gender(name)
+    if got is None or got == want:
+        return name
+    return _FALLBACK.get(role, name)
+
+
 def repair_people(raw: dict | None, roles: list[str],
                   traits: dict[str, dict[str, float]]) -> list[Person]:
     """Лагодить КОД: чужа роль, порожнє імʼя, дублікат — усе відкидається, норов лишається наш.
@@ -237,7 +292,7 @@ def repair_people(raw: dict | None, roles: list[str],
             continue
         seen.add(role)
         out.append(Person(
-            role=role, name=name[:NAME_MAX],
+            role=role, name=fit_gender(role, name)[:NAME_MAX],
             bio=" ".join(str(item.get("про_себе") or "").split())[:BIO_MAX],
             saying=" ".join(str(item.get("примовка") or "").split())[:SAYING_MAX],
             traits=traits.get(role, {}),

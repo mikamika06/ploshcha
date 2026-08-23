@@ -17,6 +17,7 @@
 import json
 import random
 import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 
 from ..domain.evidence import found_in
 from ..domain.graph import child_budget
@@ -58,8 +59,27 @@ VICHE_NOTE = "viche"
 #
 # Компроміс між «одна партитура на прогін» (нічого не реагує) і «виклик на кожен такт» (дорого):
 # оркестратор бачить стенограму й позиції кожні WAVE тактів.
-WAVE = 5
-MAX_WAVES = 5
+# Хвиля має тривати ДОВШЕ, ніж пишеться наступна: планування 7-11 с, репліка 0.5-1.5 с, тож
+# пʼять тактів вигоряли швидше, ніж приходив наступний план, і в розмові знову зяяли провали.
+WAVE = 10
+MAX_WAVES = 8
+# ★ ПЕРША хвиля — коротка.
+#
+# Доти нульова хвиля планувала ВСЮ партитуру (12-20 тактів, стеля виводу 2200), і глядач дивився
+# на «Село думу думає» рівно стільки, скільки Мамай писав цей текст: заміряно 28.6 с до
+# `plan.formed` і 30.3 с до першої репліки. Розмова від цього не коротшає — решта дописується
+# хвилями, зате перше слово лунає майже одразу.
+# Розмір хвилі за її номером: перші дві короткі (щоб село заговорило й не змовкло), далі повні.
+# Заміряно: коротка хвиля пишеться ~7 с, повна ~19 с; після третьої хвилі конвеєр уже наповнений,
+# і довга пауза нікому не видна.
+WAVE_SIZES = (3, 5)
+
+
+def wave_size(wave: int) -> int:
+    return WAVE_SIZES[wave] if wave < len(WAVE_SIZES) else WAVE
+
+
+FIRST_WAVE = WAVE_SIZES[0]
 # Ходи для ремонту повтору: інший хід — інший зміст. Обертаємо за індексом такту, тож
 # відтворювано за сідом, як і решта збурень.
 _CONTRAST = ("заперечити", "спитати_діло", "пожартувати", "пожалітись", "порахувати")
@@ -154,6 +174,7 @@ class Viche(AgentPort):
         # тактами, а не в середині — інакше репліка вклинювалась би в напівзгенерований такт.
         self._inbox: list[dict] = []
         self._lock = threading.Lock()
+        self._blk = threading.Lock()
         self._whispers: dict[str, str] = {}
         # Вади самого КАНАЛУ (обрив на стелі, порожня відповідь) — окремо від вад змісту: їх
         # помічає `_call`, який про поточний список інцидентів нічого не знає.
@@ -185,18 +206,64 @@ class Viche(AgentPort):
         index = 0
         wave = 0
         pending: list[Beat] = []
-        while index < target and wave <= MAX_WAVES:
+        # ★ ПЕРШЕ СЛОВО ЛУНАЄ, ПОКИ МАМАЙ ЩЕ ПИШЕ.
+        #
+        # Планування — дорогий слот (заміряно 6 с навіть на короткій хвилі, 28 с на повній), а
+        # репліка — дешевий (Lapa, 0.5 с). Доти вони йшли одне за одним, тож глядач дивився на
+        # «Село думу думає» весь час планування. Тепер код САМ призначає, кому починати —
+        # перший у касті, тобто той, чия лінза найближча до новини, — і його репліка йде
+        # паралельно з партитурою. Вибір тут не судження, а порядок касту, отже це код.
+        # ★ Наступна хвиля пишеться, ПОКИ село говорить.
+        #
+        # Заміряно на живому прогоні: між репліками 0.6-2.5 с, але кожні пʼять тактів — провал на
+        # 6-12 с, і це рівно планування наступної хвилі. З двадцяти семи реплік чотири такі паузи
+        # зʼїдали 39 секунд із 70. Мамай і Лапа сидять на різних кінцях мережі, тож нехай пишуть
+        # одночасно: щойно в черзі лишається два такти, замовляємо наступну хвилю в окремому потоці.
+        # ★ Дві хвилі в роботі одночасно.
+        #
+        # Планування ПОВІЛЬНІШЕ за мову: десять тактів пишуться ~14 с, а вимовляються ~10 с. Одна
+        # хвиля наперед не встигає за розмовою — заміряно провал 14 с посеред живого віча. Тому
+        # тримаємо конвеєр: поки грає поточна хвиля, пишуться ще дві.
+        ahead: list[Future] = []
+        pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="viche-plan")
+        try:
+          # Партитуру замовляємо ДО першого слова: поки Лапа каже реакцію, Мамай уже пише.
+          if cast and budget.can_continue():
+              # ★ Дві перші хвилі замовляємо ОДНОЧАСНО, ще до першого слова.
+              #
+              # Друга не бачить стенограми — її ще немає, — зате приходить, поки грає перша, і
+              # розмова не спотикається на самому початку. Заміряно: без цього після третього
+              # такту зяяв провал 16-19 с, бо коротка хвиля вигоряє швидше, ніж пишеться наступна.
+              ahead.append(pool.submit(self._plan, task, cast, seed, budget, incidents,
+                                       want=min(wave_size(0), target), first=True))
+              if target > wave_size(0):
+                  ahead.append(pool.submit(self._plan, task, cast, seed + 17, budget, incidents,
+                                           want=min(wave_size(1), target - wave_size(0)),
+                                           first=False))
+          opener = self._opening(task, cast, seed, budget, incidents)
+          if opener:
+              said += opener
+              index += 1
+          while index < target and wave <= MAX_WAVES:
             if not pending:
                 if wave >= MAX_WAVES or not budget.can_continue():
+                    # Обрізану розмову треба НАЗВАТИ обрізаною: інакше «скінчились кроки» виглядає
+                    # як «село саме замовкло». Тепер стеля може впертись і тут — перше слово й
+                    # замовлена наперед партитура витрачають крок ще до циклу.
+                    if not budget.can_continue():
+                        incidents.append("viche_budget")
                     break
-                want = min(WAVE, target - index)
+                want = min(wave_size(wave), target - index)
                 # Провал ПЕРШОЇ хвилі — це втрачена партитура (перепит + гучний запасний план).
                 # Провал наступної — просто кінець розмови: план у неї вже був.
-                fresh = self._plan(task, cast, seed + wave * 17, budget, incidents,
-                                   said=said if wave else None,
-                                   stances=stances if wave else None,
-                                   want=want if wave else None,
-                                   first=wave == 0)
+                if ahead:
+                    fresh = ahead.pop(0).result()
+                else:
+                    fresh = self._plan(task, cast, seed + wave * 17, budget, incidents,
+                                       said=said if wave else None,
+                                       stances=stances if wave else None,
+                                       want=want,
+                                       first=wave == 0)
                 if not fresh:
                     break
                 pending = scatter(fresh, roles, seed + wave, task, self._people,
@@ -220,7 +287,20 @@ class Viche(AgentPort):
             # Позицію рухає КОД за тим, що сталось у такті: інструмент дав факт чи ні, який хід.
             stances = stance_after(beat, stances, self.standing,
                                    self._last_found if len(said) > before else None)
-        beats = played
+            # Черга дотанцьовує — саме час замовити наступну хвилю, щоб вона встигла до тиші.
+            booked = len(pending) + sum(wave_size(wave + 1 + i) for i in range(len(ahead)))
+            if (len(ahead) < 2 and wave < MAX_WAVES
+                    and index + booked < target and budget.can_continue()):
+                nxt = wave + 1 + len(ahead)
+                ahead.append(pool.submit(
+                    self._plan, task, cast, seed + nxt * 17, budget,
+                    incidents, said=list(said), stances=dict(stances),
+                    want=min(wave_size(nxt), target - index - booked), first=False))
+          beats = played
+        finally:
+            for f in ahead:
+                f.cancel()
+            pool.shutdown(wait=False)
 
         if said:
             # Староста зводить не всюди: у шинку модератора немає, і саме тому там кажуть інше.
@@ -291,6 +371,22 @@ class Viche(AgentPort):
         return picked or list(folk[:self.width])
 
     # ── партитура ─────────────────────────────────────────────────────────────
+    def _opening(self, task: str, cast: list[Persona], seed: int, budget: Budget,
+                 incidents: list[str]) -> list[tuple[Persona, str]]:
+        """Хто озивається першим — і його слово, поки партитура ще пишеться.
+
+        Такт складає код: перший у касті, хід «реакція», нікому не у відповідь. Це не судження про
+        розмову, а порядок, у якому `cast_for` уже поставив людей за близькістю лінзи до новини.
+        """
+        if not cast:
+            return []
+        beat = Beat(хто=cast[0].role, хід="реакція", у_відповідь=None, запит=None)
+        try:
+            return self._play(task, beat, 1, cast, [], seed, budget, incidents)
+        except Exception as exc:   # перше слово не має права завалити віче
+            incidents.append(f"viche_open_lost:{type(exc).__name__}")
+            return []
+
     def _plan(self, task: str, cast: list[Persona], seed: int, budget: Budget,
               incidents: list[str], *, said: list[tuple[Persona, str]] | None = None,
               stances: dict[str, float] | None = None, want: int | None = None,
@@ -445,11 +541,11 @@ class Viche(AgentPort):
               said: list[tuple[Persona, str]], seed: int, budget: Budget,
               incidents: list[str], *, fact: str | None) -> str:
         prompt = self._packet(task, who, beat, said, fact)
-        system = self._persona_system(who)
+        system = self._persona_system(who, task)
         span = self._span(who, index)
         raw = self._call("speak", prompt, system, line_schema(), seed + index, budget,
                          span=span, voice=False)
-        line = _text(raw)
+        line = _text(raw, self._names())
         echoed = _echoes(line, task, prompt, who.lens)
         twin = _twin_of(line, said)
         stale = twin is not None
@@ -471,24 +567,33 @@ class Viche(AgentPort):
             # оркестратором, і вся економія задуму зникала.
             raw = self._call("speak", nudge, system, line_schema(), seed + index * 7 + 1,
                              budget, span=span, voice=False)
-            line = _text(raw)
+            line = _text(raw, self._names())
             if _drifted(line) or _too_similar(line, [t for _, t in said]):
                 incidents.append(f"viche_escalate:{who.role}")
                 raw = self._call("synthesize", nudge, system, line_schema(), seed + index,
                                  budget, span=span, voice=False)
-                line = _text(raw)
+                line = _text(raw, self._names())
             if _drifted(line) or _too_similar(line, [t for _, t in said]):
                 return ""
         line = line[:MAX_LINE_CHARS]
         self._emit_line(span, line, index)
         return line
 
-    def _persona_system(self, who: Persona) -> str:
+    def _names(self) -> set[str]:
+        """Імена цього села — щоб чужий підпис у репліці ловився й на вигаданих іменах."""
+        return {str(p.name).lower() for p in self._people.values() if getattr(p, "name", "")}
+
+    def _persona_system(self, who: Persona, task: str = "") -> str:
         """Хто ти — у СИСТЕМІ, а не в тексті запиту.
 
         Перший живий прогін показав рівно це: Lapa дослівно переказала пакет разом із лінзою й
         підказкою ходу («дід Свирид: … Дід Свирид — памʼять: … Спитай, що робити практично»).
         Системне повідомлення вона так не копіює.
+
+        ★ Новина переїхала сюди з тієї самої причини й теж за заміром. Коли з пакета прибрали чужі
+        репліки, Lapa почала копіювати ЄДИНИЙ текст, що там лишався, — саму новину: репліка
+        починалась дослівним «Кажуть, за річкою бачили вовка…». Перенесення новини в систему
+        збило `_echoes` з 5/29 до 1/29 на тих самих трьох темах.
         """
         person = self._people.get(who.role)
         extra = ""
@@ -502,12 +607,13 @@ class Viche(AgentPort):
         if self._recalled and (person is None or remembers(person)):
             recalled = "\nСело памʼятає: " + " | ".join(self._recalled[:2])
         manner = f"\n{self.mode.manner}" if self.mode.manner else ""
-        return (f"{self.line_system}{manner}{recalled}\n\nТИ: {who.name}. "
+        news = f"\nСЬОГОДНІ НА ВІЧІ ГОВОРЯТЬ ПРО ТАКЕ: {task}" if task else ""
+        return (f"{self.line_system}{manner}{news}{recalled}\n\nТИ: {who.name}. "
                 f"Дивишся на світ так: {who.lens}.{extra}")
 
     def _packet(self, task: str, who: Persona, beat: Beat,
                 said: list[tuple[Persona, str]], fact: str | None) -> str:
-        parts = [f"НОВИНА: {task}"]
+        parts: list[str] = []
         target = None
         if beat.у_відповідь and 1 <= beat.у_відповідь <= len(said):
             target = said[beat.у_відповідь - 1]
@@ -517,14 +623,20 @@ class Viche(AgentPort):
         # Одарко». Партитура може вказати на власний такт, тож відсікає це код.
         if target is not None and target[0].role == who.role:
             target = None
+        # ★ У пакеті НЕМАЄ чужого тексту — лише імена. Це не смак, а замір: доти сюди їхала цитата
+        # сусіда, і Lapa віддавала її дослівно назад. На трьох темах поспіль (29 реплік, сирий
+        # вивід без ремонту) цитата давала 19/29 повторів, самі імена — 0/29, а тематична
+        # чіпкість відповіді при цьому не змінилась (0.086 проти 0.086 змістових слів спільно з
+        # попередньою реплікою серед НЕскопійованих). Тобто цитата не купувала нічого, крім копій.
+        #
+        # ★ Профілактику «ось що вже казали, не повторюй» ПЕРЕВІРЕНО І ВІДКИНУТО раніше: ремонтів
+        # лишилось стільки ж (6 із 13), токенів стало більше (10262 → 11539), різність упала
+        # (0.967 → 0.864). Список працює як праймінг — модель копіює саме з нього. Тут той самий
+        # закон, лише сильніший: у пакеті мовця не має бути ЖОДНОГО тексту, який можна віддати назад.
         if target is not None:
-            parts.append(f"ЩОЙНО СКАЗАВ {target[0].name}: «{target[1]}»")
-        # ★ Профілактику «ось що вже казали, не повторюй» ПЕРЕВІРЕНО І ВІДКИНУТО: ремонтів лишилось
-        # стільки ж (6 із 13), токенів стало більше (10262 → 11539), різність упала (0.967 → 0.864).
-        # Список працює як праймінг — модель починає копіювати саме з нього. Тому в пакеті лише
-        # останні репліки як КОНТЕКСТ відповіді, без заборонного списку.
+            parts.append(f"ТИ ВІДПОВІДАЄШ: {target[0].name}")
         elif said:
-            parts.append("ПЕРЕД ТИМ КАЗАЛИ: " + " | ".join(f"{p.name}: {t}" for p, t in said[-2:]))
+            parts.append("ПЕРЕД ТОБОЮ ГОВОРИЛИ: " + ", ".join(p.name for p, _ in said[-2:]))
         if fact is not None:
             parts.append(f"ЩО ТИ ДІЗНАВСЯ: {fact}")
         secret = self._whispers.pop(who.role, None)
@@ -556,7 +668,7 @@ class Viche(AgentPort):
         span = self._span(STAROSTA, 0)
         raw = self._call("synthesize", prompt, self.summary_system, line_schema(), seed, budget,
                          span=span, voice=False)
-        line = _text(raw)[:MAX_LINE_CHARS]
+        line = _text(raw, self._names())[:MAX_LINE_CHARS]
         if _drifted(line):
             incidents.append("viche_summary_lost")
             return None
@@ -575,7 +687,7 @@ class Viche(AgentPort):
         span = self._span(PIP, 0)
         raw = self._call("judge", prompt, self.doubt_system, line_schema(), seed, budget,
                          span=span, voice=False)
-        line = _text(raw)[:MAX_LINE_CHARS]
+        line = _text(raw, self._names())[:MAX_LINE_CHARS]
         if _drifted(line):
             incidents.append("viche_doubt_lost")
             return None
@@ -606,19 +718,21 @@ class Viche(AgentPort):
         spoke = [p for p in cast if any(q.role == p.role for q, _ in said)]
         if not spoke:
             return tally([])
-        talk = "\n".join(f"- {p.name} ({p.role}): {t}" for p, t in said[-12:])
         votes: list[tuple[str, str]] = []
         reasons: list[tuple[str, str, str]] = []
         spoken: list[tuple[Persona, str]] = []
         for i, p in enumerate(spoke):
             if not budget.can_continue():
                 break
-            prompt = (f"НОВИНА: {task}\n\nЩО КАЗАЛИ:\n{talk}\n\n"
-                      f"Ти — {p.name} ({p.role}). Твоя лінза: {p.lens}. "
-                      f"Схиляєшся: {stance_label(stances.get(p.role, 0.0))}.\n"
-                      "Як голосуєш і чому — коротко, своїми словами.")
-            data = _safe_json(self._call("speak", prompt, self.line_system, vote_schema(),
-                                         seed + 7 * i, budget, max_tokens=120))
+            # ★ У пакеті голосу НЕМАЄ ні лінзи, ні чужих реплік — той самий закон, що й у
+            # звичайній репліці: що дали текстом, те й повернеться дослівно. Саме звідси бралися
+            # однакові віщування: лінза баби Горпини «прикмета й пересторога: до чого воно
+            # йдеться» їхала в пакеті, і голос починався з «До чого воно йдеться, до чого?» плюс
+            # вигадана прикмета («ніби завірюха у червні»). Хто ти й про що віче — у СИСТЕМІ.
+            prompt = (f"Схиляєшся: {stance_label(stances.get(p.role, 0.0))}.\n"
+                      "Як голосуєш і чому — коротко, своїми словами, про саму справу.")
+            data = _safe_json(self._call("speak", prompt, self._persona_system(p, task),
+                                         vote_schema(), seed + 7 * i, budget, max_tokens=120))
             vote = str((data or {}).get("голос") or "")
             if vote not in VOTES:
                 # Загублений голос МІНЯЄ ухвалу, тому мовчки його викидати не можна. Коли не
@@ -628,6 +742,10 @@ class Viche(AgentPort):
                     incidents.append(f"viche_vote_lost:{p.role}")
                 continue
             why = " ".join(str((data or {}).get("чому") or "").split())[:90]
+            # Причина, що переказує лінзу або саму новину, — не причина. Голос лишається, слова
+            # відкидаємо: краще коротке «проти», ніж чуже речення в чужих устах.
+            if why and _echoes(why, task, "", p.lens):
+                why = ""
             votes.append((p.role, vote))
             reasons.append((p.role, vote, why))
             spoken.append((p, f"{vote}. {why}" if why else vote))
@@ -693,7 +811,16 @@ class Viche(AgentPort):
         decision = data.get("ухвала")
         if votes and votes.get("лічба") and isinstance(decision, dict):
             # Що ухвалили — вирішила лічба; літописець лише називає це людською мовою.
-            decision = {**decision, "що": f"{votes['підсумок']} · {decision.get('що') or ''}"[:140]}
+            #
+            # ★ І тільки якщо він СПРАВДІ назвав. Кілька разів у поле «що» приїжджала сама роль
+            # («divchyna»), і на Дошці висіло «ухвалили: за 5, проти 1, утримались 0 · divchyna» —
+            # службовий рядок замість ухвали. Роль, імʼя або огризок у два слова відкидаємо: краще
+            # чиста лічба, ніж лічба з чужим ідентифікатором.
+            what = " ".join(str(decision.get("що") or "").split())
+            bad = (what.lower() in _SPEAKERS | self._names()
+                   or len(what.split()) < 3 or len(what) < 12)
+            decision = {**decision, "що": (votes["підсумок"] if bad
+                                           else f"{votes['підсумок']} · {what}")[:140]}
         self._emit_decision(decision, roles)
         self.trace.emit(StepRecord(
             run_id=self.run_id, tick=0, agent="chronicler", stage="report", model="viche",
@@ -833,8 +960,11 @@ class Viche(AgentPort):
                                                                cfg.temperature + self.mode.heat)),
                                       max_tokens=max_tokens or cfg.max_tokens,
                                       seed=seed)
-        budget.spend(res.usage.total, self.router.lane(kind), res.usage.prompt_tokens, stage=kind)
-        budget.steps_used += 1
+        # Партитура пишеться паралельно з реплікою, тож лічбу витрат тримаємо під замком:
+        # інакше два потоки читають-пишуть ті самі поля, і стеля рахується з дірками.
+        with self._blk:
+            budget.spend(res.usage.total, self.router.lane(kind), res.usage.prompt_tokens, stage=kind)
+            budget.steps_used += 1
         # ★ Розрізняємо «модель написала дурницю» і «шлюз не дописав». Обидва дають той самий
         # нерозбірний JSON, і доти вони були нерозрізненні: інцидент казав `score_lost`, а
         # справжня причина — замала стеля виводу або мовчання шлюзу — не лишалась ніде.
@@ -993,10 +1123,34 @@ def _closings(head: str) -> list[str]:
     return [tail, '"' + tail] if stripped is not None else [tail]
 
 
-def _text(raw: str) -> str:
+# Хто взагалі може стояти підписом перед реплікою: імена й ролі села.
+_SPEAKERS = ({p.name.lower() for p in BY_ROLE.values()}
+             | {r.lower() for r in BY_ROLE}
+             | {"староста", "піп", "оповідач", "ти", STAROSTA.name.lower(), PIP.name.lower()})
+
+
+def _strip_speaker(line: str, names: set[str] | None = None) -> str:
+    """★ Прибирає чужий підпис на початку репліки.
+
+    Виконавцеві сказано не називати себе, але він регулярно ліпить «Одарка: …» — і бульбашка над
+    Миколою підписана Миколою, а всередині говорить Одарка. Ріжемо КОДОМ і лише тоді, коли перед
+    двокрапкою стоїть саме імʼя чи роль із цього села: інакше загубили б звичайну пряму мову
+    («Кажу так: …»).
+    """
+    head, sep, rest = line.partition(":")
+    if not sep or len(head) > 28 or not rest.strip():
+        return line
+    key = head.strip().strip("«»\"'").lower()
+    known = (names or set()) | _SPEAKERS
+    if key in known or any(key == n or key.endswith(" " + n) for n in known):
+        return rest.strip()
+    return line
+
+
+def _text(raw: str, names: set[str] | None = None) -> str:
     data = _safe_json(raw)
     line = str((data or {}).get("репліка") or "").strip()
-    return " ".join((line or (raw or "").strip()).split())
+    return _strip_speaker(" ".join((line or (raw or "").strip()).split()), names)
 
 
 def _grams(text: str, n: int = 3) -> set[tuple[str, ...]]:
