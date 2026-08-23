@@ -44,7 +44,11 @@ def beat(who, move="згадати", reply=None, tool=None, query=None) -> dict:
 
 
 def line(text) -> str:
-    return json.dumps({"репліка": text}, ensure_ascii=False)
+    """Репліка так, як її тепер віддає виконавець: три варіанти одним викликом.
+
+    Вибирає з них КОД, тож у фейку всі три однакові — тест перевіряє шлях, а не смак.
+    """
+    return json.dumps({"варіанти": [text, text, text]}, ensure_ascii=False)
 
 
 VARIED = [
@@ -661,8 +665,11 @@ def test_a_flaky_structured_call_is_retried_once():
 
     pair = [p.role for p in cast_for(NEWS, 2)]
     trace = InMemoryTrace()
+    # ★ Планування наперед вимкнено: тут перевіряється ПЕРЕПИТ, а два потоки, що розбирають
+    # список фейкових відповідей наввипередки, зробили б порядок невідтворюваним.
     agent, _ = build(["такти обірваний {", score(beat(pair[0]))] + lines(3)
                      + ["заголовок обірваний {", chron((pair[0], "Отак."))], width=2, trace=trace)
+    agent.plan_ahead = False
     result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
 
     assert "viche_score_retry" in result.incidents
@@ -1592,3 +1599,102 @@ def test_the_first_word_sounds_before_the_score_is_written():
     first_line = (result.answer or "").splitlines()[0]
     assert first_line.startswith(cast_for(NEWS, 2)[0].name + ":"), \
         "починає той, кого призначив код, а не той, кого написала партитура"
+
+
+def test_a_vote_reason_is_never_just_the_vote_again():
+    """★ Модель раз по раз писала в «чому» саме голос, і на екран ішло «проти. проти» — зіпсована
+    платівка замість причини. Голос лишається, порожні слова відкидаємо."""
+    from ploshcha_sim.domain.viche import VOTES
+    assert "проти" in VOTES
+    agent, llm = build([score(beat(cast_for(NEWS, 2)[0].role))] + lines(4)
+                       + ['{"голос": "проти", "чому": "проти"}'] * 4
+                       + [chron((cast_for(NEWS, 2)[0].role, "Отак."))], width=2)
+    result = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    assert "проти. проти" not in (result.answer or "")
+
+
+def test_the_packet_names_who_else_is_here():
+    """★ Виконавець вигадував співрозмовника: «А ви, дідусю, що скажете?» — до людини, якої на
+    вічі немає. Імена присутніх у пакеті безпечні (їх не переказують реченням) і дають звертання
+    до когось справжнього."""
+    agent, llm = build([score(beat(cast_for(NEWS, 3)[0].role))] + lines(6), width=3)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    speak = [c for c in llm.calls if "варіанти" in str(c.get("schema") or "")]
+    assert speak and any("НА ВІЧІ ЩЕ:" in c["prompt"] for c in speak)
+
+
+def test_the_same_opening_words_are_not_used_twice():
+    """★ Заміряно на 84 репліках: дослівних дублікатів 0, пар понад поріг 0.45 — лише 2, тобто
+    старий сторож працює. Але «а пам'ятаю, як торік…» прозвучало 11 разів, «та що ж це таке» — 5:
+    люди говорили різне, а звучали однаково, бо кожен другий заходив тими самими трьома словами."""
+    from ploshcha_sim.agents.viche import _opening_key
+
+    assert _opening_key("А пам'ятаю, як торік пан приїздив") == "пам'ятаю як торік"
+    assert _opening_key("а пам'ятаю, як торік було геть інше") == "пам'ятаю як торік", \
+        "зачин той самий, хоч продовження різне"
+    assert _opening_key("Та що ж це таке") != _opening_key("А пам'ятаю, як торік")
+    assert _opening_key("Ой!") == "", "надто коротке — не зачин"
+
+
+def test_the_same_thought_in_other_words_counts_as_a_repeat():
+    """★ Сторож на 3-грамах ловив лише переказ слово-в-слово. На живих прогонах лишались пари на
+    кшталт «Та ні, то не вовк, а просто пес заблукав» / «Та то, мабуть, не вовк, а пес заблукав»
+    (спільних змістових основ 0.67) і дослівне «Не вірю!» двічі — короткі репліки 3-грам не мають
+    узагалі, тож не перевірялись нічим."""
+    from ploshcha_sim.agents.viche import _same_meaning
+
+    a = "Та ні, то не вовк, а просто пес заблукав."
+    b = "Та то, мабуть, не вовк, а пес заблукав."
+    assert _same_meaning(b, [a]) == a, "та сама думка іншими словами — повтор"
+    assert _same_meaning("Не вірю!", ["Не вірю!"]) == "Не вірю!", "коротка репліка теж мусить ловитись"
+    assert _same_meaning("Гребля протікає, треба лагодити", [a]) is None, "різна думка — не повтор"
+
+
+def test_a_topic_about_self_harm_gets_one_calm_line_not_a_viche():
+    """★ У живій сесії гість кидав «Піду втоплюся», «Я застрілюсь», «Піду повішусь» — і механіка
+    відпрацювала бездоганно: партитура, ремонт, лічба, хроніка й ухвала «відхилили: Піду втоплюся»,
+    доручена попові. Тобто публічний сайт ставив на голосування заяву живої людини про самогубство.
+    Розпізнає це код, а не модель, і віча не буде взагалі."""
+    from ploshcha_sim.domain.viche import about_self_harm, HARM_ANSWER
+
+    assert about_self_harm("Піду повішусь") and about_self_harm("Я застрілюсь")
+    assert not about_self_harm("вішалка для одягу"), "корінь у мирному слові — не привід"
+    assert not about_self_harm("втопився човен")
+
+    agent, llm = build(lines(6), width=2)
+    result = agent.run("Піду втоплюся", seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    assert result.answer.endswith(HARM_ANSWER)
+    assert "viche_self_harm" in result.incidents
+    assert not llm.calls, "жодного виклику моделі: село мовчить навмисно"
+
+
+def test_a_thin_topic_is_framed_before_the_village_talks():
+    """★ На беззмістовному вводі модель не каже «не розумію»: вона добудовує сільську подію й веде
+    віче навколо вигадки — «Пішов нафіг» перетворювалось на «зникнення Янка-касира з грішми».
+    Дешевий окремий виклик переказує, що саме написали, і далі говорять уже про це."""
+    import json as _json
+
+    frame = _json.dumps({"зрозуміло": False, "про_що": "якесь одне слово без пояснення"},
+                        ensure_ascii=False)
+    agent, llm = build([frame] + [score(beat(cast_for("галя де", 2)[0].role))] + lines(6), width=2)
+    agent.plan_ahead = False
+    agent.run("галя де", seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+    assert "зрозуміло" in str(llm.calls[0].get("schema") or ""), "перший виклик — тлумачення теми"
+    later = " ".join(c["prompt"] for c in llm.calls[1:])
+    assert "галя де" in later, "дослівний текст гостя лишається в темі"
+
+
+def test_a_service_line_from_the_packet_never_reaches_the_bubble():
+    """★ «ТИ ВІДПОВІДАЄШ: дід Свирид» — чотири слова, тобто жодної пʼятірки, і перевірка на n-грамах
+    пропускала це як нову репліку. На живому вічі службові рядки пакета так тричі за розмову
+    опинились у бульбашках, а раз виконавець переказав уголос власну персону із системного
+    повідомлення разом із примовкою й норовом."""
+    from ploshcha_sim.agents.viche import _echoes
+
+    packet = ("НОВИНА: тест\nТИ ВІДПОВІДАЄШ: дід Свирид\nНА ВІЧІ ЩЕ: Марія, Іван\n\n"
+              "ТВІЙ ХІД: заперечити")
+    system = "ТИ: Остап. Дивишся на світ так: діло — що робити руками вже завтра."
+    assert _echoes("ТИ ВІДПОВІДАЄШ: дід Свирид", "тест", packet, "", system)
+    assert _echoes("НА ВІЧІ ЩЕ: Марія, Іван", "тест", packet, "", system)
+    assert _echoes("Дивишся на світ так: діло", "тест", packet, "", system), "системне теж"
+    assert not _echoes("Та не буде з того діла нічого", "тест", packet, "", system)

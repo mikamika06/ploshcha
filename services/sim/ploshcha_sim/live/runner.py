@@ -6,6 +6,7 @@
 """
 
 import threading
+import zlib
 import time
 import traceback
 import uuid
@@ -66,6 +67,10 @@ class _Crash:
         self.incidents = [f"live_crash:{message[:180]}"]
 
 
+# Місце в мапі живих віч між орендою теми й появою оркестратора: сесія вже зайнята, агента ще нема.
+_WAITING = object()
+
+
 class LiveRunner:
     """`make_orchestrator(trace, run_id)` віддає готовий оркестратор; черга дає задачі."""
 
@@ -112,6 +117,8 @@ class LiveRunner:
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
         self._lock = threading.Lock()
+        # Оренда теми — під власним замком: два вільні робітники не мають узяти дві теми одного гостя.
+        self._lease_lock = threading.Lock()
         self.state = "paused" if paused else "running"
         self.tick = 0
         self.last_error: str | None = None
@@ -146,6 +153,29 @@ class LiveRunner:
         if self.max_workers > self.workers:
             sup = threading.Thread(target=self._supervise, name="live-supervisor", daemon=True)
             sup.start()
+
+    def _lease(self, worker: str):
+        """Беремо тему — але не ту, чия сесія вже говорить.
+
+        Резервуємо `sid` ТУТ-таки, під тим самим замком: інакше два вільні робітники, побачивши
+        порожньо, візьмуть дві теми одного гостя одночасно — рівно те, що ми й лікуємо.
+        """
+        if self.queue is None:
+            return None
+        with self._lease_lock:
+            with self._lock:
+                busy = tuple(sid for sid in self._active if sid)
+            try:
+                item = self.queue.lease(worker, busy) if busy else self.queue.lease(worker)
+            except TypeError:
+                # Черга без підтримки фільтра (фейк у тестах, стара реалізація) — беремо як є.
+                item = self.queue.lease(worker)
+            if item is not None:
+                sid = clean_sid((item.payload or {}).get("sid"))
+                if sid:
+                    with self._lock:
+                        self._active.setdefault(sid, _WAITING)
+            return item
 
     def _spawn(self) -> None:
         """Ще один робітник. Імʼя унікальне, бо воно ж іде в оренду черги."""
@@ -325,7 +355,7 @@ class LiveRunner:
                     if reason is not None:
                         self._degrade(reason)
                         continue
-                    item = self.queue.lease(worker or self.worker) if self.queue is not None else None
+                    item = self._lease(worker or self.worker)
                     if item is None:
                         # Зайвий робітник гасне сам: тримати десяток порожніх потоків після
                         # напливу немає сенсу, а базовий склад лишається завжди.
@@ -387,8 +417,17 @@ class LiveRunner:
             return []
         out: list[dict] = []
         for d in decisions.standing():
+            # ★ Напис збираємо з ТЕМИ, а не з того, що лежить у `label`.
+            #
+            # У базі є ухвали, записані ще старим кодом: там у назві службова лічба разом з
+            # огризком від літописця («відхилили: за 2, проти 4, утримались 0 · Все страш…»). Вони
+            # спливають на Дошці щоразу, коли починається нове віче, бо чинні ухвали відновлюються.
+            # Тема ж лежить поруч, у тому самому рядку, і з неї напис виходить читабельний завжди.
+            head = "відхилили" if str(d.get("label", "")).startswith("відхилили") else "ухвалили"
+            topic = " ".join(str(d.get("topic") or "").split())
+            label = f"{head}: {topic}"[:120] if topic else str(d["label"])[:120]
             out.append(proj._envelope("event.happened", {"event": {
-                "id": f"standing-{d['who']}", "kind": "decision", "label": d["label"],
+                "id": f"standing-{d['who']}", "kind": "decision", "label": label,
                 "description": "чинна ухвала минулого віча",
                 "place": {"poi": d["poi"]}, "involves": [d["who"]]}}, 0))
             out += proj._walk(d["who"], d["poi"], 0)
@@ -444,7 +483,15 @@ class LiveRunner:
         with self._lock:
             self._active[sid or ""] = orch
         template = getattr(orch, "budget_template", None)
-        result = orch.run(task, seed=1,
+        # ★ Сід — від САМОГО ПРОГОНУ, а не константа.
+        #
+        # Заміряно на живій сесії: гість сім разів кинув «Хто я» за дві хвилини й отримав сім
+        # прогонів по 21 771 токена з байт-у-байт однаковою хронікою — бо сід стояв одиницею, склад
+        # людей є функцією теми, а шлюз на однакових входах детермінований. Для гостя це «зламалось»,
+        # для гаманця — 152 тисячі токенів за одну розмову. `run_id` унікальний на кожну постановку
+        # теми, тож із нього виходить і відтворюваність (той самий прогін відтворюється за ним), і
+        # різність (нова спроба — інша розмова).
+        result = orch.run(task, seed=zlib.crc32(run_id.encode()) & 0x7FFFFFFF,
                           budget=template.model_copy(deep=True) if template else None)
         with self._lock:
             self._active.pop(sid or "", None)

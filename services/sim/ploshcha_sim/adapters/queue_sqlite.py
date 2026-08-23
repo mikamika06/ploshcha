@@ -60,12 +60,26 @@ class SqliteQueue(QueuePort):
                 (key, json.dumps(payload, ensure_ascii=False), self._clock()))
             return cur.rowcount == 1
 
-    def lease(self, worker: str) -> WorkItem | None:
+    def lease(self, worker: str, exclude_sids: tuple[str, ...] = ()) -> WorkItem | None:
+        """`exclude_sids` — чиї теми зараз НЕ брати.
+
+        Гість, що кинув три теми поспіль, отримував три віча одночасно: фронт тримає одну
+        стенограму й одну локацію, тож три прогони змішувались в одному браузері («село не
+        говорить, бігають» — скарга з телефона). Паралельність між РІЗНИМИ людьми лишається, бо
+        заради неї все й робилось.
+        """
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute(
-                "SELECT key, payload, attempts FROM work WHERE status='pending' "
-                "ORDER BY created_at, key LIMIT 1").fetchone()
+            if exclude_sids:
+                holes = ",".join("?" * len(exclude_sids))
+                row = db.execute(
+                    "SELECT key, payload, attempts FROM work WHERE status='pending' "
+                    f"AND COALESCE(json_extract(payload, '$.sid'), '') NOT IN ({holes}) "
+                    "ORDER BY created_at, key LIMIT 1", exclude_sids).fetchone()
+            else:
+                row = db.execute(
+                    "SELECT key, payload, attempts FROM work WHERE status='pending' "
+                    "ORDER BY created_at, key LIMIT 1").fetchone()
             if row is None:
                 db.execute("COMMIT")
                 return None
