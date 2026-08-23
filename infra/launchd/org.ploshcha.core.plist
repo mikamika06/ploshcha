@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>org.ploshcha.core</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/macbook/ploshcha/.venv/bin/python</string>
+    <string>/Users/macbook/ploshcha/services/sim/scripts/serve_ploshcha.py</string>
+    <string>--port</string><string>8765</string>
+    <string>--condition</string><string>viche</string>
+    <string>--resume</string>
+    <string>--db</string><string>/Users/macbook/ploshcha/data/ploshcha/ploshcha.db</string>
+    <string>--max-tokens</string><string>300000</string>
+    <string>--max-usd</string><string>0.50</string>
+    <string>--max-items</string><string>60</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/macbook/ploshcha</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>15</integer>
+  <key>StandardOutPath</key><string>/Users/macbook/ploshcha/.ploshcha.log</string>
+  <key>StandardErrorPath</key><string>/Users/macbook/ploshcha/.ploshcha.log</string>
+</dict>
+</plist>
