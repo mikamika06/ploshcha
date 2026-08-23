@@ -131,7 +131,7 @@ apps/web/        Vite + TS + PixiJS: сцена, розмова гуртом, Д
 services/sim/
   ploshcha_sim/    ядро: domain / ports / adapters / agents / live
   evalkit/         дослідницький харнес: умови, промпти, предикати, вартість
-  tests/           1075 тестів, нуль викликів моделі й нуль мережі
+  tests/           1091 тест, нуль викликів моделі й нуль мережі
 data/            стан прода (data/ploshcha/*.db + sessions/<sid>.db на гостя — gitignored) і локальні фікстури
 eval/            golden-set + проби
 infra/           docker-compose (без моделей і БД)
