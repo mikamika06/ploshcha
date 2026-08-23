@@ -66,13 +66,16 @@ def parse_args(argv):
                    help="стартувати одразу; за замовчуванням сервер стоїть на ПАУЗІ")
     # Звідки вітрині дозволено ходити по потік. Порожньо = лише свій домен; зірочка й пароль
     # несумісні, тому список мусить бути явним.
+    p.add_argument("--workers", type=int, default=int(os.environ.get("PLOSHCHA_WORKERS", "4")),
+                   help="скільки віч ідуть одночасно; робота — чекання на шлюз, не процесор")
     p.add_argument("--origins", default=os.environ.get("PLOSHCHA_ORIGINS", ""),
                    help="через кому: дозволені джерела для CORS")
     return p.parse_args(argv)
 
 
 def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: int,
-               db: str, kill_file: str | None = None, paused: bool = True):
+               db: str, kill_file: str | None = None, paused: bool = True,
+               workers: int = 1):
     """Збірка живого циклу — спільна для сервера і для соак-заміру, щоб проводка не дублювалась."""
     key, url = os.environ.get("LAPA_API_KEY"), os.environ.get("LAPA_BASE_URL")
     if not key or not url:
@@ -186,7 +189,8 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
 
     runner = LiveRunner(bus, queue, base.make_agent, governor=governor, scene=SCENE,
                         paused=paused, cast=base.cast, decisions=base.decisions,
-                        rumours=base.rumours, sessions=sessions, latency=clock)
+                        rumours=base.rumours, sessions=sessions, latency=clock,
+                        workers=workers)
     return spec, bus, queue, runner
 
 
@@ -196,7 +200,7 @@ def main(argv=None) -> int:
         spec, bus, queue, runner = build_live(
             condition=args.condition, max_tokens=args.max_tokens, max_usd=args.max_usd,
             max_items=args.max_items, db=args.db, kill_file=args.kill_file,
-            paused=not args.resume)
+            paused=not args.resume, workers=args.workers)
     except (RuntimeError, KeyError) as exc:
         print(exc)
         return 2
@@ -214,7 +218,8 @@ def main(argv=None) -> int:
         print(f"  ⚠ збірки немає: {static}/index.html — зроби `pnpm build`, або став --static ''")
         static = None
     httpd = serve(bus, runner, port=args.port, static=static,
-          origins=tuple(o.strip() for o in args.origins.split(',') if o.strip()))
+          origins=tuple(o.strip() for o in args.origins.split(',') if o.strip()),
+          feedback=Path(args.db).parent / "skargy.jsonl")
     runner.start()
     print(f"ПЛОЩА онлайн: http://127.0.0.1:{args.port}"
           + ("" if static else "  (лише API — статику не роздаємо)"))

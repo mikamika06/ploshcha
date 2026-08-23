@@ -246,6 +246,26 @@ def test_a_late_viewer_of_a_session_still_gets_only_his_own():
     assert [e["n"] for e in bus.since(cursor, SID_A)[0]] == [2]
 
 
+def test_history_of_a_shared_run_is_not_replayed_to_a_newcomer():
+    """★ Спільна подія видима, доки вона ЙДЕ, але не відтворюється новому глядачеві.
+
+    Фронт просить історію з нуля, щоб гість побачив своє село; на прогонах без сесії (CLI, мої
+    перевірки) це означало, що кожен, хто відкривав ПЛОЩУ з будь-якого пристрою, діставав чужі
+    прогони як власні — на Дошці висіла купа тем, яких він не кидав. Мітка «спільне» — про стан
+    ядра ЗАРАЗ, а не про історію.
+    """
+    bus = EventBus()
+    bus.publish({"n": 0}, None)   # чужий прогін без сесії — уже минув
+    bus.publish({"n": 1}, SID_A)  # і чужа сесія теж
+    joined = bus.tail_cursor()
+    bus.publish({"n": 2}, None)   # а це вже за нього — стан ядра наживо
+    seen = [e["n"] for e in bus.since(0, SID_B, shared_from=joined)[0]]
+    assert seen == [2], "з історії гостеві належить лише СВОЄ, спільне — тільки наживо"
+    mine = [e["n"] for e in bus.since(0, SID_A, shared_from=joined)[0]]
+    assert mine == [1, 2], "власне село гість добирає з історії, як і доти"
+    assert [e["n"] for e in bus.since(0, None, shared_from=joined)[0]] == [0, 1, 2], "інспектор бачить усе"
+
+
 def test_the_http_stream_filters_by_the_query_parameter(tmp_path):
     """Розбір `?sid=` живе в хендлері, тобто поза межами тестів шини. Доти той самий рядок уже
     ламався один раз на `since=`, тож перевіряємо шлях цілком, а не лише його середину."""
@@ -310,28 +330,27 @@ def test_a_guest_cannot_speak_into_another_guests_viche(tmp_path):
     """Гість не бачить чужого прогону в потоці, тож слово, кинуте в нього, зникло б без сліду — а
     з боку іншого села прилетів би голос нізвідки."""
     _, _, _, runner = _live(tmp_path)
-    runner.current = _Talker()
-    runner.current_sid = SID_A
+    talker = _Talker()
+    runner._active[SID_A] = talker
     code, body = handle_command({"kind": "say", "text": "агов", "sid": SID_B}, runner)
     assert code == 409 and "error" in body
-    assert runner.current.heard == []
+    assert talker.heard == []
 
 
 def test_a_guest_can_speak_into_his_own_viche(tmp_path):
     _, _, _, runner = _live(tmp_path)
-    runner.current = _Talker()
-    runner.current_sid = SID_A
+    talker = _Talker()
+    runner._active[SID_A] = talker
     code, _ = handle_command({"kind": "say", "text": "агов", "sid": SID_A}, runner)
     assert code == 200
-    assert runner.current.heard == [{"kind": "say", "text": "агов"}]
+    assert talker.heard == [{"kind": "say", "text": "агов"}]
 
 
 def test_a_guest_may_speak_into_the_shared_viche(tmp_path):
     """Спільне віче (тема з консолі) видиме ВСІМ, бо його події без мітки. Раз чути — значить і
     відповідати можна: інакше на екрані була б розмова, у якій поле вводу мовчки не працює."""
     _, _, _, runner = _live(tmp_path)
-    runner.current = _Talker()
-    runner.current_sid = None
+    runner._active[""] = _Talker()   # прогін без сесії — спільне віче
     assert handle_command({"kind": "say", "text": "агов", "sid": SID_A}, runner)[0] == 200
 
 
@@ -513,3 +532,18 @@ def test_a_broken_setting_falls_back_instead_of_killing_the_core(monkeypatch):
         monkeypatch.setenv("PLOSHCHA_MAX_SESSIONS", bad)
         assert ttl_seconds() == DEFAULT_TTL_DAYS * 86400.0
         assert max_sessions() == DEFAULT_MAX_SESSIONS
+
+
+def test_a_run_without_a_session_is_not_broadcast_to_guests():
+    """★ Прогін без сесії (консоль, соак, curl) НЕ належить усім.
+
+    Мітка `None` у шині означає «стан ядра», а не «чужа розмова». Доти будь-яка тема, кинута повз
+    браузер, летіла в потік КОЖНОГО гостя — і чужі теми зʼявлялись у нього на Дошці, хоч він їх не
+    кидав. Тепер такий прогін має власну мітку, а інспектор без `sid` бачить усе, як і доти.
+    """
+    bus = EventBus()
+    bus.publish({"n": "чужий прогін"}, LiveRunner._own(None))
+    bus.publish({"n": "своє"}, LiveRunner._own(SID_A))
+    assert [e["n"] for e in bus.since(0, SID_B)[0]] == [], "гість не бачить нічийного прогону"
+    assert [e["n"] for e in bus.since(0, SID_A)[0]] == ["своє"]
+    assert len(bus.since(0, None)[0]) == 2, "інспектор без sid бачить усе"
