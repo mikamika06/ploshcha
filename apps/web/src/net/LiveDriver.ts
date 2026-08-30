@@ -24,6 +24,8 @@ export class LiveDriver implements EventSourcePort {
   private cursor: number | undefined;
   private queue: ParsedEvent[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
+  /** Прогін, який іде ЗАРАЗ. Стара розмова не має доказувати себе поверх нової. */
+  private run: string | undefined;
 
   /** `sid` — чиє село слухаємо. Ядро фільтрує потік ним, тож без нього прилетіли б чужі розмови. */
   constructor(private url: string, private sid: string = sessionId()) {
@@ -47,6 +49,20 @@ export class LiveDriver implements EventSourcePort {
     }, delay);
   }
 
+  /**
+   * Забути притримані репліки.
+   *
+   * ★ Розмова, яку гість завершив, не має доказувати себе ще півхвилини. Ядро віддає віче за
+   * секунди, а сцена грає його по одній репліці на `PACE_MS`, тож у черзі стоять десятки чужих
+   * уже реплік — і після «завершити» вони й далі спливали бульбашками над селом. Кінець прогону в
+   * ядрі тут не поміч: черга вже на цьому боці, і забути її може лише цей бік.
+   */
+  drop(): void {
+    this.queue = [];
+    if (this.timer !== undefined) clearTimeout(this.timer);
+    this.timer = undefined;
+  }
+
   subscribe(onEvent: (ev: ParsedEvent) => void, onEnd?: () => void): () => void {
     const open = () => {
       if (this.stopped) return;
@@ -65,6 +81,18 @@ export class LiveDriver implements EventSourcePort {
         }
         const ev = parseEnvelope(msg.data);
         if (!ev) return;
+        // ★ Нова розмова ЗМИВАЄ недограну стару.
+        //
+        // Фільтра за сесією тут не досить: обидва прогони належать тому самому гостю, тож ядро
+        // чесно шле обидва. А притримка (`PACE_MS`) тримає в черзі до півхвилини реплік — після
+        // нової теми вони доказувались уже під нею, і на екрані виходила одна розмова, зшита з
+        // двох. Розрізняє їх номер прогону в конверті; чекати цього від сцени не можна, бо туди
+        // подія доїде вже перемішаною.
+        if (ev.known && ev.type === "run.started") {
+          this.run = ev.runId;
+          this.queue = this.queue.filter((q) => q.runId === ev.runId);
+        }
+        if (this.run !== undefined && ev.runId !== this.run && PACED.has(ev.type)) return;
         if (ev.known && PACED.has(ev.type)) {
           this.queue.push(ev);
           this.drain(onEvent);

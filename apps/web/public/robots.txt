@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ploshcha.org/sitemap.xml

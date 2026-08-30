@@ -15,11 +15,49 @@ export class Gripe {
 
   constructor(private where: () => string) {
     const host = document.getElementById("stage") ?? document.body;
+    // ★ Один кут замість двох. Доти «про це село» й «щось не так?» стояли в різних кутах, різними
+    // правилами: ліва рахувала відступ від ширини вікна, права мала жорсткі 20 і 28 пікселів, шрифти
+    // різнились на пів пікселя, шари — на девʼять порядків. На широкому екрані вони розʼїжджались,
+    // на вузькому сходились, і жодна не знала про безпечні зони телефона.
+    const corner = document.createElement("div");
+    corner.className = "corner";
     const btn = document.createElement("button");
-    btn.className = "gripe";
+    btn.className = "corner-dots";
     btn.type = "button";
-    btn.textContent = "щось не так?";
-    host.appendChild(btn);
+    btn.setAttribute("aria-label", "Ще");
+    btn.textContent = "•••";
+    const menu = document.createElement("div");
+    menu.className = "corner-menu";
+    // Посилання переїжджає СЮДИ з розмітки сторінки, а не твориться тут: у статичному HTML воно
+    // потрібне краулерам, які JavaScript не виконують (заміряно: жоден великий AI-краулер не
+    // рендерить сторінку), тож зникнути звідти воно не може.
+    const nav = document.querySelector(".stovp a");
+    if (nav) menu.appendChild(nav);
+    const gripeItem = document.createElement("button");
+    gripeItem.type = "button";
+    gripeItem.className = "corner-item";
+    gripeItem.textContent = "щось не так?";
+    menu.appendChild(gripeItem);
+    corner.append(menu, btn);
+    host.appendChild(corner);
+
+    const closeMenu = (): void => corner.classList.remove("on");
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      corner.classList.toggle("on");
+      if (!corner.classList.contains("on")) this.note.classList.remove("on");
+    });
+    corner.addEventListener("click", (e) => e.stopPropagation());
+    document.addEventListener("click", () => { closeMenu(); this.note.classList.remove("on"); });
+    window.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      // Escape закриває спершу меню — і лише якщо його немає, летить далі до сцени.
+      if (corner.classList.contains("on") || this.note.classList.contains("on")) {
+        e.stopPropagation();
+        closeMenu();
+        this.note.classList.remove("on");
+      }
+    }, true);
 
     this.note = document.createElement("div");
     this.note.className = "gripe-note";
@@ -30,7 +68,7 @@ export class Gripe {
     this.area = this.note.querySelector("textarea") as HTMLTextAreaElement;
     this.say = this.note.querySelector(".gripe-say") as HTMLElement;
 
-    btn.addEventListener("click", (e) => {
+    gripeItem.addEventListener("click", (e) => {
       e.stopPropagation();
       this.note.classList.toggle("on");
       if (this.note.classList.contains("on")) this.area.focus();

@@ -104,6 +104,13 @@ body {
   display: block;
 }
 
+/* Стовп із написом край кадру — єдиний вихід зі сцени в текст. Сторінки про Площу існують
+   насамперед для краулерів, які JavaScript не виконують, тож посилання лежить у СТАТИЧНОМУ
+   `index.html`, а не малюється кодом: інакше його не побачить жоден із них. На екрані воно
+   мусить лишатись написом на дошці, а не пунктом меню, тому z-index нижчий за все, що
+   відкривається поверх села, — Дошка, кімната й інспектор його просто накривають. */
+.stovp { display: none; }
+
 /* ── шепіт над предметом (наведення) ─────────────────────────────── */
 .whisper {
   position: fixed;
@@ -697,6 +704,7 @@ body {
 .rv {
   position: absolute;
   height: 200px;
+  transition: opacity 0.45s ease;
   cursor: pointer;
   user-select: none;
   will-change: left, top;
@@ -1356,13 +1364,41 @@ body {
 /* ── скарга ─────────────────────────────────────────────────────────────────
    Кнопка в кутку й записка під нею. Той самий матеріал, що й решта підписів
    села: дощечка, серіф, тепла тінь. Це не HUD, а цидулка на стіні. */
-.gripe {
+/* ── кут: три крапки, з них два пункти ────────────────────────────
+   Відступ один на обидві осі й рахує безпечні зони: сторінка йде з `viewport-fit=cover`, тож на
+   телефоні з вирізом і смугою жестів кнопка інакше сідає просто на них. */
+.corner {
   position: fixed;
-  /* Вище за раму села: на телефоні кнопка лягала просто на мальовану рамку й читалась як частина
-     малюнка, а не як кнопка. */
-  right: 20px;
-  bottom: 28px;
+  right: max(env(safe-area-inset-right), clamp(12px, 1.6vw, 24px));
+  bottom: max(env(safe-area-inset-bottom), clamp(12px, 1.6vw, 24px));
   z-index: 950000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.corner-dots {
+  padding: 6px 12px;
+  font: 600 15px/1 var(--serif);
+  letter-spacing: 1px;
+  color: var(--plaq-ink);
+  background: var(--plaq);
+  border: 1.5px solid var(--plaq-edge);
+  border-radius: var(--plaq-r);
+  box-shadow: var(--plaq-sh);
+  cursor: pointer;
+  opacity: 0.62;
+  transition: opacity 0.2s ease;
+}
+.corner-dots:hover, .corner.on .corner-dots { opacity: 1; }
+.corner-menu {
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.corner.on .corner-menu { display: flex; }
+.corner-menu a, .corner-item {
   padding: 7px 13px;
   font: 600 13px/1 var(--serif);
   color: var(--plaq-ink);
@@ -1370,15 +1406,16 @@ body {
   border: 1.5px solid var(--plaq-edge);
   border-radius: var(--plaq-r);
   box-shadow: var(--plaq-sh);
+  text-decoration: none;
   cursor: pointer;
-  opacity: 0.72;
-  transition: opacity 0.2s ease;
+  white-space: nowrap;
+  opacity: 0.92;
 }
-.gripe:hover { opacity: 1; }
+.corner-menu a:hover, .corner-item:hover { opacity: 1; }
 .gripe-note {
   position: fixed;
-  right: 20px;
-  bottom: 70px;
+  right: max(env(safe-area-inset-right), clamp(12px, 1.6vw, 24px));
+  bottom: calc(max(env(safe-area-inset-bottom), clamp(12px, 1.6vw, 24px)) + 108px);
   z-index: 950001;
   width: min(340px, calc(100vw - 24px));
   padding: 14px;
@@ -1417,3 +1454,41 @@ body {
   cursor: pointer;
 }
 .gripe-say { font: italic 400 12px/1.3 var(--serif); color: rgba(46, 32, 9, 0.75); }
+
+/* ── питання з вибором («віче ще триває») ────────────────────────────────────
+   Той самий матеріал, що в підписів і бирок: питання належить селу, а не системі. Вище за все,
+   бо ставиться воно поверх локації, Дошки й скарги — і мусить дочекатись відповіді. */
+.ask {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(28px, 8vh, 96px);
+  transform: translate(-50%, 12px);
+  z-index: 950002;
+  width: max-content;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 16px 22px 14px;
+  text-align: center;
+  cursor: default;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ask.on {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+.ask-say {
+  font: 500 clamp(14px, 1.4vw, 17px) / 1.4 var(--serif);
+  color: var(--plaq-ink);
+}
+.ask-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 12px;
+}
+.ask-row button {
+  padding: 8px 16px;
+  font: 600 13px/1 var(--serif);
+}

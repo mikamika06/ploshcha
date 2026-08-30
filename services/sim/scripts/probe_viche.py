@@ -16,9 +16,11 @@ load_env(ROOT / ".env")
 
 from evalkit.conditions import CONDITIONS  # noqa: E402
 from evalkit.cost import role_of  # noqa: E402
+from evalkit.dialogue import numbers  # noqa: E402
 from evalkit.prompts import resolve  # noqa: E402
 from ploshcha_sim.adapters.llm_openai import OpenAICompatLlm  # noqa: E402
 from ploshcha_sim.compose import build_budget, build_viche  # noqa: E402
+from ploshcha_sim.domain.viche import stance_match  # noqa: E402
 
 NEWS = [
     "Кажуть, за річкою бачили вовка, і він унадився до кошари.",
@@ -26,35 +28,6 @@ NEWS = [
     "Молодиця з крайньої хати не вийшла на толоку вже третій раз.",
     "Гребля протікає, а дощі обіцяють на тому тижні.",
 ]
-
-
-def ngrams(text: str, n: int) -> set[tuple[str, ...]]:
-    words = text.lower().split()
-    return {tuple(words[i:i + n]) for i in range(max(0, len(words) - n + 1))}
-
-
-def distinctness(lines: list[str], n: int = 2) -> float:
-    """Частка унікальних n-грам. Низька = всі говорять однаково (ризик обвалу ентропії Lapa)."""
-    total, uniq = 0, set()
-    for line in lines:
-        words = line.lower().split()
-        grams = [tuple(words[i:i + n]) for i in range(max(0, len(words) - n + 1))]
-        total += len(grams)
-        uniq |= set(grams)
-    return len(uniq) / total if total else 0.0
-
-
-def overlap(lines: list[str], n: int = 2) -> float:
-    """Середнє попарне перекриття n-грам між репліками — пряма міра «всі однакові»."""
-    grams = [ngrams(t, n) for t in lines]
-    pairs = [(i, j) for i in range(len(grams)) for j in range(i + 1, len(grams))]
-    if not pairs:
-        return 0.0
-    scores = []
-    for i, j in pairs:
-        union = grams[i] | grams[j]
-        scores.append(len(grams[i] & grams[j]) / len(union) if union else 0.0)
-    return sum(scores) / len(scores)
 
 
 def main(argv=None) -> int:
@@ -104,9 +77,18 @@ def main(argv=None) -> int:
             "вхідних_по_стадіях": dict(result.prompt_by_stage),
             "по_стадіях": dict(result.tokens_by_stage),
             "по_ролях": dict(roles),
-            "distinct2": round(distinctness(texts, 2), 3),
-            "overlap2": round(overlap(texts, 2), 3),
+            # Числа про саму розмову — одним шматком з `evalkit.dialogue`, щоб зчеплення не
+            # лишилось у разовому аудиті: різність поруч із ним показувала 0.975 там, де звʼязку
+            # між репліками не було зовсім.
+            **numbers(lines, news),
             "інциденти": result.incidents, "нотатки": result.notes,
+            # ★ Партитура й позиції — у ЗВІТ, бо без них наступний круг знову міряв би розмову
+            # тимчасовим шпигуном: у 155 попередніх звітах тактів немає жодного, і «хто кого
+            # підтримав» з них не відновлюється взагалі.
+            "такти": result.beats,
+            "позиції": result.stances,
+            # Чи міряють код і модель одне й те саме: знак позиції проти голосу того ж селянина.
+            "позиції_проти_голосів": stance_match(result.stances),
             "розмова": lines,
         }
         reports.append(report)
@@ -115,7 +97,25 @@ def main(argv=None) -> int:
         print(f"  {result.outcome} · {len(texts)} реплік · {result.steps}/{build_budget(spec).max_steps} кроків · {len(set(speakers))} голосів · "
               f"{report['токенів']} ток (вх {report['вхідних']} / ген {report['згенерованих']}) · {report['секунд']}s · "
               f"яруси {report['по_ярусах']} · distinct2 {report['distinct2']} · "
-              f"overlap2 {report['overlap2']}")
+              f"overlap2 {report['overlap2']} · зчеплення {report['зчеплення']} "
+              f"({report['ознаки_звʼязку']}) · переказ {report['переказ']} "
+              f"({report['перекази']['переказів']}) · "
+              # Протік у рядок проби, а не лише в JSON: три круги поспіль його ловили саморобним
+              # шпигуном саме тому, що очима його ніде не було видно.
+              f"протік {report['протік']} ({report['протіки']['протіків']})")
+        # Підхоплення — функція довжини репліки (6.7% без стелі проти 1.0% при ≤12 словах на
+        # одній і тій самій пʼєсі), тож у рядок проби воно йде ЛИШЕ разом зі стелею, довжиною й
+        # відстанню до людського еталона: без цих трьох сусідів попередні круги записували в
+        # регрес звʼязності будь-яку правку, що вкоротила репліку.
+        align = report["вирівнювання"]
+        print(f"  підхоплення: як є {align['як_є']} на {align['пар']} парах · "
+              f"до {align['стеля']} слів {report['вирівняне']} на {align['пар_у_стелі']} · "
+              f"довжина {align['слів']} слів · "
+              f"до еталона пʼєс ({align['еталон']}) {align['до_еталона']}")
+        match = report["позиції_проти_голосів"]
+        print(f"  позиції: рухомих {match['рухомих']}/{match['усіх']} · "
+              f"знаком {match['за_знаком']}/{match['звірено']} ({match['частка_знака']}) · "
+              f"ярликом {match['збіглось']}/{match['звірено']} ({match['частка']})")
         if result.incidents:
             print(f"  інциденти: {result.incidents}")
         if not args.quiet:

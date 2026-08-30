@@ -105,3 +105,15 @@ class TaskResult(BaseModel):
     tokens_by_stage_lane: dict[str, int] = Field(default_factory=dict)
     prompt_by_stage_lane: dict[str, int] = Field(default_factory=dict)
     scratch: list[dict] = Field(default_factory=list)
+    # ★ ПАРТИТУРА Й ПОЗИЦІЇ ЇДУТЬ У ЗВІТ, а не гинуть разом із прогоном.
+    #
+    # Доти віче віддавало про розмову самі лічильники — `beats=19` нотаткою, і в усіх 43 прогонах
+    # із нотатками це було ОДНЕ Й ТЕ САМЕ число. У 155 звітах `docs/research/eval-runs/` немає
+    # жодного такту: `grep -l 'у_відповідь'` дає нуль файлів. Тому «хто кого підтримав» не
+    # відновлювався з наявних даних узагалі, і кожен круг правок мусив ставити тимчасового
+    # шпигуна, щоб побачити те, що система тримала в руках і викидала.
+    #
+    # `scratch` для цього не годиться: його читають як слід ІНСТРУМЕНТІВ (`evidence_state`,
+    # `partial_answer`, проєктор переграє його як виклики), і такт там ламав би доказовий стан.
+    beats: list[dict] = Field(default_factory=list)
+    stances: list[dict] = Field(default_factory=list)

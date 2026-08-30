@@ -9,6 +9,7 @@
 """
 
 import sqlite3
+from contextlib import contextmanager
 import time
 from pathlib import Path
 
@@ -26,10 +27,28 @@ class SqliteDecisions:
                        "label TEXT NOT NULL, who TEXT NOT NULL, poi TEXT NOT NULL, "
                        "created_at REAL NOT NULL)")
 
-    def _db(self) -> sqlite3.Connection:
+    @contextmanager
+    def _db(self):
+        """★ Зʼєднання ЗАКРИВАЄТЬСЯ явно.
+
+        `with sqlite3.connect(...)` фіксує транзакцію, але не закриває зʼєднання: доки обʼєкт
+        живий, живий і його дескриптор. У черзі цей самий взірець поклав ядро на проді — 964
+        відкритих дескриптори при стелі 1024, `[Errno 24] Too many open files`, а слідом
+        «OperationalError: unable to open database file» і цикл на паузі.
+        """
         con = sqlite3.connect(self.path, timeout=10)
-        con.row_factory = sqlite3.Row
-        return con
+        try:
+            con.row_factory = sqlite3.Row
+            yield con
+            # `with sqlite3.Connection` фіксував транзакцію сам; закриваємо руками — фіксуємо теж
+            # руками, інакше запис відкочується на закритті (заміряно: хроніка переставала
+            # накопичуватись, а звʼязки не росли).
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        finally:
+            con.close()
 
     def add(self, topic: str, label: str, who: str, poi: str) -> None:
         with self._db() as db:

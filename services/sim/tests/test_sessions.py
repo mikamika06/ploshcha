@@ -13,7 +13,9 @@
 
 import json
 import os
+import sqlite3
 import time
+import urllib.error
 import urllib.request
 
 from ploshcha_sim.adapters.decisions_sqlite import SqliteDecisions
@@ -103,6 +105,19 @@ def _drain(runner, queue) -> None:
 
 def _age(path, seconds: float, *, now: float) -> None:
     os.utime(path, (now - seconds, now - seconds))
+
+
+def _command(port: int, body: dict) -> tuple[int, dict]:
+    """Команда СПРАВЖНІМ портом. Стеля частоти живе в обгортці хендлера, тож `handle_command`
+    її не бачить узагалі — правило про неї можна перевірити лише через HTTP."""
+    req = urllib.request.Request(f"http://127.0.0.1:{port}/command",
+                                 data=json.dumps(body).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as res:
+            return res.status, json.loads(res.read())
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.loads(exc.read())
 
 
 # ── ідентифікатор ─────────────────────────────────────────────────────────────
@@ -547,3 +562,422 @@ def test_a_run_without_a_session_is_not_broadcast_to_guests():
     assert [e["n"] for e in bus.since(0, SID_B)[0]] == [], "гість не бачить нічийного прогону"
     assert [e["n"] for e in bus.since(0, SID_A)[0]] == ["своє"]
     assert len(bus.since(0, None)[0]) == 2, "інспектор без sid бачить усе"
+
+
+# ── завершити СВОЄ віче ───────────────────────────────────────────────────────
+
+class _Viche(_Talker):
+    """Віче, яке вміє замовкнути: рівно ті методи, якими його смикають сервер і робітник."""
+
+    def __init__(self):
+        super().__init__()
+        self.hushed = False
+
+    def hush(self) -> None:
+        self.hushed = True
+
+    def run(self, task, seed=1, budget=None):
+        return _HushedResult() if self.hushed else _Result()
+
+
+class _HushedResult(_Result):
+    """Прогін, що згорнувся на прохання, — рівно той слід, який лишає `Viche.hush`."""
+
+    incidents = ["viche_hushed"]
+
+
+class _HushedAgent:
+    def __init__(self, trace, run_id: str):
+        self.trace, self.run_id = trace, run_id
+
+    def run(self, task, seed=1, budget=None):
+        return _HushedResult()
+
+
+def test_a_guest_cannot_finish_another_guests_viche(tmp_path):
+    """★ Спинити чуже віче — гірше, ніж заговорити в нього: слово гість хоч чує, а тут він просто
+    гасить розмову, якої не бачить. Тому ключ шукається ТОЧНО, без запасного варіанта."""
+    _, _, _, runner = _live(tmp_path)
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    code, body = handle_command({"kind": "finish", "sid": SID_B}, runner)
+    assert code == 200 and body["ok"] is False
+    assert not viche.hushed
+
+
+def test_a_guest_can_finish_his_own_viche(tmp_path):
+    _, _, _, runner = _live(tmp_path)
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    code, body = handle_command({"kind": "finish", "sid": SID_A}, runner)
+    assert code == 200 and body["ok"] is True
+    assert viche.hushed
+
+
+def test_finishing_when_there_is_nothing_to_finish_is_not_an_error(tmp_path):
+    """Гість тисне «завершити» рівно тоді, коли віче могло скінчитись мить тому саме. Відмова
+    кодом читалась би як поламка, тож стан «нема чого спиняти» — це `ok: false`, а не 409."""
+    _, _, _, runner = _live(tmp_path)
+    code, body = handle_command({"kind": "finish", "sid": SID_A}, runner)
+    assert code == 200 and body["ok"] is False
+
+
+def test_a_new_topic_finishes_the_previous_conversation(tmp_path):
+    """★ Кинути нову тему і є спосіб сказати «ця мені більше не потрібна».
+
+    Черга й так не пустить два віча однієї сесії водночас, тож без цього нова тема лежала б, поки
+    догомонить стара, — а гість дивився б на розмову, якої вже не просив, і платив за неї.
+    """
+    _, _, _, runner = _live(tmp_path)
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    code, body = handle_command({"kind": "topic", "text": "Гребля", "sid": SID_A}, runner)
+    assert code == 200 and body["finished"] is True
+    assert viche.hushed
+
+
+def test_a_new_topic_replaces_the_one_that_still_waits_in_the_queue(tmp_path):
+    """★ Нова тема заступає й ту СВОЮ, що ще не почалась, — це рішення, а не побічний наслідок.
+
+    Фронт закриває стару розмову тим самим кліком («Стара розмова тут і кінчається», `main.ts`),
+    тож двох своїх тем гість не бачить ніколи: він дивиться на останню. Тема, що лежала б у черзі,
+    почалась би сама вже після неї — розмова, якої ніхто не просив, за повну ціну прогону.
+    """
+    _, queue, _, runner = _live(tmp_path)
+    handle_command({"kind": "topic", "text": "Гребля", "key": "a", "sid": SID_A}, runner)
+    handle_command({"kind": "topic", "text": "Криниця", "key": "b", "sid": SID_A}, runner)
+
+    assert queue.stats() == {"pending": 1}
+    assert runner._lease("перший").payload["task"] == "Криниця"
+
+
+def test_a_new_topic_does_not_touch_another_guests_conversation(tmp_path):
+    _, _, _, runner = _live(tmp_path)
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    handle_command({"kind": "topic", "text": "Гребля", "sid": SID_B}, runner)
+    assert not viche.hushed
+
+
+def test_a_finish_asked_before_the_viche_began_still_reaches_it(tmp_path):
+    """Вікно між орендою теми й появою оркестратора — це секунди, і саме там гість тисне
+    найчастіше: одразу після того, як кинув тему. Прохання мусить дочекатись агента, а не згинути
+    на порожньому місці."""
+    _, queue, _, runner = _live(tmp_path)
+    queue.put("a", {"task": "Криниця", "sid": SID_A})
+    item = runner._lease("перший")
+    assert handle_command({"kind": "finish", "sid": SID_A}, runner)[1]["ok"] is True
+    seen: list = []
+    runner.make_orchestrator = lambda trace, run_id, place=None: seen.append(
+        _Viche()) or seen[-1]
+    runner.sessions = None
+    runner._run_one(item)
+    assert seen and seen[0].hushed
+
+
+def test_finish_also_takes_the_topic_that_still_waits_in_the_queue(tmp_path):
+    """★ Вікно, у якому «завершити» доти не діставало нічого: тема ще ЛЕЖИТЬ у черзі.
+
+    `finish` спиняв рівно той прогін, який уже веде робітник, а неорендована тема того самого
+    гостя спокійно дочікувалась свого. Вікно не теоретичне: наглядач дивиться на чергу раз на
+    `SUPERVISE_EVERY_S` = 2 с і добирає робітника саме за наявністю `pending`. Тобто гість тиснув
+    «завершити» — і за дві секунди село починало гомоніти про тему, від якої він щойно
+    відмовився, за повну ціну прогону (медіана прод-прогону 19 093 токени на 121 айтемі).
+    """
+    _, queue, _, runner = _live(tmp_path)
+    queue.put("a", {"task": "Гребля", "sid": SID_A})
+
+    code, body = handle_command({"kind": "finish", "sid": SID_A}, runner)
+    assert code == 200 and body["ok"] is True, "спинити чергу — теж «є що спиняти»"
+    assert queue.stats() == {}
+    assert runner._lease("наглядач") is None, "і за дві секунди говорити вже нема про що"
+
+
+def test_finish_does_not_take_a_topic_queued_by_another_guest(tmp_path):
+    """Скасувати чуже гірше, ніж заговорити в чуже віче: гість не побачить навіть, що в нього
+    забрали розмову. Ціль — сесія з айтема, а не «все, що лежить»."""
+    _, queue, _, runner = _live(tmp_path)
+    queue.put("a", {"task": "Гребля", "sid": SID_B})
+    queue.put("b", {"task": "З консолі"})
+
+    handle_command({"kind": "finish", "sid": SID_A}, runner)
+    assert queue.stats() == {"pending": 2}
+
+
+def test_a_topic_without_a_session_is_not_cancelled_by_a_console_finish(tmp_path):
+    """Спільний кошик не належить нікому окремо: туди падають теми з консолі, з соаку і зі старого
+    клієнта. Одна команда без `sid` стирала б там чужу роботу, тоді як своє віче вона однаково
+    спиняє."""
+    _, queue, _, runner = _live(tmp_path)
+    queue.put("a", {"task": "З консолі"})
+    assert handle_command({"kind": "finish"}, runner)[1]["ok"] is False
+    assert queue.stats() == {"pending": 1}
+
+
+def test_a_finished_viche_announces_itself_in_the_stream(tmp_path):
+    """★ Механізм, що спрацював мовчки, нічим не відрізняється від поламки.
+
+    `task.outcome` несе `viche_hushed` в інцидентах, але інциденти — журнал прогону, а не звістка
+    глядачеві: сцена їх не читає. Тому кінець на прохання каже про себе окремою подією — і лише
+    тій сесії, якої стосується.
+    """
+    bus = EventBus()
+    queue = SqliteQueue(str(tmp_path / "q.db"))
+    runner = LiveRunner(bus, queue, lambda trace, run_id, place=None: _HushedAgent(trace, run_id),
+                        scene=SCENE, governor=Governor(max_tokens=1_000_000))
+    queue.put("a", {"task": "Криниця", "sid": SID_A})
+    runner._run_one(queue.lease("test"))
+
+    mine = [e for e in bus.since(0, SID_A)[0] if e["type"] == "run.degraded"]
+    assert mine and mine[0]["payload"] == {"stage": "viche", "reason": "віче завершено"}
+    assert not [e for e in bus.since(0, SID_B)[0] if e["type"] == "run.degraded"]
+
+
+def test_the_previous_conversation_is_over_before_the_next_one_starts(tmp_path):
+    """★ Сесія лишається зайнятою до ОСТАННЬОЇ події прогону, а не до кінця розмови.
+
+    Доти вона звільнялась одразу після `run`, а закриття (`task.outcome`, хроніка) летіло в шину
+    вже після цього. Вільний робітник встигав узяти наступну тему того самого гостя й почати
+    публікувати `run.started` посеред цього хвоста — і в потоці однієї сесії дві розмови
+    перепліталися. Фільтр за сесією тут не поміч: обидва прогони належать тому самому гостю.
+    """
+    bus, queue, _, runner = _live(tmp_path)
+    queue.put("a", {"task": "перша", "sid": SID_A})
+    queue.put("b", {"task": "друга", "sid": SID_A})
+    taken: list = []
+    publish = bus.publish
+
+    def peek(events, sid=None):
+        publish(events, sid)
+        batch = [events] if isinstance(events, dict) else events
+        if any(e.get("type") == "task.outcome" for e in batch):
+            taken.append(runner._lease("другий"))
+
+    bus.publish = peek
+    runner._run_one(runner._lease("перший"))
+    assert taken and taken[0] is None, "друга тема не має початись, поки перша ще договорює"
+
+
+# ── гість пішов: віче не говорить у порожнечу ─────────────────────────────────
+
+def test_a_viche_nobody_listens_to_is_hushed(tmp_path):
+    """★ Покинутий прогін догомонює 18 902 токени з 24 761 (див. `Viche.hush`).
+
+    Закрита вкладка помітна ядру лише як обрив SSE, тож облік слухачів і є єдиний спосіб про це
+    дізнатись. Пільга тут знята до нуля навмисно: її величину стереже сусідній тест, а цей — про
+    те, що механізм узагалі спрацьовує.
+    """
+    _, _, _, runner = _live(tmp_path)
+    runner.abandon_s = 0.0
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    with runner.watching(SID_A):
+        pass
+    assert runner._hush_abandoned() == 1
+    assert viche.hushed
+    assert runner.health()["hushed"] == 1
+
+
+def test_a_viche_someone_still_watches_is_left_alone(tmp_path):
+    _, _, _, runner = _live(tmp_path)
+    runner.abandon_s = 0.0
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    with runner.watching(SID_A):
+        assert runner._hush_abandoned() == 0
+    assert not viche.hushed
+
+
+def test_a_guest_who_reloads_the_page_keeps_his_viche(tmp_path):
+    """★ Перезавантаження сторінки з боку сервера НЕ відрізняється від закритої вкладки: і те, і
+    те — обрив потоку. Тому повернення слухача скасовує відлік, а не подовжує його."""
+    _, _, _, runner = _live(tmp_path)
+    runner.abandon_s = 0.0
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    with runner.watching(SID_A):
+        pass
+    with runner.watching(SID_A):
+        assert runner._hush_abandoned() == 0
+    assert not viche.hushed
+
+
+def test_the_grace_is_measured_before_anything_is_hushed(tmp_path):
+    """Пільга — не прикраса: без неї F5 коштував би гостю всієї розмови."""
+    _, _, _, runner = _live(tmp_path)
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    with runner.watching(SID_A):
+        pass
+    assert runner._hush_abandoned() == 0, "щойно відпав — це ще не «пішов»"
+    assert not viche.hushed
+
+
+def test_an_abandoned_session_loses_the_topic_it_would_never_hear(tmp_path):
+    """★ Найдорожче в наглядачі не те, що він спиняє, а те, чого він не дає початись.
+
+    Пільга віддає лише хвіст розмови — заміряно 4 826 токенів із 24 761. Тема, яку гість кинув і
+    пішов, ще не почалась зовсім, тож коштує вона цілий прогін: медіана 19 093 токени на 121
+    записаному прод-айтемі. Доти вона спокійно дочікувалась робітника й гомоніла в порожню кімнату.
+    """
+    _, queue, _, runner = _live(tmp_path)
+    runner.abandon_s = 0.0
+    queue.put("a", {"task": "Гребля", "sid": SID_A})
+    with runner.watching(SID_A):
+        pass
+
+    assert runner._hush_abandoned() == 1
+    assert queue.stats() == {}
+    assert runner.health()["hushed"] == 1
+
+
+def test_the_record_of_a_guest_who_left_does_not_pile_up(tmp_path):
+    """★ Облік тих, хто пішов, мусить і меншати, а не тільки рости.
+
+    Викреслювались доти лише сесії, чиє віче саме йшло; решта лишалась у `_left` назавжди — сто
+    байтів на кожного гостя, який бодай раз відкрив потік і закрив вкладку. На довгограючому проді
+    це витік, тим прикріший, що росте він рівно з відвідуваністю. Після пільги запис нічого не
+    тримає: спиняти нема чого, а нове зʼєднання завело б свій запис із нуля.
+    """
+    _, _, _, runner = _live(tmp_path)
+    runner.abandon_s = 0.0
+    for sid in (SID_A, SID_B):
+        with runner.watching(sid):
+            pass
+    assert len(runner._left) == 2
+
+    assert runner._hush_abandoned() == 0, "спиняти справді нема чого"
+    assert runner._left == {}, "але й памʼятати про них уже нема чого"
+
+
+def test_a_guest_who_comes_back_after_the_record_is_swept_is_watched_again(tmp_path):
+    """Викреслений запис не має означати, що гість більше не під наглядом: наступний потік заводить
+    відлік наново, і покинуте віче згортається так само."""
+    _, _, _, runner = _live(tmp_path)
+    runner.abandon_s = 0.0
+    with runner.watching(SID_A):
+        pass
+    runner._hush_abandoned()
+
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    with runner.watching(SID_A):
+        pass
+    assert runner._hush_abandoned() == 1
+    assert viche.hushed
+
+
+def test_a_run_that_never_had_a_listener_is_never_hushed(tmp_path):
+    """Соак, консоль і CLI потоку не відкривають узагалі. Якби «нема слухача» означало «покинуто»,
+    вони гинули б на першій же перевірці — тобто ядро не можна було б смикнути без браузера."""
+    _, _, _, runner = _live(tmp_path)
+    runner.abandon_s = 0.0
+    viche = _Viche()
+    runner._active[""] = viche
+    assert runner._hush_abandoned() == 0
+    assert not viche.hushed
+
+
+def test_the_core_counts_the_streams_that_are_open(tmp_path):
+    """Облік слухачів має вести САМ сервер, а не тест: закрита вкладка видна лише в довгому
+    зʼєднанні, і якщо `/stream` його не заводить, механізм мертвий при живих тестах."""
+    bus, _, _, runner = _live(tmp_path)
+    httpd = serve(bus, runner, port=0)
+    port = httpd.server_address[1]
+    try:
+        res = urllib.request.urlopen(f"http://127.0.0.1:{port}/stream?sid={SID_A}", timeout=5)
+        deadline = time.time() + 3.0
+        while runner.health()["listeners"] != 1 and time.time() < deadline:
+            time.sleep(0.02)
+        assert runner.health()["listeners"] == 1
+        bus.close()
+        res.close()
+        deadline = time.time() + 3.0
+        while runner.health()["listeners"] and time.time() < deadline:
+            time.sleep(0.02)
+        assert runner.health()["listeners"] == 0, "глядач, що відпав, мусить зникнути з обліку"
+    finally:
+        httpd.shutdown()
+
+
+def test_a_hush_asked_in_the_waiting_window_does_not_outlive_its_run(tmp_path):
+    """★ Прохання про тишу належить ОДНОМУ прогону і мусить померти разом із ним.
+
+    Чекає воно у вузькому вікні між орендою теми й появою оркестратора, а знімає його `_work` —
+    рядком, до якого прогін може й не доїхати: чинні ухвали й побудова агента ходять у SQLite, і
+    «база зайнята» тут звичайна річ. Доти `sid` лишався в наборі назавжди, тож НАСТУПНЕ віче цієї
+    сесії гинуло на першому такті, скільки б тем гість не кидав: один збій мовчки забирав у нього
+    всі дальші розмови.
+    """
+    _, queue, _, runner = _live(tmp_path)
+    runner.sessions = None
+    queue.put("a", {"task": "Криниця", "sid": SID_A})
+    item = runner._lease("перший")
+    assert handle_command({"kind": "finish", "sid": SID_A}, runner)[1]["ok"] is True
+
+    made: list = []
+
+    def make(trace, run_id, place=None):
+        if not made:
+            made.append(None)
+            raise sqlite3.OperationalError("database is locked")
+        made.append(_Viche())
+        return made[-1]
+
+    runner.make_orchestrator = make
+    runner._run_one(item)                       # перший прогін падає, не діставши прохання
+    queue.put("b", {"task": "Гребля", "sid": SID_A})
+    runner._run_one(runner._lease("другий"))
+
+    assert isinstance(made[-1], _Viche)
+    assert not made[-1].hushed, "нове віче не спиняється проханням, адресованим минулому"
+
+
+def test_the_watch_over_abandoned_viches_is_started_by_the_core(tmp_path, monkeypatch):
+    """★ Наглядач, якого ніхто не заводить, мертвий при живих тестах.
+
+    Решта тестів про покинуте віче кличе `_hush_abandoned` рукою — тобто перевіряє правило, а не
+    те, що його хтось застосовує. Приберіть рядок із `start()`, і всі вони лишаться зелені, поки
+    в проді покинутий прогін догомонює 18 902 токени з 24 761 (`Viche.hush`). Тому тут ніхто нічого не
+    кличе: сесія просто лишається без слухача, а віче мусить згорнутись саме.
+    """
+    from ploshcha_sim.live import runner as live_runner
+
+    monkeypatch.setattr(live_runner, "WATCH_EVERY_S", 0.02)
+    _, _, _, runner = _live(tmp_path)
+    runner.abandon_s = 0.0
+    viche = _Viche()
+    runner._active[SID_A] = viche
+    with runner.watching(SID_A):
+        pass
+    runner.start()
+    try:
+        deadline = time.time() + 3.0
+        while not viche.hushed and time.time() < deadline:
+            time.sleep(0.01)
+        assert viche.hushed, "ядро мусить саме питати, чи його ще слухають"
+    finally:
+        runner.stop()
+
+
+def test_the_spend_gate_does_not_refuse_the_command_that_stops_spending(tmp_path):
+    """★ Стеля витрат не сміє різати єдину команду, яка витрати ЗМЕНШУЄ.
+
+    `RATE_MAX` стоїть на гаманці: тема коштує тисячі токенів. Але «завершити» обриває віче, яке
+    саме зараз платить, і покинутий прогін догомонює 18 902 токени з 24 761. Доти гість, що вичерпав
+    клацанням (а це рівно той, хто кидає теми одну за одною), діставав 429 саме на ту команду,
+    заради якої стеля й стоїть, — і село договорювало за його гроші.
+    """
+    from ploshcha_sim.live.server import RATE_MAX
+
+    bus, _, _, runner = _live(tmp_path)
+    httpd = serve(bus, runner, port=0)
+    port = httpd.server_address[1]
+    try:
+        for _ in range(RATE_MAX):
+            assert _command(port, {"kind": "хтозна", "sid": SID_A})[0] == 400
+        assert _command(port, {"kind": "topic", "text": "Гребля", "sid": SID_A})[0] == 429
+        code, body = _command(port, {"kind": "finish", "sid": SID_A})
+        assert code == 200 and body["ok"] is False, "нема чого спиняти — але це не 429"
+    finally:
+        httpd.shutdown()

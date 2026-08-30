@@ -30,7 +30,8 @@ from ploshcha_sim.adapters.decisions_sqlite import SqliteDecisions  # noqa: E402
 from ploshcha_sim.adapters.queue_sqlite import SqliteQueue  # noqa: E402
 from ploshcha_sim.compose import (  # noqa: E402
     build_budget, build_effort, build_graph, build_orchestrator, build_router,
-    build_scout, build_viche)
+    build_scout, build_viche, build_viche_guard, build_viche_sense,
+    refuse_sightless_viche)
 from ploshcha_sim.domain.governor import Governor  # noqa: E402
 from ploshcha_sim.adapters.memory_sqlite import SqliteMemory  # noqa: E402
 from ploshcha_sim.adapters.rumours_sqlite import SqliteRumours  # noqa: E402
@@ -76,13 +77,26 @@ def parse_args(argv):
 def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: int,
                db: str, kill_file: str | None = None, paused: bool = True,
                workers: int = 1):
-    """Збірка живого циклу — спільна для сервера і для соак-заміру, щоб проводка не дублювалась."""
-    key, url = os.environ.get("LAPA_API_KEY"), os.environ.get("LAPA_BASE_URL")
-    if not key or not url:
-        raise RuntimeError("нема LAPA_API_KEY / LAPA_BASE_URL у .env")
+    """Збірка живого циклу — спільна для сервера і для соак-заміру, щоб проводка не дублювалась.
+
+    ★ Умова перевіряється ПЕРШОЮ, до ключів і до породження села, і це не порядок заради порядку.
+    Сліпе віче (`viche_sense=False`) коштує рівно нуль, щоб відмовити, а село народжується одним
+    викликом Мамая, тож перевірка після нього платила б за конфігурацію, яку однаково не піднімуть.
+    І причину видно з першого рядка: відмова про ключі на сліпій умові збила б з пантелику.
+
+    Чому саме тут, а не в `build_viche`: цей вхід — ЖИВИЙ цикл, у нього приходить людина з вулиці
+    через Дошку. Замір сліпої конфігурації збирає віче `build_viche` (`probe_sense_price.py`,
+    `probe_viche.py`), і йому нічого не забороняється — підстава при `refuse_sightless_viche`.
+    """
     spec = CONDITIONS.get(condition)
     if spec is None:
         raise KeyError(f"невідома умова {condition!r}")
+    refusal = refuse_sightless_viche(spec)
+    if refusal:
+        raise RuntimeError(refusal)
+    key, url = os.environ.get("LAPA_API_KEY"), os.environ.get("LAPA_BASE_URL")
+    if not key or not url:
+        raise RuntimeError("нема LAPA_API_KEY / LAPA_BASE_URL у .env")
 
     lapa = OpenAICompatLlm(model=os.environ["LAPA_MODEL"], base_url=url, api_key=key,
                            structured_mode="json_schema")
@@ -145,6 +159,12 @@ def build_live(*, condition: str, max_tokens: int, max_usd: float, max_items: in
                                              if talk else None,
                                     rumours=talk.open() if talk else None,
                                     place=place, memory=memory,
+                                    # Явно, як і решта переліку: `build_viche` склав би охорону
+                                    # й сам, але тут перелічено все, що серверу важливо не
+                                    # загубити, — а мовчазне ковтання kwargs уже коштувало нам
+                                    # сталих персон і нетрасованого графа.
+                                    guard=build_viche_guard(spec),
+                                    sense=build_viche_sense(spec),
                                     scout=build_scout(
                                         CONDITIONS["ref@8"], lapa=lapa, mamay=mamay,
                                         system=resolve("agent/v2-ref").render_system(),

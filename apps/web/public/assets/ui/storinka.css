@@ -1,0 +1,139 @@
+:root {
+  --paper1: #f7f0e2;
+  --paper2: #ede1c8;
+  --ink: #2b2318;
+  --dim: #6b5836;
+  --wine: #9a3b2f;
+  --edge: rgba(70, 46, 24, 0.24);
+  --serif: Georgia, "Times New Roman", serif;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  padding: 0 20px 72px;
+  background: #1a1206;
+  color: var(--ink);
+  font: 400 18px/1.62 var(--serif);
+}
+
+.arkush {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: clamp(28px, 6vw, 64px) clamp(20px, 5vw, 56px) clamp(36px, 7vw, 72px);
+  background: linear-gradient(180deg, var(--paper1), var(--paper2));
+  border-left: 1px solid var(--edge);
+  border-right: 1px solid var(--edge);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.45);
+}
+
+.doroha {
+  margin: 0 0 28px;
+  font-size: 15px;
+  color: var(--dim);
+  letter-spacing: 0.02em;
+}
+
+.doroha a { color: var(--dim); }
+
+h1 {
+  margin: 0 0 8px;
+  font-size: clamp(30px, 5.4vw, 42px);
+  line-height: 1.16;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.pidzahol {
+  margin: 0 0 34px;
+  font-size: 17px;
+  font-style: italic;
+  color: var(--dim);
+}
+
+h2 {
+  margin: 46px 0 14px;
+  font-size: clamp(22px, 3.4vw, 27px);
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+h3 {
+  margin: 32px 0 10px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+p { margin: 0 0 18px; }
+
+a { color: var(--wine); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: #7d2c22; }
+
+ol, ul { margin: 0 0 20px; padding-left: 1.35em; }
+li { margin-bottom: 8px; }
+
+dl { margin: 0 0 20px; }
+dt { margin: 24px 0 6px; font-weight: 700; }
+dd { margin: 0 0 16px; }
+
+.chyslo {
+  margin: 26px 0;
+  padding: 16px 20px;
+  background: rgba(255, 252, 245, 0.66);
+  border-left: 3px solid var(--wine);
+  font-size: 17px;
+}
+
+.chyslo p:last-child { margin-bottom: 0; }
+
+.zvidky {
+  font-size: 15px;
+  color: var(--dim);
+  font-style: italic;
+}
+
+.rozkryttia {
+  margin: 46px 0 0;
+  padding: 18px 20px;
+  border: 1px solid var(--edge);
+  background: rgba(255, 252, 245, 0.5);
+  font-size: 16px;
+}
+
+.rozkryttia p:last-child { margin-bottom: 0; }
+
+.pidval {
+  margin: 44px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--edge);
+  font-size: 16px;
+  color: var(--dim);
+}
+
+.pidval p { margin: 0 0 10px; }
+
+table {
+  width: 100%;
+  margin: 0 0 22px;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+th, td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--edge);
+  vertical-align: top;
+}
+
+th { font-weight: 700; }
+
+.tabl { overflow-x: auto; }
+
+@media (max-width: 560px) {
+  body { font-size: 17px; padding: 0 0 56px; }
+  .arkush { border-left: 0; border-right: 0; }
+}
