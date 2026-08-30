@@ -12,7 +12,7 @@ import { SimStore } from "./store/SimStore";
 import { Ports, radiusFor } from "./interact/Ports";
 import { Board } from "./interact/Board";
 import { GroupTalk } from "./interact/GroupTalk";
-import { discussionFor, type TalkPart } from "./interact/discussion";
+import { FIXTURE_CAST, discussionFor, type TalkPart } from "./interact/discussion";
 import { LivingRoom, type RoomCast, type Pt } from "./interact/LivingRoom";
 import { Curtain } from "./scene/Curtain";
 import { Inspector } from "./interact/Inspector";
@@ -69,6 +69,7 @@ const SOCIAL_ROOM: Record<string, { bg: string; name: string; floor: Pt[]; mask?
 
 import { FixtureDriver } from "./net/FixtureDriver";
 import { LiveDriver, sendCommand, fetchHealth, CommandRefused } from "./net/LiveDriver";
+import type { EventSourcePort } from "./net/types";
 import { Gripe } from "./interact/Gripe";
 import { parseEnvelope } from "./net/validate";
 import { GRADE_MUTED, loadGraded, assetUrl } from "./util/gfx";
@@ -184,6 +185,40 @@ async function boot(): Promise<void> {
     думка.classList.toggle("on", Boolean(text));
   };
 
+  /**
+   * Питання з вибором — тією самою хмаркою, що й підписи села.
+   *
+   * ★ Діалогів браузера тут немає й не буде: `confirm()` — це системне вікно з чужим шрифтом
+   * поверх села, тобто рівно той вихід зі сцени, якого ця оболонка уникає всюди. Матеріал той
+   * самий (`plaq`), слова людські, вибір із двох — і жодного «ви впевнені?».
+   */
+  const ask = document.createElement("div");
+  ask.className = "ask plaq";
+  ask.innerHTML = `<div class="ask-say"></div>
+                   <div class="ask-row">
+                     <button class="tag ask-yes" type="button"></button>
+                     <button class="tag ask-no" type="button">Хай говорять</button>
+                   </div>`;
+  stageEl.appendChild(ask);
+  let asked: (() => void) | null = null;
+  const closeAsk = (): void => {
+    asked = null;
+    ask.classList.remove("on");
+  };
+  const askThen = (say: string, yes: string, run: () => void): void => {
+    (ask.querySelector(".ask-say") as HTMLElement).textContent = say;
+    (ask.querySelector(".ask-yes") as HTMLElement).textContent = yes;
+    asked = run;
+    ask.classList.add("on");
+  };
+  ask.addEventListener("click", (e) => e.stopPropagation());
+  ask.querySelector(".ask-yes")!.addEventListener("click", () => {
+    const go = asked;
+    closeAsk();
+    go?.();
+  });
+  ask.querySelector(".ask-no")!.addEventListener("click", () => closeAsk());
+
   // Перша підказка: стрілка на Дошку. Показуємо рівно один раз на пристрій — правило про
   // «предмети замість кнопок» треба сказати вголос лише доти, доки воно невідоме.
   const HINT_SEEN = "ploshcha.hint.board";
@@ -193,8 +228,17 @@ async function boot(): Promise<void> {
                          <div class="first-hint-arrow"></div>`;
   stageEl.appendChild(firstHint);
   let hintPoi: POI | null = null;
+  // ★ Показ підказки відкладений, і цей таймер треба вміти скасувати.
+  //
+  // Доти гість, який тицьнув Дошку раніше за 2.6 с, діставав підказку ПІСЛЯ того, як вона вже
+  // сховалась: `hideHint` знімав клас, а відкладений показ вішав його назад. І позбутись її вже
+  // не було як — `hintPoi` порожній, тож стеження за камерою (`hintPoi` у циклі) мовчить, і
+  // табличка лишалась висіти поверх відкритої Дошки до кінця сесії.
+  let hintTimer: number | undefined;
   const hideHint = (): void => {
     hintPoi = null;
+    if (hintTimer !== undefined) window.clearTimeout(hintTimer);
+    hintTimer = undefined;
     firstHint.classList.remove("on");
     try {
       localStorage.setItem(HINT_SEEN, "1");
@@ -240,6 +284,31 @@ async function boot(): Promise<void> {
   let resumeSkips = 0; // після рестарту тікера (вкладка/вихід з кімнати) — відкинути перші «биті» кадри
   let stoppedAt = 0;   // коли тікер спинили: на цю паузу зсуваємо годинник сцени
   let talkOpen = false; // чи чекає відкрите вікно розмови на репліки з живого потоку
+  /**
+   * Прогін, який ЗАРАЗ коштує грошей: `runId` живого віча або `null`.
+   *
+   * Береться з подій ядра, а не з наших намірів: тема могла ще лежати в черзі, віче могло
+   * скінчитись саме, поки глядач дочитує притримані репліки. Питати «завершити?» про розмову,
+   * якої вже немає, — та сама брехня інтерфейсу, що й «Село думу думає» над мертвим ядром.
+   */
+  let liveRun: string | null = null;
+  const finishRun = (): void => {
+    if (!IS_LIVE) return;
+    // ★ Рішення гостя — уже ФАКТ, а не намір, і питати про нього вдруге не можна.
+    //
+    // Подія кінця приходить із ядра, і між «Завершити» та нею лежить ціле віче: тиша береться на
+    // межі такту, а такт — це виклик Мамая (медіана 3.2 с, максимум 15.9 с на цьому шлюзі).
+    // Заміряно браузером на живому ядрі 2026-08-28: **8416 мс** від кліку до `task.outcome`. Усе
+    // це вікно `liveRun` лишався піднятим, тож наступний вихід або нова тема діставали ту саму
+    // табличку вдруге — «Віче ще триває» про віче, яке гість щойно спинив сам. Тому знімаємо тут:
+    // подія ядра лишається підтвердженням, а не єдиним джерелом.
+    liveRun = null;
+    // Притримані репліки — це та сама розмова, яку щойно спинили. Лишити їх грати означало б
+    // сперечатись із власним питанням: гість сказав «завершити», а село говорить далі.
+    driver.drop?.();
+    void sendCommand(LIVE_URL, { kind: "finish" }).catch((err: unknown) =>
+      console.warn("[live] віче не спинилось", err));
+  };
 
   const exitToVillage = (): void => {
     preRoom.length = 0;
@@ -264,6 +333,24 @@ async function boot(): Promise<void> {
     }
   };
   /**
+   * Вийти з розмови. Поки віче йде — спершу питання, і воно ж єдине місце, де село спиняють.
+   *
+   * ★ Вкладку, яку закривають, тут не перехопити: `beforeunload` уміє лише системне вікно, а
+   * `pagehide` не відрізняє «пішов» від «перезавантажив» — і слухняний F5 коштував би гостю
+   * всієї розмови. Тому закриту вкладку ловить ядро (пільга без слухача), а фронт відповідає за
+   * ті виходи, які видно: «до села», Escape і нова тема.
+   */
+  const leaveTalk = (): void => {
+    if (!IS_LIVE || !liveRun) {
+      exitToVillage();
+      return;
+    }
+    askThen("Віче ще триває. Завершити його?", "Завершити", () => {
+      finishRun();
+      exitToVillage();
+    });
+  };
+  /**
    * Вхід у порт. Наближення тут БІЛЬШЕ НЕМАЄ.
    *
    * Камера пірнала й затемнювала кадр перед кожним відкриттям — зайвий кадр-переріз, який нічого
@@ -279,7 +366,7 @@ async function boot(): Promise<void> {
   };
 
   const groupTalk = new GroupTalk(
-    () => exitToVillage(),
+    () => leaveTalk(),
     (text) => {
       if (!IS_LIVE) return;
       void sendCommand(LIVE_URL, { kind: "say", text })
@@ -290,68 +377,94 @@ async function boot(): Promise<void> {
   );
   const board = new Board(
     (t) => {
-      board.close();
-      // учасники — реальні селяни зі стору; якщо ще не «наспавнились» — запасний гурт
-      const villagers = [...store.state.villagers.values()];
-      const pool: TalkPart[] =
-        villagers.length >= 2
-          ? villagers.map((v) => ({ id: v.id, name: v.name, role: v.role }))
-          : [
-              { id: "parubok", name: "Іван", role: "parubok" },
-              { id: "divchyna", name: "Оксана", role: "divchyna" },
-              { id: "did", name: "дід Свирид", role: "did" },
-              { id: "sheptu", name: "баба Горпина", role: "sheptu" },
-            ];
-      const parts = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(5, pool.length));
-      // Усі СПРАВДІ йдуть на місце віча — своїми ногами, по мапі. Доти це було наближення камери
-      // до площі, тобто «зібрались» лише на словах: люди лишались там, де стояли.
-      const talkKind = roomFor(board.where);
-      const talkPoi = scene.pois.find((q) => q.kind === talkKind) ?? squarePoi;
-      if (talkPoi) {
-        // Громада ОДРАЗУ на місці: тицьнув тему — і всі там. Хода через усе село була хвилиною
-        // порожнього екрана, а після віча вони й лишаються стояти там, де говорили.
-        director.hold(parts.map((q) => q.id), true);
-        const spots = grid.spotsNear(talkPoi.x, talkPoi.y, parts.length);
-        parts.forEach((q, i) => {
-          const spot = spots[i] ? grid.cellCenter(spots[i][0], spots[i][1])
-            : { x: talkPoi.x, y: talkPoi.y };
-          director.placeAt(q.id, spot);
-        });
+      // ★ Нова тема закриває стару розмову, тож питаємо ДО того, як ядро це зробить.
+      //
+      // Гість, що кинув другу тему, доти не знав, куди поділась перша: ядро мусить її згорнути
+      // (інакше вони змішаються в одному потоці), а на екрані це виглядало б як обрив. Питання
+      // тут — не осторога, а те саме рішення, названо вголос.
+      if (IS_LIVE && liveRun) {
+        askThen("Віче ще триває. Завершити його й почати нове?", "Почати нове",
+                () => startTopic(t));
+        return;
       }
-      // У живому режимі репліки беруться ЛИШЕ з реального потоку. Генератор тут дав би фікцію:
-      // тема щойно поставлена в чергу, ядро над нею думає десятки секунд, тож `transcript`
-      // порожній — і колишня умова `live.length` тихо падала в заготовані репліки.
-      if (IS_LIVE) {
-        talkOpen = true;
-        // Якщо місце має намальовану локацію — розмова йде ТАМ; VN-накладка лишається запасним
-        // шляхом (Дошка як місце, або невідоме місце з ядра).
-        if (talkKind) void enterTalkRoom(board.where, parts);
-        else groupTalk.openLive(t.text, "Тему передано в ядро. Село сходиться, Мамай думає…");
-        // Ключ мусить бути свіжий: черга ядра ідемпотентна за ключем, тож стабільний хеш тексту
-        // означав би, що другий клік по тій самій темі тихо НЕ запускає прогін.
-        void sendCommand(LIVE_URL, {
-          kind: "topic",
-          text: t.text,
-          place: board.where,
-          key: `${t.id}-${Date.now().toString(36)}`,
-        }).catch((err: unknown) => {
-          console.warn("[board] тема не доїхала в ядро", err);
-          groupTalk.finish(err instanceof CommandRefused
-            ? `Ядро не взяло тему: ${err.message}`
-            : "Тема не доїхала в ядро — воно не відповідає.");
-        });
-      } else {
-        talkOpen = false;
-        groupTalk.open(t.text, parts, discussionFor(t.text, parts));
-      }
+      startTopic(t);
     },
     () => exitToVillage(),
   );
+  function startTopic(t: { id: string; text: string }): void {
+    board.close();
+    // ★ Імена на сцені називає ЛИШЕ ядро (`casting.done`).
+    //
+    // Тут стояв запасний ростер із «Оксаною» — і в живому режимі саме він доїжджав на сцену
+    // першим: першу тему вкладки глядач кидає, коли складу ще нема (його оголошує прогін, а
+    // прогону ще нема), локація відкривалась на цих іменах, а `LivingRoom.addPerson` на вже
+    // посадженому `vid` мовчки виходив. `id` фікстури дорівнює ролі, тобто збігається з `id`
+    // справжнього касту, тож підпис лишався фікстурним НАЗАВЖДИ: у базі власника «Пилип
+    // Завзятко», на екрані «Іван» (аудит 2026-08-29, чотири розбіжні підписи з восьми).
+    // Тепер із ядром гурт порожній: кожен приходить у локацію на своїй першій репліці, під
+    // імʼям із `casting.done` (`castOf`). Без ядра грає фікстура — вона для того й названа так.
+    const villagers = [...store.state.villagers.values()];
+    const pool: TalkPart[] =
+      villagers.length >= 2
+        ? villagers.map((v) => ({ id: v.id, name: v.name, role: v.role }))
+        : IS_LIVE ? [] : FIXTURE_CAST;
+    const parts = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(5, pool.length));
+    // Усі СПРАВДІ йдуть на місце віча — своїми ногами, по мапі. Доти це було наближення камери
+    // до площі, тобто «зібрались» лише на словах: люди лишались там, де стояли.
+    const talkKind = roomFor(board.where);
+    const talkPoi = scene.pois.find((q) => q.kind === talkKind) ?? squarePoi;
+    if (talkPoi && parts.length) {
+      // ★ Громада СХОДИТЬСЯ на місце — ногами, поспішаючи. Не ставиться туди одразу.
+      //
+      // Миттєве розставляння тут стояло навмисно: колись локація відкривалась аж тоді, як усі
+      // зійшлись, і хода через усе село була хвилиною чекання. Тепер хмари беруться по готовності
+      // порядку (`enterTalkRoom`), тобто хода не затримує НІЧОГО, — а стрибок лишався видним:
+      // замір у браузері 2026-08-29 показав чотирьох, що перелетіли 507, 662, 837 і 930 світових
+      // пікселів за один кадр у 2 мс. Поспіх (`HURRY`) заміряний окремо, у самому директорі.
+      director.hold(parts.map((q) => q.id), true);
+      const spots = grid.spotsNear(talkPoi.x, talkPoi.y, parts.length);
+      parts.forEach((q, i) => {
+        const spot = spots[i] ? grid.cellCenter(spots[i][0], spots[i][1])
+          : { x: talkPoi.x, y: talkPoi.y };
+        director.moveTo(q.id, spot);
+      });
+    }
+    // У живому режимі репліки беруться ЛИШЕ з реального потоку. Генератор тут дав би фікцію:
+    // тема щойно поставлена в чергу, ядро над нею думає десятки секунд, тож `transcript`
+    // порожній — і колишня умова `live.length` тихо падала в заготовані репліки.
+    if (IS_LIVE) {
+      talkOpen = true;
+      // Стара розмова тут і кінчається. Ядро згорне її саме (`topic` кличе `finish`), але подія
+      // про це прийде через секунди, а притримані репліки грають щосекунди — і нова тема
+      // починалась би під голоси минулої.
+      driver.drop?.();
+      // Якщо місце має намальовану локацію — розмова йде ТАМ; VN-накладка лишається запасним
+      // шляхом (Дошка як місце, або невідоме місце з ядра).
+      if (talkKind) void enterTalkRoom(board.where, parts);
+      else groupTalk.openLive(t.text, "Тему передано в ядро. Село сходиться, Мамай думає…");
+      // Ключ мусить бути свіжий: черга ядра ідемпотентна за ключем, тож стабільний хеш тексту
+      // означав би, що другий клік по тій самій темі тихо НЕ запускає прогін.
+      void sendCommand(LIVE_URL, {
+        kind: "topic",
+        text: t.text,
+        place: board.where,
+        key: `${t.id}-${Date.now().toString(36)}`,
+      }).catch((err: unknown) => {
+        console.warn("[board] тема не доїхала в ядро", err);
+        groupTalk.finish(err instanceof CommandRefused
+          ? `Ядро не взяло тему: ${err.message}`
+          : "Тема не доїхала в ядро — воно не відповідає.");
+      });
+    } else {
+      talkOpen = false;
+      groupTalk.open(t.text, parts, discussionFor(t.text, parts));
+    }
+  }
   // Літопис прибрано зі сцени: стос службових плашок праворуч заступав село й нічого не додавав.
   // Гучними лишились тільки поламки — вони йдуть у підпис знизу, де й «Село думу думає…».
   const inspector = new Inspector(() => inspector.close());
   const room = new LivingRoom(
-    () => exitToVillage(),
+    () => leaveTalk(),
     (text) => {
       if (!IS_LIVE) return;
       const live = talkRoom !== null;
@@ -417,7 +530,31 @@ async function boot(): Promise<void> {
     // порядок складено: один структурований виклик оркестратора йде десятки секунд, і кидати
     // глядача в порожню локацію на цей час немає сенсу.
     planReady = false;
-    mapThink("Село думу думає…");
+    // ★ ЛОКАЦІЯ ВІДКРИВАЄТЬСЯ ОДРАЗУ, а чекання переїхало всередину неї.
+    //
+    // Доти глядач дивився на мапу з плашкою «Село думу думає…», доки ядро не віддасть перше слово,
+    // і лише тоді бачив завісу й кімнату. Заміряно в браузері: плашка висіла 6.5 с, кімната
+    // відкривалась на 7.1-й — при тому що ядро віддає перше слово за 2.5 с. Чотири секунди з семи
+    // були накладними витратами показу, а не думання.
+    if (talkRoom !== kind) return;
+    await curtain.sweep(() => {
+      inspector.close();
+      board.close();
+      groupTalk.close();
+      ports.setEnabled(false);
+      whisper.classList.remove("on");
+      const cast: RoomCast[] = parts.map((p) => ({ id: p.role, name: p.name, vid: p.id }));
+      room.open(r.bg, r.name, cast, r.floor, r.mask, { figScale: FIG });
+      room.setLive(true);
+      for (const w of preRoom.splice(0)) {
+        room.addPerson(castOf(w.who));
+        room.enqueue(w.who, w.text, w.deed, w.toward);
+      }
+      stoppedAt = performance.now();
+      renderer.app.ticker.stop();
+    });
+    // Чекання тепер видно В КІМНАТІ: люди вже на місці, і зрозуміло, що саме триває.
+    room.waiting(true);
     const until = performance.now() + PONDER_CAP_MS;
     // ★ Лічильник, а не залишок від різниці часу. `(now - until) % 4000 < 220` тут завжди істина:
     // різниця відʼємна аж до кінця очікування, а відʼємний залишок у JS теж відʼємний, тобто
@@ -438,34 +575,20 @@ async function boot(): Promise<void> {
           talkRoom = null;
           talkOpen = false;
           director.hold([...store.state.villagers.keys()], false);
-          mapThink(`Ядро спинилось: ${h.stoppedReason ?? h.lastError ?? h.state}`);
-          window.setTimeout(() => mapThink(""), 9000);
+          // Кімната вже відкрита, тож причину кажемо в ній, а не на мапі за спиною глядача.
+          room.waiting(false);
+          room.notice(`Ядро спинилось: ${h.stoppedReason ?? h.lastError ?? h.state}`);
           return;
         }
       }
     }
     mapThink("");
-    if (talkRoom !== kind) return;
-    // Спершу ХОДЬБА: доки Мамай думає, село сходиться на місце — це видно на мапі. Хмари беремо
-    // лише коли всі дійшли; стеля потрібна, бо непрохідна клітинка не має вішати сцену назавжди.
-    if (talkRoom !== kind) return; // віче вже скінчилось або перебите, поки сходились
-    await curtain.sweep(() => {
-      inspector.close();
-      board.close();
-      groupTalk.close();
-      ports.setEnabled(false);
-      whisper.classList.remove("on"); // підказка порту лишалась висіти вже над локацією
-      const cast: RoomCast[] = parts.map((p) => ({ id: p.role, name: p.name, vid: p.id }));
-      room.open(r.bg, r.name, cast, r.floor, r.mask, { figScale: FIG });
-      room.setLive(true);
-      // Якщо ядро вже щось віддало, доки відкривалась локація — воно звучить тут, по кліку.
-      for (const w of preRoom.splice(0)) {
-        room.addPerson(castOf(w.who));
-        room.enqueue(w.who, w.text, w.deed, w.toward);
-      }
-      stoppedAt = performance.now();
-      renderer.app.ticker.stop();
-    });
+    room.waiting(false);
+    // Слово, що прийшло, доки глядач чекав у кімнаті, звучить тут — черга кімнати вже відкрита.
+    for (const w of preRoom.splice(0)) {
+      room.addPerson(castOf(w.who));
+      room.enqueue(w.who, w.text, w.deed, w.toward);
+    }
   };
 
   // Скарга — завжди під рукою, у кутку: людина, що впіймала баг, не має шукати, куди про нього
@@ -524,7 +647,13 @@ async function boot(): Promise<void> {
   });
   loc.querySelector(".loc-back")!.addEventListener("click", () => exitToVillage());
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") exitToVillage();
+    if (e.key !== "Escape") return;
+    // Escape на відкритому питанні — це відповідь «ні», а не другий вихід поверх першого.
+    if (ask.classList.contains("on")) {
+      closeAsk();
+      return;
+    }
+    leaveTalk();
   });
 
   // клік по селянину на діорамі → інспектор когніції (ручний хіт-тест поза Pixi)
@@ -550,6 +679,10 @@ async function boot(): Promise<void> {
     // Невідомий тип доїжджає сюди сирим (контракт additive) — сцена свідомо його не малює.
     if (!ev.known) return;
     switch (ev.type) {
+      case "run.started":
+        // Ядро взялось за тему — відтепер розмова коштує грошей, і є що завершувати.
+        liveRun = ev.runId;
+        break;
       case "casting.done":
         director.spawn(ev.payload.cast);
         break;
@@ -602,6 +735,10 @@ async function boot(): Promise<void> {
         break;
       }
       case "task.outcome":
+        // Розмова догоріла сама: питати про завершення більше нема про що, хай навіть глядач ще
+        // дочитує притримані репліки — ядро на них уже не витрачається.
+        liveRun = null;
+        closeAsk();
         // Локацію НЕ закриваємо: люди лишаються стояти там, де говорили, а глядач дочитує чергу
         // й виходить «до села», коли захоче. Напису тут немає: `task.outcome` приходить раніше,
         // ніж дочитано чергу, і «віче скінчилось» брехало посеред розмови.
@@ -615,6 +752,8 @@ async function boot(): Promise<void> {
         }
         break;
       case "run.error":
+        liveRun = null;
+        closeAsk();
         mapThink("Ядро впало — розмова не відбулась.");
         window.setTimeout(() => mapThink(""), 9000);
         if (talkOpen) groupTalk.finish("Ядро впало — розмова не відбулась.");
@@ -626,8 +765,19 @@ async function boot(): Promise<void> {
       case "plan.revised":
         break; // це внутрішнє життя ядра; його місце в інспекторі, а не поверх села
       case "run.degraded":
-        // Зупинка — не дрібниця: її мусить бути видно, тому вона йде в той самий підпис знизу.
-        mapThink(`Віче стало: ${ev.payload.reason ?? ev.payload.stage}`);
+        // ★ Кінець на прохання — не поламка, і читатись мусить інакше.
+        //
+        // Тим самим типом події їдуть дві різні речі: стеля витрат чи смерть робітника (стан
+        // ядра, стосується всіх) і згорнуте віче цього гостя. Перше — «Віче стало: <причина>»,
+        // друге — рівно те, про що просили, без службового слова.
+        if (ev.payload.stage === "viche") {
+          liveRun = null;
+          closeAsk();
+          mapThink(ev.payload.reason ?? "Віче завершено");
+        } else {
+          // Зупинка — не дрібниця: її мусить бути видно, тому вона йде в той самий підпис знизу.
+          mapThink(`Віче стало: ${ev.payload.reason ?? ev.payload.stage}`);
+        }
         window.setTimeout(() => mapThink(""), 9000);
         break;
       case "event.happened": {
@@ -757,9 +907,22 @@ async function boot(): Promise<void> {
   const tail = firstTick > 0 ? allLines.slice(firstTick) : [];
   for (const l of head) {
     const ev = parseEnvelope(l);
-    if (ev) store.apply(ev); // run.started + casting.* → селяни спавняться зараз, під хмарами
+    if (!ev) continue;
+    // ★ ЗАПИСАНИЙ `run.started` — не живий прогін, і в живому режимі його брати не можна.
+    //
+    // Голова фікстури тут потрібна рівно задля касту: люди мусять стояти на місцях ще під
+    // хмарами. Але першим рядком запису йде `run.started` (`runId: "quiet-day"`), і стор чесно
+    // ставив його як поточний прогін — тобто `liveRun` був піднятий із першого кадру КОЖНОГО
+    // завантаження, ще до того, як гість щось кинув. Наслідок видно було на екрані: перша ж тема
+    // з Дошки діставала табличку «Віче ще триває. Завершити його й почати нове?» про розмову,
+    // якої ніколи не було, а Escape на тихій мапі — «Завершити його?». Заміряно на порожньому
+    // ядрі (нуль подій у шині): 2 теми — 2 таблички.
+    if (IS_LIVE && ev.known && ev.type === "run.started") continue;
+    store.apply(ev); // casting.* → селяни спавняться зараз, під хмарами
   }
-  const driver = IS_LIVE
+  // Тип — ПОРТ, а не котрась із двох реалізацій: решта фронта не має знати, звідки беруться
+  // події, і саме тому притримка вміє забути чергу через необовʼязковий `drop`.
+  const driver: EventSourcePort = IS_LIVE
     ? new LiveDriver(`${LIVE_URL}/stream`)
     : new FixtureDriver(tail.length ? tail : allLines, REPLAY_MS);
   driver.subscribe(
@@ -797,7 +960,10 @@ async function boot(): Promise<void> {
     const board = scene.pois.find((p) => p.kind === "board");
     if (board) {
       hintPoi = board;
-      window.setTimeout(() => firstHint.classList.add("on"), 2600);
+      hintTimer = window.setTimeout(() => {
+        // Гість міг устигнути тицьнути сам — тоді підказці вже нема чого казати.
+        if (hintPoi) firstHint.classList.add("on");
+      }, 2600);
       // Підказка не має жити вічно: якщо гість пішов гуляти селом, вона своє сказала.
       // Довше, ніж було: 22 секунди не вистачало навіть роздивитись село.
       window.setTimeout(hideHint, 60000);

@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, Text, Texture } from "pixi.js";
+import { Container, Sprite, Texture } from "pixi.js";
 import type { PlaceRef, POI, VillagerPublic } from "@ploshcha/contract-ts";
 import type { WalkGrid } from "./WalkGrid";
 import { ovalShadow } from "../util/gfx";
@@ -22,68 +22,26 @@ function tintOf(traits: string[]): number {
 /** Три голоси, один матеріал: сказане вголос, пошептане, сумнів. */
 export type BubbleKind = "voice" | "whisper" | "doubt";
 
-const SKIN: Record<BubbleKind, {
-  paper: number; ink: number; edge: number; italic: boolean; alpha: number;
-}> = {
-  // Один вигляд на весь застосунок: тепла хмарка з мʼяким кутом і темним обідком. Доти кожна
-  // поверхня мала свій матеріал (рваний папір, деревина, темна плашка), і те саме речення
-  // виглядало трьома різними речами залежно від того, звідки на нього дивишся.
-  voice: { paper: 0xf7ecd2, ink: 0x2e2009, edge: 0x6f4f22, italic: false, alpha: 1 },
-  whisper: { paper: 0xe6eef7, ink: 0x22303f, edge: 0x4f6a86, italic: true, alpha: 0.95 },
-  doubt: { paper: 0xf3e3bd, ink: 0x4a3520, edge: 0x7d5a2a, italic: true, alpha: 1 },
-};
 
-/** Обрис хмарки: заокруглений прямокутник і хвіст ОДНИМ контуром, щоб обідок ішов і по хвосту. */
-function cloudPath(g: Graphics, w: number, h: number, tail: number, rad: number): void {
-  g.moveTo(rad, 0);
-  g.lineTo(w - rad, 0);
-  g.quadraticCurveTo(w, 0, w, rad);
-  g.lineTo(w, h - rad);
-  g.quadraticCurveTo(w, h, w - rad, h);
-  g.lineTo(w / 2 + 13, h);
-  g.lineTo(w / 2 + 1, h + tail);
-  g.lineTo(w / 2 - 13, h);
-  g.lineTo(rad, h);
-  g.quadraticCurveTo(0, h, 0, h - rad);
-  g.lineTo(0, rad);
-  g.quadraticCurveTo(0, 0, rad, 0);
-  g.closePath();
-}
 
 // Ширина рядка й скільки рядків показуємо. Довше — у вікні розмови й у літописі, де є місце.
-const BUBBLE_WIDTH = 260;
-const BUBBLE_CHARS_PER_LINE = 38;
-const BUBBLE_LINES = 3;
 // Скільки бульбашка висить. Довгу треба встигнути прочитати, коротка не має стирчати.
-const BUBBLE_BASE_S = 1.1;
-const BUBBLE_PER_CHAR_S = 0.045;
-const BUBBLE_MAX_S = 7;
-// Більше двох одночасно — стіна тексту над селом; шість штук ми вже бачили.
-const BUBBLE_AT_ONCE = 2;
-// Нижче цього зуму людей не розібрати, тож і підписувати нема кого.
 const BUBBLE_MIN_ZOOM = 0.95;
-// Наскільки швидше йде той, кого покликали на віче.
-const HURRY = 2.6;
+/**
+ * Наскільки швидше йде той, кого покликали на віче. Число ЗАМІРЯНЕ, а не вибране на смак.
+ *
+ * Замір 2026-08-29 у браузері на справжній сітці ходьби (`bfs` від клітинки кожного селянина до
+ * Площі, сума відстаней між центрами клітинок): 239, 1313, 1413, 1748, 2347, 2762, 2762 і 3573
+ * світових пікселі на вісьмох людей, медіана 2047. Буденний крок — `walk` × `SCL`, тобто 20-27
+ * пікселів на секунду, тож при старому множнику 2.6 медіанна хода тривала 33 с, а найдовша 68 с.
+ * Стільки глядач на мапі не стоїть: він іде в локацію на ПЕРШІЙ репліці, а дорога ядра до неї
+ * міряється поодинокими викликами Мамая (медіана 5.3 с, максимум 22.1 с — `/health` живого ядра),
+ * тобто нікого з них не було б видно на місці. При 6 медіанна хода — 14 с, найближчі доходять за
+ * 1.5-6 с, найдальший лишається в дорозі 30 с і доходить уже без глядача. Затримки це не додає
+ * НІКОМУ: хмари беруться по готовності порядку, а не по тому, чи всі зійшлись.
+ */
+const HURRY = 6;
 
-/** Обрізає ЦІЛИМИ словами до N рядків: інакше репліка кінчалась на півслові. */
-function clampLines(text: string, perLine: number, lines: number): string {
-  const words = text.split(/\s+/);
-  const out: string[] = [];
-  let row = "";
-  for (const w of words) {
-    const next = row ? `${row} ${w}` : w;
-    if (next.length <= perLine) {
-      row = next;
-      continue;
-    }
-    out.push(row);
-    row = w;
-    if (out.length === lines) break;
-  }
-  if (out.length < lines && row) out.push(row);
-  const cut = out.length === lines && out.join(" ").length < text.length;
-  return out.join(" ") + (cut ? "…" : "");
-}
 
 interface Rec {
   id: string;
@@ -185,32 +143,12 @@ export class AgentDirector {
     }
   }
 
-  /**
-   * Поставити людину НА місце одразу, без ходьби.
-   *
-   * Віче більше не збирають ходою через усе село: тицьнув тему — і громада вже там. Хода лишалась
-   * хвилиною порожнього екрана, а сенсу не додавала: рішення однаково ухвалюють у локації.
-   */
-  placeAt(id: string, to: PlaceRef): void {
-    const r = this.recs.get(id);
-    if (!r) return;
-    let nx = to.x;
-    let ny = to.y;
-    if (to.poi && this.pois.has(to.poi)) {
-      const poi = this.pois.get(to.poi)!;
-      nx = poi.x;
-      ny = poi.y;
-    }
-    if (nx === undefined || ny === undefined) return;
-    const cell = this.grid.nearWalk(nx, ny);
-    if (!cell) return;
-    const at = this.grid.cellCenter(cell[0], cell[1]);
-    r.x = at.x;
-    r.y = at.y;
-    r.cell = cell;
-    r.path = null;
-    r.state = "idle";
-  }
+  // ★ Миттєвого розставляння (`placeAt`) тут БІЛЬШЕ НЕМАЄ, і метод прибрано, а не лишено про
+  // запас. Він з'явився, коли хмари бралися аж по тому, як усі зійшлись, — тоді хода справді
+  // тримала глядача перед порожнім селом. Відтоді локація відкривається по готовності порядку
+  // (`enterTalkRoom`), тобто хода вже нікого не затримує, а стрибок через півсела лишався видним
+  // як поламка: замір у браузері — четверо перелетіли 507, 662, 837 і 930 пікселів за один кадр
+  // у 2 мс. Живий метод «постав одразу» повернув би це першою ж правкою, тож його немає.
 
   /** Середина юрби — камері є за чим іти. */
   centroid(ids: string[]): { x: number; y: number } | null {
@@ -305,34 +243,28 @@ export class AgentDirector {
     }
   }
 
-  speak(id: string, text: string, kind: BubbleKind = "voice"): void {
-    const r = this.recs.get(id);
-    if (!r) return;
-    // ★ На загальному плані репліку не малюємо ВЗАГАЛІ, а не ховаємо.
+  speak(_id: string, _text: string, _kind: BubbleKind = "voice"): void {
+    // ★ НА МАПІ РЕПЛІК НЕМАЄ ВЗАГАЛІ.
     //
-    // Доти бульбашка створювалась і жила свої сім секунд невидимою: варто було наблизити камеру в
-    // цей проміжок — і над селом розкривались репліки, яких ніхто щойно не казав. Виглядало як
-    // «спонтанні бульбашки при наближенні». Слово від цього не гине: воно є в стенограмі й у
-    // хроніці, а на мапі його однаково не було видно.
-    if (this.zoom < BUBBLE_MIN_ZOOM) return;
-    // Найстарішу бульбашку прибираємо самі: шість одночасно вже давали стіну тексту над селом.
-    const live = [...this.recs.values()].filter((x) => x.bubble && x.id !== id);
-    while (live.length >= BUBBLE_AT_ONCE) {
-      const oldest = live.reduce((a, b) => (a.bubbleT <= b.bubbleT ? a : b));
-      this.clearBubble(oldest);
-      live.splice(live.indexOf(oldest), 1);
-    }
-    this.clearBubble(r);
-    r.bubble = this.makeBubble(text, kind);
-    // Час життя від ДОВЖИНИ: сталі 3.6 с не давали дочитати довгу й тримали коротку без потреби.
-    r.bubbleT = Math.min(BUBBLE_MAX_S, BUBBLE_BASE_S + text.length * BUBBLE_PER_CHAR_S);
-    this.world.addChild(r.bubble);
+    // Бульбашка над селом породила три різні поламки поспіль: репліки, що спливали при наближенні
+    // вже після завершення розмови; хвостик, притиснутий до краю кадру й тому наведений на
+    // порожню землю (заміряно відрив 897, 1342 і 2405 пікселів); і слова мовця, який пішов, що
+    // лишались висіти над місцем, де його вже немає. Щоразу лікували наслідок.
+    //
+    // Розмова має ОДНЕ місце — намальовану локацію, де видно, хто говорить і кому. Мапа лишається
+    // мапою: по ній видно, хто куди пішов. Слово при цьому не гине — воно є в стенограмі, у
+    // хроніці й у самій кімнаті.
+    return;
   }
 
-  /** На загальному плані селянин ~20 px: бульбашка там вища за хату й нічого не пояснює. */
-  /** Видима частина світу — з камери. Без неї репліка з краю села лишалась за кадром. */
   setView(rect: { x0: number; y0: number; x1: number; y1: number }): void {
     this.view = rect;
+  }
+
+  /** Чи цей селянин зараз у кадрі. Репліку малюємо лише над тим, кого видно. */
+  private inView(r: Rec): boolean {
+    const v = this.view;
+    return !v || (r.x >= v.x0 && r.x <= v.x1 && r.y >= v.y0 && r.y <= v.y1);
   }
 
   /** Чи хтось саме зараз говорить (є жива бульбашка). */
@@ -415,26 +347,28 @@ export class AgentDirector {
         // разом зі світом, коли камера віддаляється.
         const k = Math.max(0.55, Math.min(1.25, 1 / Math.max(0.35, this.zoom)));
         r.bubble.scale.set(k);
-        // ★ І тримаємо її В КАДРІ.
+        // ★ Хвостик НЕ ПОКИДАЄ мовця — ні на піксель убік.
         //
-        // Селянин може стояти скраю села: репліка чесно висіла над ним і при цьому за межею
-        // екрана — прочитати її було нічим, бо камера туди не їде. Тому ставимо над головою, а
-        // тоді заганяємо всередину видимого прямокутника з полем на саму бульбашку.
-        const bx = r.x;
-        const by = r.y - r.tex.height * r.sc - 6 * this.SCL;
+        // Доти репліку заганяли в кадр цілком: `bubble.x` ставав межею видимого прямокутника, хоч
+        // би де стояв мовець. Але позиція бульбашки — це вістря хвостика (`pivot` на `h + tail`),
+        // тобто зсув на два світові екрани лишав хвостик стирчати над порожньою дорогою. Заміряно
+        // в браузері 2026-08-29 на живому вічі при зумі 1.7: **1391 кадр** із відірваною
+        // бульбашкою, відрив до **2405** світових пікселів, і рівно ці дві репліки власник і
+        // сфотографував над порожнім полем.
+        //
+        // У кадр репліку заганяє тепер не зсув, а правило: мовця не видно — репліки немає. Тому по
+        // горизонталі — рівно над головою, а по вертикалі лишається один-єдиний доводчик: якщо над
+        // головою немає місця (людина при верхньому краю), бульбашка ОПУСКАЄТЬСЯ на самого мовця,
+        // а не відлітає вбік. Хвостик у найгіршому разі лежить на його ж фігурі.
+        const b = r.bubble.getLocalBounds();
         const v = this.view;
-        if (v) {
-          const b = r.bubble.getLocalBounds();
-          const halfW = (b.width * k) / 2 + 8;
-          const topH = b.height * k + 8;
-          r.bubble.x = Math.min(Math.max(bx, v.x0 + halfW), Math.max(v.x0 + halfW, v.x1 - halfW));
-          r.bubble.y = Math.min(Math.max(by, v.y0 + topH), Math.max(v.y0 + topH, v.y1 - 8));
-        } else {
-          r.bubble.x = bx;
-          r.bubble.y = by;
-        }
-        // Відʼїхали — репліку прибираємо назовсім, щоб вона не «вигулькнула» при поверненні.
-        if (this.zoom < BUBBLE_MIN_ZOOM) {
+        r.bubble.x = r.x;
+        r.bubble.y = v
+          ? Math.max(r.y - r.tex.height * r.sc - 6 * this.SCL, v.y0 + b.height * k + 8)
+          : r.y - r.tex.height * r.sc - 6 * this.SCL;
+        // Відʼїхали або мовець вийшов із кадру — репліку прибираємо назовсім, щоб вона не
+        // «вигулькнула» при поверненні й не лишилась висіти там, де вже нікого немає.
+        if (this.zoom < BUBBLE_MIN_ZOOM || !this.inView(r)) {
           this.clearBubble(r);
           continue;
         }
@@ -450,60 +384,4 @@ export class AgentDirector {
       r.bubble = undefined;
     }
   }
-
-  /**
-   * Бульбашка — ГОЛОС: світлий папір із чорнилом, а не темна плашка.
-   *
-   * Доти вона була тим самим темним прямокутником, що й службовий літопис, підпис імені й кнопки:
-   * вісім різних значень одним виглядом. Тут голос дістає власний матеріал, і його вже не сплутати
-   * зі службовим рядком.
-   *
-   * Хвостик був і раніше — 9 пікселів, тобто невидимий на тлі 40-піксельного селянина. Через це
-   * репліка читалась як «висить сама по собі», хоча привʼязка працювала. Тепер хвіст масштабується
-   * разом із рештою.
-   */
-  private makeBubble(text: string, kind: BubbleKind = "voice"): Container {
-    const skin = SKIN[kind];
-    const c = new Container();
-    // Не ріжемо на півслові: переносимо й обрізаємо ЦІЛИМИ рядками, крапки лише в кінці.
-    const label = clampLines(text, BUBBLE_CHARS_PER_LINE, BUBBLE_LINES);
-    const t = new Text(label, {
-      fontFamily: "Georgia, 'Times New Roman', serif",
-      fontSize: 15,
-      fontWeight: "500",
-      fontStyle: skin.italic ? "italic" : "normal",
-      fill: skin.ink,
-      wordWrap: true,
-      wordWrapWidth: BUBBLE_WIDTH,
-      align: "left",
-      lineHeight: 20,
-    });
-    const padX = 20;
-    const padY = 13;
-    const tail = 17;
-    const RAD = 18;
-    const w = t.width + padX * 2;
-    const h = t.height + padY * 2;
-
-    const shade = new Graphics();
-    shade.beginFill(0x2b1c0c, 0.28);
-    cloudPath(shade, w, h, tail, RAD);
-    shade.endFill();
-    shade.x = 2;
-    shade.y = 5;
-
-    const bg = new Graphics();
-    bg.beginFill(skin.paper, 1);
-    bg.lineStyle(3.6, skin.edge, 1);
-    cloudPath(bg, w, h, tail, RAD);
-    bg.endFill();
-
-    t.x = padX;
-    t.y = padY;
-    c.addChild(shade, bg, t);
-    c.alpha = skin.alpha;
-    c.pivot.set(w / 2, h + tail);
-    return c;
-  }
-
 }

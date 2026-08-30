@@ -586,11 +586,29 @@ export class LivingRoom {
    * а на екрані нічого — і виглядає, ніби ядро мовчить.
    */
   addPerson(c: RoomCast, text?: string): void {
-    if (this.vs.some((r) => r.cast.vid === c.vid)) return;
+    const seated = this.vs.find((r) => r.cast.vid === c.vid);
+    if (seated) {
+      // ★ Імʼя ПЕРЕПИСУЄМО тим, яке прийшло від ядра.
+      //
+      // Доти хто сів першим, той і лишався своїм підписом до кінця віча — а склад ядро оголошує
+      // ОКРЕМОЮ подією, яка може доїхати вже після того, як людина в кімнаті. Разом із фікстурним
+      // гуртом фронта це й давало підпис, що не збігається з тим, кого мало на увазі ядро (аудит
+      // 2026-08-29: «Оксана» замість «Олени Завійної»). Гурт прибрано, звірка лишається.
+      if (c.name && c.name !== seated.cast.name) {
+        seated.cast = { ...seated.cast, name: c.name };
+        // Бульбашка вже могла висіти зі старим підписом — правимо й її, інакше вірне імʼя
+        // побачить лише той, хто дочекається наступної репліки.
+        const who = seated.bubble?.querySelector(".rv-who");
+        if (who) who.textContent = c.name;
+      }
+      return;
+    }
     // Поки не знаємо підлоги, прибулець чекає: посадити його на запасний полігон означало б
     // смикнути через півкімнати, щойно приїде маска.
     if (!this.seated) {
-      if (!this.pending.some((q) => q.vid === c.vid)) this.pending.push(c);
+      const waits = this.pending.findIndex((q) => q.vid === c.vid);
+      if (waits < 0) this.pending.push(c);
+      else if (c.name) this.pending[waits] = { ...this.pending[waits], name: c.name };
       if (text) this.enqueue(c.vid ?? c.id, text);
       return;
     }
@@ -599,11 +617,29 @@ export class LivingRoom {
     el.draggable = false;
     const frames = [0, 1, 2].map((n) => assetUrl(`/assets/roles/${c.id}/${n}.webp`));
     el.src = frames[0];
-    const [x, y] = this.randFloor();
+    // ★ Людина ВХОДИТЬ, а не виникає.
+    //
+    // Каст росте по ходу віча: кожен мовець додається в кімнату аж на своїй першій репліці, і доти
+    // він просто зʼявлявся у випадковій точці підлоги — вісім селян означало вісім таких появ
+    // просто під час розмови, і читалось це як телепорт. Тепер ціль лишається тією самою випадковою
+    // точкою, а старт береться біля нижнього краю зони, тобто «від дверей»: людина проходить свій
+    // шлях тими самими кроками, що й усі інші.
+    const [tx, ty] = this.randFloor();
+    let x = tx;
+    let y = this.bbox.y1;
+    if (!this.fits(x, y)) {
+      // Низ зони може бути зайнятий меблями — тоді входимо з того боку, з якого взагалі можна.
+      const side = tx < (this.bbox.x0 + this.bbox.x1) / 2 ? this.bbox.x0 : this.bbox.x1;
+      if (this.fits(side, ty)) { x = side; y = ty; } else { x = tx; y = ty; }
+    }
     const rv: RV = {
-      cast: c, el, frames, cur: 0, x, y, tx: x, ty: y,
-      state: "idle", timer: rand(0.5, 3), face: 1, bob: 0, bubble: null, bubbleT: 0, bw: 0, bh: 0,
+      cast: c, el, frames, cur: 0, x, y, tx, ty,
+      state: x === tx && y === ty ? "idle" : "walk",
+      timer: rand(0.5, 3), face: 1, bob: 0, bubble: null, bubbleT: 0, bw: 0, bh: 0,
     };
+    // Поява без ривка: спрайт проявляється, поки робить перші кроки.
+    el.style.opacity = "0";
+    requestAnimationFrame(() => { el.style.opacity = "1"; });
     el.addEventListener("click", (e) => {
       e.stopPropagation();
       this.advance();

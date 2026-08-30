@@ -3,21 +3,73 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <title>Площа</title>
+    <title>Площа — українське село, яким говорять мовні моделі</title>
+    <link rel="canonical" href="https://ploshcha.org/" />
     <link rel="icon" href="./favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="./assets/brand/mark-180.png" />
     <meta name="description" content="Площа — українське село, що обговорює новини. Кожна репліка на екрані — справжній крок агентного ядра." />
     <meta name="theme-color" content="#21222f" />
     <meta property="og:title" content="Площа — село, що говорить" />
     <meta property="og:description" content="Кидаєш новину на Дошку-вісник — село сходиться й обговорює її своїми голосами." />
-    <meta property="og:image" content="./assets/brand/lockup.png" />
+    <meta property="og:image" content="https://ploshcha.org/assets/brand/lockup.png" />
+    <meta property="og:image:width" content="1400" />
+    <meta property="og:image:height" content="520" />
+    <meta property="og:url" content="https://ploshcha.org/" />
+    <meta property="og:site_name" content="Площа" />
+    <meta property="og:locale" content="uk_UA" />
     <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Площа — село, що говорить" />
+    <meta name="twitter:description" content="Кидаєш новину на Дошку-вісник — село сходиться й обговорює її своїми голосами." />
+    <meta name="twitter:image" content="https://ploshcha.org/assets/brand/lockup.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://ploshcha.org/#site",
+            "url": "https://ploshcha.org/",
+            "name": "Площа",
+            "inLanguage": "uk",
+            "description": "Жива симуляція українського села, у якому мовні моделі грають селян: гість пише тему на Дошку, село збирається на віче, обговорює її й ухвалює рішення голосуванням.",
+            "publisher": { "@id": "https://ploshcha.org/#org" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://ploshcha.org/#org",
+            "name": "Площа",
+            "url": "https://ploshcha.org/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://ploshcha.org/assets/brand/mark.png",
+              "width": 512,
+              "height": 512
+            }
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://ploshcha.org/#app",
+            "name": "Площа",
+            "url": "https://ploshcha.org/",
+            "applicationCategory": "SimulationApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "uk",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "UAH" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="stage">
       <div id="frame"></div>
       <div class="fps"><span id="fps">…</span> fps</div>
       <div id="frame-top"></div>
+      <nav class="stovp" aria-label="Тексти про Площу">
+        <a href="/pro.html">про це село</a>
+      </nav>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
