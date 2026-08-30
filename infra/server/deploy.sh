@@ -8,18 +8,41 @@
 # Запуск із мака:  infra/server/deploy.sh [користувач@адреса]
 set -euo pipefail
 
-HOST="${1:-root@192.168.0.209}"
+HOST="${1:-root@100.95.11.34}"
 KEY="${PLOSHCHA_SSH_KEY:-$HOME/.ssh/dellserver_ed25519}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEST="/opt/ploshcha"
-SSH=(ssh -i "$KEY" -o ConnectTimeout=10 "$HOST")
+# Через Tailscale, бо мак не завжди в домашній мережі: `tailscale nc` замість LAN-адреси.
+TS_NC="${PLOSHCHA_TS_NC:-}"
+PROXY=()
+if [[ "$HOST" == *"100."* && -x /opt/homebrew/bin/tailscale ]]; then
+  cat > /tmp/ploshcha-tsnc.sh <<'NC'
+#!/bin/bash
+exec /opt/homebrew/bin/tailscale --socket "$HOME/.config/tailscale/tailscaled.sock" nc "$1" "$2"
+NC
+  chmod +x /tmp/ploshcha-tsnc.sh
+  PROXY=(-o "ProxyCommand=/tmp/ploshcha-tsnc.sh %h %p")
+fi
+SSH=(ssh -i "$KEY" -o ConnectTimeout=15 "${PROXY[@]}" "$HOST")
+# rsync отримує ОДИН виконуваний файл, а не рядок із лапками: інакше ProxyCommand із пробілами
+# розлазиться на аргументи й rsync скаржиться на «hostname contains invalid characters».
+RSH=/tmp/ploshcha-rsh.sh
+{
+  echo '#!/bin/bash'
+  if [[ ${#PROXY[@]} -gt 0 ]]; then
+    echo "exec ssh -i \"$KEY\" -o ConnectTimeout=15 -o ProxyCommand=\"/tmp/ploshcha-tsnc.sh %h %p\" \"\$@\""
+  else
+    echo "exec ssh -i \"$KEY\" -o ConnectTimeout=15 \"\$@\""
+  fi
+} > "$RSH"
+chmod +x "$RSH"
 
 echo "== 1/6 перевірка сервера =="
 "${SSH[@]}" 'uname -m; python3 --version; systemctl --version | head -1' || {
   echo "сервер недоступний: увімкни його й перевір, що він у тій самій мережі" >&2; exit 1; }
 
 echo "== 2/6 код і збірка (без docs, .venv, node_modules) =="
-rsync -az --delete -e "ssh -i $KEY" \
+rsync -az --delete -e "$RSH" \
   --exclude '.venv' --exclude 'node_modules' --exclude 'docs' --exclude '.git' \
   --exclude 'eval/traces' --exclude '.ruff_cache' --exclude 'data' \
   "$ROOT/" "$HOST:$DEST/"
@@ -27,11 +50,11 @@ rsync -az --delete -e "ssh -i $KEY" \
 echo "== 3/6 стан села (база + сесії) — лише якщо на сервері ще порожньо =="
 "${SSH[@]}" "test -f $DEST/data/ploshcha/ploshcha.db" \
   && echo "   база на сервері вже є — не чіпаю" \
-  || rsync -az -e "ssh -i $KEY" "$ROOT/data/" "$HOST:$DEST/data/"
+  || rsync -az -e "$RSH" "$ROOT/data/" "$HOST:$DEST/data/"
 
 echo "== 4/6 секрети (окремо, права 600) =="
-rsync -a -e "ssh -i $KEY" "$ROOT/.env" "$HOST:$DEST/.env"
-rsync -a -e "ssh -i $KEY" "$HOME/.ploshcha-tunnel.token" "$HOST:$DEST/.tunnel-token"
+rsync -a -e "$RSH" "$ROOT/.env" "$HOST:$DEST/.env"
+rsync -a -e "$RSH" "$HOME/.ploshcha-tunnel.token" "$HOST:$DEST/.tunnel-token"
 "${SSH[@]}" "chmod 600 $DEST/.env $DEST/.tunnel-token"
 
 echo "== 5/6 оточення, cloudflared, юніти =="
@@ -68,6 +91,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# Стеля дескрипторів: 1024 за замовчуванням ядро вичерпало за добу (SSE-потоки, статика й бази),
+# і впало з `[Errno 24] Too many open files`. Тримаємо запас, навіть коли витік полагоджено.
+LimitNOFILE=65535
 WorkingDirectory=/opt/ploshcha
 ExecStart=/opt/ploshcha/.venv/bin/python /opt/ploshcha/services/sim/scripts/serve_ploshcha.py \
   --port 8765 --condition viche --resume --db /opt/ploshcha/data/ploshcha/ploshcha.db \
