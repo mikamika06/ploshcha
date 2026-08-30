@@ -337,3 +337,28 @@ def test_a_move_without_a_destination_would_have_been_rejected(validator):
     broken = StreamProjector("r", TS)._walk("koval", "forge", 1)[0]
     broken["payload"] = {"agentId": "koval", "activity": "кує"}
     assert list(validator.iter_errors(broken))
+
+
+def test_a_mood_named_by_the_count_still_fits_the_contract(validator):
+    """Настрій дня називає лічба — і мусить лишитись ДВОМА полями, які контракт дозволяє.
+
+    `MoodView` тут — `additionalProperties: false`, а на фронті ще й `.strict()`: третій ключ
+    (напр. «згода» з часткою одностайних) відкинув би весь конверт хроніки мовчки — рівно та
+    поламка, заради якої цей файл існує. Тому лічба міняє ЧИСЛО і ЯРЛИК, а поля собі не додає;
+    `label` у схемі — вільний рядок, тож «незгода» проходить, хоч її й немає в енумі `MOODS`.
+    """
+    from ploshcha_sim.domain.viche import mood_view
+
+    mood = mood_view("тривога", "дуже", tally={"за": 3, "проти": 3, "утримуюсь": 0})
+    assert mood["label"] == "незгода" and set(mood) == {"valence", "label"}
+    events = StreamProjector("r", TS).feed(StepRecord(
+        run_id="r", tick=0, agent="chronicler", stage="report", model="viche", lane="lapa",
+        prompt="", raw_output="", parsed={"day": 1, "title": "Віче", "narration": "Розійшлись.",
+                                          "mood": mood}))
+    check(validator, events)
+    report = next(e for e in events if e["type"] == "report.compiled")
+    assert report["payload"]["chronicle"]["mood"] == mood
+
+    # Доказ, що валідатор ловить саме це: настрій із третім полем контракту не проходить.
+    report["payload"]["chronicle"]["mood"] = {**mood, "згода": 0.0}
+    assert list(validator.iter_errors(report))

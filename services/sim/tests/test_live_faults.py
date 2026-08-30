@@ -11,6 +11,7 @@
 """
 
 import json
+import sqlite3
 import threading
 import time
 import urllib.error
@@ -402,3 +403,21 @@ def test_a_viewer_waiting_on_a_closed_bus_is_released_not_hung(tmp_path):
     bus.close()
     assert done.wait(2.0), "close() мусить розбудити глядача"
     assert bus.closed
+
+
+def test_the_queue_does_not_leak_a_file_handle_per_call(tmp_path):
+    """★ Це поклало прод. `with sqlite3.connect(...) as db` фіксує транзакцію, але НЕ закриває
+    зʼєднання, і доки обʼєкт живий — живий і дескриптор. У ядрі назбиралось 508 ручок до
+    `ploshcha.db` і 456 до його WAL при стелі 1024; далі `[Errno 24] Too many open files`, а слідом
+    «OperationalError: unable to open database file» — і цикл став на паузу, хоч сайт віддавав
+    сторінку."""
+    import gc
+    from ploshcha_sim.adapters.queue_sqlite import SqliteQueue
+
+    q = SqliteQueue(str(tmp_path / "q.db"))
+    for i in range(200):
+        q.put(f"k{i}", {"task": f"t{i}"})
+        q.stats()
+    gc.collect()
+    live = [o for o in gc.get_objects() if isinstance(o, sqlite3.Connection)]
+    assert len(live) < 10, f"зʼєднання лишаються відкритими: {len(live)}"

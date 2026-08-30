@@ -14,6 +14,7 @@
 
 import json
 import sqlite3
+from contextlib import contextmanager
 import time
 from pathlib import Path
 
@@ -47,11 +48,29 @@ class SqliteQueue(QueuePort):
         with self._db() as db:
             db.executescript(SCHEMA)
 
-    def _db(self) -> sqlite3.Connection:
+    @contextmanager
+    def _db(self):
+        """★ Зʼєднання ЗАКРИВАЄТЬСЯ, а не лишається на совісті збирача сміття.
+
+        `with sqlite3.connect(...) as db` не закриває зʼєднання — він лише фіксує транзакцію. Доки
+        обʼєкт живий (а в потоках і в трасах винятків посилання тримаються довго), його файловий
+        дескриптор теж живий. На проді це поклало ядро: 508 відкритих ручок до `ploshcha.db` і 456
+        до його WAL при стелі 1024, далі `[Errno 24] Too many open files` — і як наслідок
+        «OperationalError: unable to open database file», через яку цикл став на паузу.
+        """
         db = sqlite3.connect(self.path, isolation_level=None, timeout=30)
-        # WAL, бо читання статистики під час роботи не має блокувати воркера.
-        db.execute("PRAGMA journal_mode=WAL")
-        return db
+        try:
+            # WAL, бо читання статистики під час роботи не має блокувати воркера.
+            db.execute("PRAGMA journal_mode=WAL")
+            yield db
+            # `with sqlite3.Connection` фіксував транзакцію сам; закриваючи зʼєднання руками, ми
+            # мусимо зробити це замість нього — інакше запис тихо відкочується на закритті.
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def put(self, key: str, payload: dict) -> bool:
         with self._db() as db:
@@ -103,6 +122,44 @@ class SqliteQueue(QueuePort):
             status = "dead" if attempts >= self.max_attempts else "pending"
             db.execute("UPDATE work SET status=?, error=?, leased_at=NULL WHERE key=?",
                        (status, error[:500], key))
+
+    def cancel_pending(self, *, key: str | None = None, sid: str | None = None) -> int:
+        """★ Зняти з черги те, що ще НЕ орендоване. Повертає, скільки знято.
+
+        Без цього «завершити» доходило рівно до того прогону, який уже веде робітник, а тема, що
+        лежала В ЧЕРЗІ, спокійно дочікувалась свого. Вікно тут не теоретичне: наглядач дивиться на
+        чергу раз на `SUPERVISE_EVERY_S` = 2 с і добирає робітника САМЕ за наявністю `pending`,
+        тобто гість натискав «завершити» — і за дві секунди село починало голосно гомоніти про
+        тему, від якої він щойно відмовився, ще й за повну ціну прогону (медіана прод-прогону
+        19 093 токени на 121 записаному айтемі).
+
+        Ціль називається `key` або `sid`, і хоч одне з двох мусить бути: `DELETE` без умови стер би
+        чергу цілком, а це рівно та поламка, від якої тут стережуться. Порожній виклик тому нічого
+        не робить і каже про це нулем, а не винятком, — той самий вибір, що в `requeue_dead`.
+
+        Орендованого не чіпаємо навмисно (`status='pending'`): робітник уже в дорозі, у нього своя
+        мʼяка зупинка (`Viche.hush`), і забрати айтем із-під нього означало б лишити прогін без
+        термінального стану — рівно те, чого уникає `recover_stale`.
+
+        ★ ЧОМУ `DELETE`, А НЕ СТАТУС «скасовано». Ключ теми з Дошки виводиться з її ТЕКСТУ, а `put`
+        — `INSERT OR IGNORE` за ключем. Рядок, що лишився б лежати, назавжди закрив би цю саму тему
+        для цього самого гостя: він написав би її вдруге, черга мовчки відповіла б `False`, і віче
+        не почалось би ніколи. Скасована тема не має й що памʼятати — вона не відпрацювала, тож
+        ані результату, ані причини провалу в неї немає.
+        """
+        if key is None and sid is None:
+            return 0
+        where = ["status='pending'"]
+        args: list = []
+        if key is not None:
+            where.append("key=?")
+            args.append(key)
+        if sid is not None:
+            where.append("COALESCE(json_extract(payload, '$.sid'), '')=?")
+            args.append(sid)
+        with self._db() as db:
+            cur = db.execute(f"DELETE FROM work WHERE {' AND '.join(where)}", args)
+            return cur.rowcount
 
     def requeue_dead(self, key: str | None = None) -> int:
         """Повернути мертві айтеми в чергу, скинувши лічильник спроб.

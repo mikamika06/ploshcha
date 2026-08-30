@@ -33,9 +33,17 @@ class ProfileRouter(ModelRouter):
     def lane(self, kind: StepKind) -> ModelLane:
         return self._lanes.get(kind, "unknown")
 
+    def set_lane(self, kind: StepKind, llm: LlmPort, lane: ModelLane) -> None:
+        """Переставити ОДИН слот на інший ярус — і мапу, і назву яруса разом.
+
+        Разом, а не окремо: `lane` йде у гаманець (`Budget.spend`) і в трасу, тож розʼїхавшись із
+        мапою, вони дали б звіт, у якому виклик оплачений одним ярусом, а підписаний іншим.
+        """
+        self._map[kind] = llm
+        self._lanes[kind] = lane
+
     def set_judge(self, llm: LlmPort, lane: ModelLane) -> None:
-        self._map["judge"] = llm
-        self._lanes["judge"] = lane
+        self.set_lane("judge", llm, lane)
 
     def self_judging(self) -> bool:
         """Суддя й той, хто відповідає, — один ярус. Інваріант проєкту забороняє це для Lapa."""

@@ -60,6 +60,69 @@ def test_a_fresh_lease_is_not_stolen_by_recovery(path):
     assert q.recover_stale(older_than_s=300) == 0, "жива аренда не має відбиратись"
 
 
+# ── скасувати те, чого ще ніхто не взяв ─────────────────────────────────────────────────────────
+
+SID_A = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
+SID_B = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb"
+
+
+def test_a_pending_topic_of_one_session_is_cancelled_and_another_is_not(path):
+    """★ «Завершити» мусить діставати й ту тему, яка ще ЛЕЖИТЬ у черзі, — але тільки свою.
+
+    Скасувати чуже гірше, ніж заговорити в чуже віче: гість навіть не побачить, що в нього забрали
+    розмову. Тому ціль тут — сесія з айтема, а не «все, що лежить».
+    """
+    q = _queue(path)
+    q.put("a", {"task": "Гребля", "sid": SID_A})
+    q.put("b", {"task": "Криниця", "sid": SID_B})
+    q.put("c", {"task": "З консолі"})
+
+    assert q.cancel_pending(sid=SID_A) == 1
+    assert q.stats() == {"pending": 2}
+    assert {q.lease("w").key, q.lease("w").key} == {"b", "c"}
+
+
+def test_a_leased_topic_is_not_taken_from_under_the_worker(path):
+    """Робітник уже в дорозі, і в нього своя мʼяка зупинка (`Viche.hush`). Забрати айтем звідти
+    означало б прогін без термінального стану — рівно те, від чого стереже `recover_stale`."""
+    q = _queue(path)
+    q.put("a", {"task": "Гребля", "sid": SID_A})
+    q.lease("w1")
+    assert q.cancel_pending(sid=SID_A) == 0
+    assert q.stats() == {"leased": 1}
+
+
+def test_a_cancelled_topic_can_be_asked_for_again(path):
+    """★ Саме тому скасоване ВИДАЛЯЄТЬСЯ, а не лежить зі статусом «скасовано».
+
+    Ключ теми з Дошки виводиться з її тексту, а `put` — `INSERT OR IGNORE` за ключем. Рядок, що
+    лишився б лежати, назавжди закрив би цю саму тему: гість написав би її вдруге, черга мовчки
+    відповіла б `False`, і віче не почалось би ніколи.
+    """
+    q = _queue(path)
+    q.put("topic-42", {"task": "Гребля", "sid": SID_A})
+    q.cancel_pending(sid=SID_A)
+    assert q.put("topic-42", {"task": "Гребля", "sid": SID_A}) is True
+    assert q.lease("w1").key == "topic-42"
+
+
+def test_cancelling_without_a_target_touches_nothing(path):
+    """`DELETE` без умови стер би чергу цілком — тобто саме та поламка, від якої тут стережуться.
+    Порожній виклик тому нічого не робить і каже про це нулем, як `requeue_dead`."""
+    q = _queue(path)
+    q.put("a", {"task": "Гребля", "sid": SID_A})
+    assert q.cancel_pending() == 0
+    assert q.stats() == {"pending": 1}
+
+
+def test_a_single_key_can_be_cancelled_without_naming_a_session(path):
+    q = _queue(path)
+    q.put("a", {"task": "Гребля", "sid": SID_A})
+    q.put("b", {"task": "Криниця", "sid": SID_A})
+    assert q.cancel_pending(key="a") == 1
+    assert q.lease("w1").key == "b"
+
+
 def test_a_broken_item_goes_dead_instead_of_eating_the_run(path):
     """Один зламаний документ не має крутитись вічно: інакше він зʼїдає бюджет прогону."""
     q = _queue(path, max_attempts=2)

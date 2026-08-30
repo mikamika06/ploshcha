@@ -32,10 +32,42 @@ class OpenAICompatLlm(LlmPort):
         self._sleep = sleep
         self._client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
 
-    def _call(self, prompt, system, temperature, max_tokens, extra_body=None, response_format=None, seed=None) -> LlmResult:
+    def _call(self, prompt, system, temperature, max_tokens, extra_body=None, response_format=None,
+              seed=None, repetition_penalty=None) -> LlmResult:
+        """★ `repetition_penalty` ДОЇЖДЖАЄ ДО ШЛЮЗУ — і старий запис про це був артефактом кешу.
+
+        Доти в трьох місцях репозиторію стояло, що шлюз Lapathoniia ковтає всі штрафи семплера
+        («вивід не змінився ані на символ»). Для `frequency_penalty`, `presence_penalty`,
+        `no_repeat_ngram_size`, `bad_words` і `dry_*` це підтвердилось удруге, а для
+        `repetition_penalty` — ні, і причина в самому способі заміру: **шлюз КЕШУЄ відповіді, а
+        `extra_body` у ключ кешу не входить**. Наївна проба (той самий пакет віча, `temperature=0`,
+        `seed=1`, девʼять плечей — `rp` 1.0/1.15/1.3/2.0, `top_k`, `min_p`, вигаданий параметр)
+        дала одну й ту саму суму `42fb002637e9ca2e` на всіх девʼятьох, зокрема на невалідних
+        `rp=0.0` і `rp=-1.0`, і без жодного 400. Кеш доведено й часом: той самий запит удруге —
+        2252 мс проти 85 мс, побайтово однаково.
+
+        Проба з розбитим кешем (мітка часу в промпті, примусовий повтор) показала протилежне:
+        `rp=5.0` першим викликом дало 6 «вовків» і побиту абетку («Вовк، Вовк， вовк ، …»), `rp=1.0`
+        першим — 10 «вовків» чистим повтором, а ДРУГИЙ виклик у кожній парі вертав байт-у-байт
+        перший, хоч штраф у ньому був інший. Тобто вивід залежить від штрафу ПЕРШОГО виклику на
+        свіжому промпті — важіль живий, ковтає його кеш, а не шлюз. Драбина на свіжих промптах
+        (Lapa 12B): 1.0-1.3 не міняють нічого, кусати починає з 1.5.
+
+        Тією ж пробою: `stop` теж доїжджає, а `guided_json`/`guided_choice` — ні, МОВЧКИ, тобто
+        `structured_mode="guided"` на цьому шлюзі мертва гілка (прод на `json_schema`).
+
+        Поле лишається вимкненим (`None` — нічого не слати, запит байт-у-байт той самий): на
+        справжніх пакетах віча плата за зменшення дослівного повернення виявилась один-до-одного,
+        тож умикати його в прод-умові `viche` нема за що (`evalkit/conditions.py`).
+        """
         messages = ([{"role": "system", "content": system}] if system else []) + [
             {"role": "user", "content": prompt}
         ]
+        # Штраф лягає ПОРУЧ зі схемою, а не замість неї: `extra_body` тут єдиний канал і для
+        # constrained decoding, і для важелів семплера, тож змішувати їх треба тут, а не в порті.
+        body = dict(extra_body or {})
+        if repetition_penalty is not None:
+            body["repetition_penalty"] = repetition_penalty
         t0 = time.perf_counter()
         resp = self._with_retry(
             lambda: self._client.chat.completions.create(
@@ -43,7 +75,7 @@ class OpenAICompatLlm(LlmPort):
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                extra_body=extra_body or {},
+                extra_body=body,
                 **({"seed": seed} if seed is not None else {}),
                 **({"response_format": response_format} if response_format else {}),
             )
@@ -58,6 +90,8 @@ class OpenAICompatLlm(LlmPort):
                 completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
             ),
             latency_ms=latency,
+            # Структурованість міряється СХЕМОЮ, а не повнотою `extra_body`: інакше сам лише
+            # штраф семплера робив би вільну генерацію «структурованою» у звіті.
             structured=bool(extra_body or response_format),
             finish_reason=resp.choices[0].finish_reason,
             rendered={
@@ -67,7 +101,7 @@ class OpenAICompatLlm(LlmPort):
                 "max_tokens": max_tokens,
                 "seed": seed,
                 "response_format": response_format,
-                "extra_body": extra_body or {},
+                "extra_body": body,
             },
         )
 
@@ -91,10 +125,13 @@ class OpenAICompatLlm(LlmPort):
                 self._sleep(delay)
                 delay *= BACKOFF
 
-    def generate(self, prompt, *, system=None, temperature=0.0, max_tokens=512, seed=None) -> LlmResult:
-        return self._call(prompt, system, temperature, max_tokens, None, seed=seed)
+    def generate(self, prompt, *, system=None, temperature=0.0, max_tokens=512, seed=None,
+                 repetition_penalty=None) -> LlmResult:
+        return self._call(prompt, system, temperature, max_tokens, None, seed=seed,
+                          repetition_penalty=repetition_penalty)
 
-    def generate_structured(self, prompt, schema, *, system=None, temperature=0.0, max_tokens=512, seed=None) -> LlmResult:
+    def generate_structured(self, prompt, schema, *, system=None, temperature=0.0, max_tokens=512,
+                            seed=None, repetition_penalty=None) -> LlmResult:
         extra: dict = {}
         rf: dict | None = None
         if self.structured_mode == "json_schema":
@@ -108,4 +145,5 @@ class OpenAICompatLlm(LlmPort):
             extra["guided_json"] = schema
             if self.guided_backend:
                 extra["guided_decoding_backend"] = self.guided_backend
-        return self._call(prompt, system, temperature, max_tokens, extra, rf, seed=seed)
+        return self._call(prompt, system, temperature, max_tokens, extra, rf, seed=seed,
+                          repetition_penalty=repetition_penalty)

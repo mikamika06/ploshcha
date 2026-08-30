@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel
 
-from ..domain.injection import Screening
+from ..domain.injection import Screening, Threat, blank_orders, screen
 
 
 class Policy(BaseModel):
@@ -17,6 +17,9 @@ class Policy(BaseModel):
     wrap_untrusted: bool = True
     on_threat: str = "note"
     scope_tools: bool = True
+    # Чий це текст: документ (дефолт) чи ЖИВА МОВА з вулиці. У мові наказовий спосіб щоденний
+    # («скажи, що я приїду», «нікому не кажи»), і ніж там ріже лише те, що звернене до машини.
+    spoken: bool = False
 
 
 class GuardPort(ABC):
@@ -26,3 +29,26 @@ class GuardPort(ABC):
     @abstractmethod
     def prepare(self, text: str, *, tag: str, trust: str = "untrusted") -> str:
         """Підготувати чужий текст до вкладення в промпт."""
+
+    def cuts(self, text: str) -> list[Threat]:
+        """Що ніж САМЕ ЦІЄЇ охорони вирізає з тексту — окремо від того, що бачить детектор.
+
+        Питати доводиться охорону, бо політику каналу знає тільки вона. Той, хто рахував це сам
+        (`Viche._guarded` через `orders(text, spoken=True)`), відкривав fail-open: із суворішою
+        політикою `prepare()` вирізав тему в "", а рахівник казав «нічого не вирізано», і в промпт
+        їхав СИРИЙ текст — суворіша конфігурація давала нульову охорону замість більшої.
+
+        Дефолт віддає весь улов детектора, а не порожньо: охорона, яка про свій ніж не сказала,
+        мусить помилятися в бік закритого, бо ціна другої помилки — неохоронений текст у промпті.
+        """
+        return screen(text).threats
+
+    def blanked(self, text: str) -> str:
+        """Той самий текст без ПРОЛЬОТІВ наказу — те, що суддя змісту читає другим разом.
+
+        Питати доводиться охорону з тієї ж причини, що й `cuts`: політику каналу знає тільки вона,
+        а на каналі живої мови («скажи, що я приїду по сіль у середу») ніж мовчить там, де на
+        документі різав би. Дефолт бере документну політику, тобто вирізає БІЛЬШЕ: охорона, яка про
+        свій ніж не сказала, мусить помилятися в бік закритого.
+        """
+        return blank_orders(text)

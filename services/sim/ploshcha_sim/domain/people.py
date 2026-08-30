@@ -274,6 +274,25 @@ def fit_gender(role: str, name: str) -> str:
     return _FALLBACK.get(role, name)
 
 
+def refit(people: list[Person]) -> list[Person]:
+    """Звірка ЗБЕРЕЖЕНОГО села з малюнками: імʼя, що свариться зі статтю ролі, міняється на заміну.
+
+    `fit_gender` стоїть на кузні (`repair_people`), а село кується РАЗ і далі лежить у базі, тож до
+    вже породженого села виправлення не доїжджає ніколи. У живій базі власника (замір 2026-08-29,
+    таблиця `village`, сід 11) таких імен два з восьми: `sheptu` — «Яким Бувалінда», `shynkar` —
+    «Грицько Поговір», тобто чоловічі імена на жіночих фігурах. На сцені це видно просто очима:
+    підпис свариться з малюнком, а саме цього `fit_gender` і мав не допустити.
+
+    Назад у базу не пишемо: звірка дешева, робиться на кожному читанні й дає той самий результат,
+    а тихий запис у чуже сховище на ЧИТАННІ — окремий клас несподіванок.
+    """
+    out: list[Person] = []
+    for person in people:
+        fixed = fit_gender(person.role, person.name)
+        out.append(person if fixed == person.name else person.model_copy(update={"name": fixed}))
+    return out
+
+
 def repair_people(raw: dict | None, roles: list[str],
                   traits: dict[str, dict[str, float]]) -> list[Person]:
     """Лагодить КОД: чужа роль, порожнє імʼя, дублікат — усе відкидається, норов лишається наш.

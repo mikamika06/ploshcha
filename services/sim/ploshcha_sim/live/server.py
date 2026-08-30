@@ -12,8 +12,10 @@
 (`LiveRunner`), інакше довге зʼєднання SSE блокувало б цикл.
 """
 
+import contextlib
 import json
 import mimetypes
+import re
 import pathlib
 import threading
 import time
@@ -24,9 +26,18 @@ from pathlib import Path
 
 from .sessions import clean_sid
 
+
+@contextlib.contextmanager
+def _nobody():
+    """Порожній облік слухачів: цикл, який його не веде (старий, підмінений у тестах). Потік від
+    цього не міняється — просто нема кому сказати, що глядач відпав."""
+    yield
+
 HOST = "127.0.0.1"
 HEARTBEAT_S = 15.0
 MAX_BODY = 64 * 1024
+IMMUTABLE = "public, max-age=31536000, immutable"
+HASHED = re.compile(r"-[0-9A-Za-z_]{8,}\.(js|css|png|jpg|jpeg|webp|woff2?|ico)$")
 INDEX = "index.html"
 # Скільки команд з однієї адреси за вікно. Тема коштує тисячі токенів, тож це не про навантаження
 # на сервер, а про гаманець.
@@ -176,7 +187,12 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
                                                      or "javascript" in kind or "json" in kind
                                                      else ""))
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-cache")
+            # Хешовані збіркою файли незмінні за побудовою: кожна перезбірка дає нове імʼя, тому
+            # старе можна тримати в кеші рік. Решта — html, robots, sitemap, llms — мусить лишатись
+            # свіжою, інакше викочена правка не доїде до гостя, а краулер побачить учорашній текст.
+            # Заміряно: до цього поділу і бандли, і спрайти йшли з no-cache, тобто кожен захід тягнув
+            # усі 4.13 МБ статики наново.
+            self.send_header("Cache-Control", IMMUTABLE if HASHED.search(target.name) else "no-cache")
             self.end_headers()
             self._body(body)
 
@@ -204,18 +220,32 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
             if self.path.split("?", 1)[0] not in ("/command", "/feedback"):
                 return self._json(404, {"error": "не знайдено"})
             who = (self.headers.get("X-Forwarded-For") or self.client_address[0] or "?").split(",")[0].strip()
-            ok, wait = gate.allow(who)
-            if not ok:
-                return self._json(429, {"error": f"занадто часто — спробуй за {wait} с"})
             length = int(self.headers.get("Content-Length") or 0)
             if length > MAX_BODY:
                 return self._json(413, {"error": "завелике тіло"})
+            # ★ Тіло читається ПЕРЕД стелею, а не після.
+            #
+            # Стеля стоїть на гаманці, а гаманець залежить від того, ЩО просять, — тож правило
+            # мусить бачити команду. Заразом це лікує давнішу дрібницю того самого рядка: доти
+            # відмова 429 виходила, не дочитавши тіла, а зʼєднання тут keep-alive (HTTP/1.1), і
+            # недочитані байти діставались наступному запиту як його початок.
             try:
                 payload = json.loads(self.rfile.read(length) or b"{}")
             except Exception as exc:
                 return self._json(400, {"error": f"не JSON: {exc}"})
             if not isinstance(payload, dict):
                 return self._json(400, {"error": "тіло має бути обʼєктом"})
+            # ★ «Завершити» стеля витрат не ріже — і це не послаблення, а її ж мета.
+            #
+            # `RATE_MAX` існує, щоб гість не спалив стелю токенів (кожна тема — тисячі). Єдина дія
+            # `finish` протилежна: вона обриває віче, яке ЗАРАЗ платить, і покинутий прогін
+            # догомонює 18 902 токени з 24 761 (`Viche.hush`). Різати її означало б, що при частому
+            # клацанні — а це рівно той гість, який кидає теми одну за одною, — не доїжджає саме
+            # та команда, заради якої стеля й стоїть. Коштує вона пошук у мапі й нічого більше.
+            if str(payload.get("kind") or "") != "finish":
+                ok, wait = gate.allow(who)
+                if not ok:
+                    return self._json(429, {"error": f"занадто часто — спробуй за {wait} с"})
             sessions = getattr(runner, "sessions", None)
             allowed, wait = allow_new_session(new_sessions, sessions,
                                               clean_sid(payload.get("sid")), who)
@@ -267,6 +297,17 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
             self.send_header("X-Accel-Buffering", "no")
             self._cors()
             self.end_headers()
+            # ★ Ядро мусить знати, що його ще СЛУХАЮТЬ.
+            #
+            # Закрита вкладка помітна тут і більш ніде: `handle_command` бачить окремі запити, а
+            # довге зʼєднання — саме цей блок. Обрив спливає на першому ж записі в мертвий сокет
+            # (удар серця раз на `HEARTBEAT_S`), і вихід із `with` каже про це ядру, хай там що
+            # зʼєднання зняло — виняток, зупинка сервера чи мирне завершення.
+            watching = getattr(runner, "watching", None)
+            with watching(sid) if watching is not None else _nobody():
+                self._pump(cursor, sid, shared_from)
+
+        def _pump(self, cursor: int, sid: str | None, shared_from: int) -> None:
             try:
                 while True:
                     events, cursor = bus.wait_ids(cursor, HEARTBEAT_S, sid, shared_from)
@@ -310,6 +351,16 @@ def handle_command(payload_in: dict, runner) -> tuple[int, dict]:
     if kind == "stop":
         runner.stop()
         return 200, {"ok": True, "state": runner.state}
+    if kind == "finish":
+        # ★ Своє віче — і НІЧИЄ БІЛЬШЕ. `stop` поруч спиняє ядро цілком, тож розрізняти їх мусить
+        # не пильність того, хто читає, а сама команда: ця дотягується рівно до прогону цієї
+        # сесії (`LiveRunner.finish`), і чужого не бачить у принципі.
+        #
+        # Відмови тут немає: «нема чого спиняти» — це вже той стан, якого просили. Гість тисне
+        # «завершити» рівно тоді, коли віче могло скінчитись мить тому саме, і 409 у відповідь
+        # читався б як поламка. Тому 200, а чи справді щось згорнуто — каже `ok`, як у `resume`.
+        ended = runner.finish(sid) if hasattr(runner, "finish") else False
+        return 200, {"ok": bool(ended), "finished": bool(ended)}
     if kind == "requeue":
         if runner.queue is None:
             return 400, {"error": "черги немає"}
@@ -343,6 +394,19 @@ def handle_command(payload_in: dict, runner) -> tuple[int, dict]:
         text = str(payload.get("text") or "").strip()
         if not text:
             return 400, {"error": "порожня тема"}
+        # ★ Нова тема ЗАКРИВАЄ попередню розмову цього ж гостя.
+        #
+        # Черга й так не дасть двом вічам однієї сесії йти водночас (`_lease` обходить зайнятих),
+        # тож без цього рядка нова тема просто лежала б хвилини дві, поки догомонить стара, — а
+        # гість дивився б на розмову, якої вже не просив, і платив за неї. Кинути нову тему і є
+        # спосіб сказати «ця мені більше не потрібна».
+        #
+        # ★ Заступає вона й ту СВОЮ тему, що ще лежить у черзі неорендованою (`_drop_pending`), і
+        # це те саме правило, а не ще одне: фронт закриває стару розмову тим самим кліком («Стара
+        # розмова тут і кінчається», `main.ts`), тож двох своїх тем гість не бачить ніколи. Та, що
+        # лишилась би в черзі, почала б говорити сама вже після нової — за повну ціну прогону
+        # (медіана 19 093 токени на 121 прод-айтемі).
+        finished = bool(runner.finish(sid)) if hasattr(runner, "finish") else False
         key = payload.get("key") or f"topic-{abs(hash(text)) % 10**10}"
         # Місце їде РАЗОМ із темою: розмова в шинку й розмова на площі — різні процеси, тож
         # місце має бути частиною задачі, а не станом сервера.
@@ -355,7 +419,7 @@ def handle_command(payload_in: dict, runner) -> tuple[int, dict]:
             payload["sid"] = sid
         fresh = runner.queue.put(str(key), payload)
         return 200, {"ok": True, "key": str(key), "fresh": bool(fresh),
-                     "queue": runner.queue.stats()}
+                     "finished": finished, "queue": runner.queue.stats()}
     return 400, {"error": f"невідома команда {kind!r}"}
 
 

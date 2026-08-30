@@ -38,6 +38,7 @@ class LlmPort(ABC):
         temperature: float = 0.0,
         max_tokens: int = 512,
         seed: int | None = None,
+        repetition_penalty: float | None = None,
     ) -> LlmResult: ...
 
     @abstractmethod
@@ -50,6 +51,13 @@ class LlmPort(ABC):
         temperature: float = 0.0,
         max_tokens: int = 512,
         seed: int | None = None,
+        repetition_penalty: float | None = None,
     ) -> LlmResult:
         """Вивід обмежений JSON-схемою (constrained decoding). Парсинг — на боці агента,
-        щоб невалідний вивід лишався вимірюваним, а не ховався в порті."""
+        щоб невалідний вивід лишався вимірюваним, а не ховався в порті.
+
+        `repetition_penalty` — третій важіль декодування поруч із `temperature` і `max_tokens`, і
+        стоїть він у порті з тієї самої причини, що й вони: це поле ЗАПИТУ, а не рішення агента.
+        `None` означає «не слати поля взагалі» — байт-у-байт той самий запит, що й доти, тож усі
+        вже пораховані прогони лишаються порівнюваними. Чому важіль існує й чому вимкнений —
+        `OpenAICompatLlm._call`."""
