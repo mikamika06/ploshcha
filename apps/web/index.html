@@ -25,6 +25,23 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": "https://ploshcha.org/#org",
+        "name": "Площа",
+        "alternateName": "Ploshcha",
+        "url": "https://ploshcha.org/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://ploshcha.org/assets/brand/mark.png",
+          "width": 512,
+          "height": 512
+        },
+        "sameAs": ["https://github.com/mikamika06/ploshcha"]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
         "@graph": [
           {
             "@type": "WebSite",
@@ -34,18 +51,6 @@
             "inLanguage": "uk",
             "description": "Жива симуляція українського села, у якому мовні моделі грають селян: гість пише тему на Дошку, село збирається на віче, обговорює її й ухвалює рішення голосуванням.",
             "publisher": { "@id": "https://ploshcha.org/#org" }
-          },
-          {
-            "@type": "Organization",
-            "@id": "https://ploshcha.org/#org",
-            "name": "Площа",
-            "url": "https://ploshcha.org/",
-            "logo": {
-              "@type": "ImageObject",
-              "url": "https://ploshcha.org/assets/brand/mark.png",
-              "width": 512,
-              "height": 512
-            }
           },
           {
             "@type": "WebApplication",
