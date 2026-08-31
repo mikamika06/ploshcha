@@ -137,3 +137,26 @@ th { font-weight: 700; }
   body { font-size: 17px; padding: 0 0 56px; }
   .arkush { border-left: 0; border-right: 0; }
 }
+
+.korotko {
+  margin: 0 0 40px;
+  padding: 18px 0 18px 22px;
+  border-left: 3px solid var(--wine);
+  list-style: none;
+}
+
+.korotko li {
+  margin: 0 0 10px;
+  padding-left: 16px;
+  font-size: 16.5px;
+  line-height: 1.5;
+  color: var(--dim);
+  text-indent: -16px;
+}
+
+.korotko li::before {
+  content: "— ";
+  color: var(--wine);
+}
+
+.korotko li:last-child { margin-bottom: 0; }
