@@ -7,6 +7,11 @@
     <meta name="description" content="Розбір архітектури Площі: Mamay пише партитуру розмови, Lapa промовляє репліки, а все, що визначене даними, вирішує код. Хвилі, сторожі повторів, гейти." />
     <link rel="canonical" href="https://ploshcha.org/yak-pracyuye.html" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/assets/brand/mark-180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="alternate" hreflang="uk" href="https://ploshcha.org/yak-pracyuye.html" />
+    <link rel="alternate" hreflang="x-default" href="https://ploshcha.org/yak-pracyuye.html" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <link rel="stylesheet" href="/assets/ui/storinka.css" />
     <meta name="theme-color" content="#21222f" />
     <meta property="og:type" content="article" />
@@ -24,28 +29,80 @@
     <meta name="twitter:image" content="https://ploshcha.org/assets/brand/lockup.png" />
     <script type="application/ld+json">
       {
-        "@context": "https://schema.org",
-        "@type": "Article",
-        "@id": "https://ploshcha.org/yak-pracyuye.html#article",
-        "headline": "Як влаштована Площа: дві моделі, хвилі й запобіжники",
-        "description": "Розбір архітектури Площі: Mamay пише партитуру розмови, Lapa промовляє репліки, а все, що визначене даними, вирішує код. Хвилі, сторожі повторів, гейти.",
-        "inLanguage": "uk",
-        "url": "https://ploshcha.org/yak-pracyuye.html",
-        "mainEntityOfPage": { "@type": "WebPage", "@id": "https://ploshcha.org/yak-pracyuye.html" },
-        "isPartOf": { "@type": "WebSite", "@id": "https://ploshcha.org/#site" },
-        "publisher": { "@type": "Organization", "@id": "https://ploshcha.org/#org", "name": "Площа" },
-        "image": "https://ploshcha.org/assets/brand/lockup.png",
-        "about": ["агентна архітектура", "оркестрація мовних моделей", "генеративні агенти", "українські LLM"],
-        "disambiguatingDescription": "Репліки села породжуються мовними моделями в момент показу і не є висловлюваннями живих людей."
-      }
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "@id": "https://ploshcha.org/yak-pracyuye.html#article",
+  "headline": "Як влаштована Площа: дві моделі, хвилі й запобіжники",
+  "description": "Розбір архітектури Площі: Mamay пише партитуру розмови, Lapa промовляє репліки, а все, що визначене даними, вирішує код. Хвилі, сторожі повторів, гейти.",
+  "inLanguage": "uk",
+  "url": "https://ploshcha.org/yak-pracyuye.html",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://ploshcha.org/yak-pracyuye.html"
+  },
+  "isPartOf": {
+    "@type": "WebSite",
+    "@id": "https://ploshcha.org/#site"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "@id": "https://ploshcha.org/#org",
+    "name": "Площа",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://ploshcha.org/assets/brand/mark.png",
+      "width": 512,
+      "height": 512
+    }
+  },
+  "image": "https://ploshcha.org/assets/brand/lockup.png",
+  "about": [
+    "агентна архітектура",
+    "оркестрація мовних моделей",
+    "генеративні агенти",
+    "українські LLM"
+  ],
+  "disambiguatingDescription": "Репліки села породжуються мовними моделями в момент показу і не є висловлюваннями живих людей.",
+  "author": {
+    "@type": "Organization",
+    "@id": "https://ploshcha.org/#org",
+    "name": "Площа"
+  },
+  "datePublished": "2026-08-30",
+  "dateModified": "2026-08-31"
+}
+    </script>
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Площа",
+      "item": "https://ploshcha.org/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Як воно влаштовано",
+      "item": "https://ploshcha.org/yak-pracyuye.html"
+    }
+  ]
+}
     </script>
   </head>
   <body>
-    <article class="arkush">
-      <p class="doroha"><a href="/">Площа</a> · <a href="/pro.html">про село</a> · як воно влаштовано</p>
+    <main class="arkush">
+      <nav class="doroha" aria-label="Шлях сторінкою"><a href="/">Площа</a> · <a href="/pro.html">про село</a> · як воно влаштовано</nav>
 
-      <h1>Як воно влаштовано зсередини</h1>
+      <article>
+
+      <h1>Як влаштована Площа зсередини: дві моделі й хвилі</h1>
       <div class="pidzahol">Дві моделі, конвеєр із хвиль і дуже багато коду між ними.</div>
+
+      <h2 id="korotko">Коротко</h2>
 
       <ul class="korotko">
         <li>Дві моделі ділять працю: Mamay (MamayLM-Gemma-3-27B-IT-v2.0) розписує порядок розмови, Lapa (LapaLLM-Gemma-3-12B-instruct) промовляє речення.</li>
@@ -56,15 +113,27 @@
         <li>Гейти змісту закрили 41 небезпечну тему з 42 на корпусі з 74 живих тем.</li>
       </ul>
 
+      <nav class="zmist" aria-label="Зміст сторінки">
+        <div class="zmist-pid">На цій сторінці</div>
+        <ol>
+          <li><a href="#vykonavtsevi-ne-dayut-vyboru">Виконавцеві не дають вибору</a></li>
+          <li><a href="#khvyli-chomu-pershe-slovo-lunaye-odrazu">Хвилі: чому перше слово лунає одразу</a></li>
+          <li><a href="#shcho-vyrishuye-kod-a-ne-model">Що вирішує код, а не модель</a></li>
+          <li><a href="#borotba-z-povtoramy">Боротьба з повторами</a></li>
+          <li><a href="#zapobizhnyky-zmistu">Запобіжники змісту</a></li>
+          <li><a href="#yak-tse-vydno-zzovni">Як це видно ззовні</a></li>
+        </ol>
+      </nav>
+
       <p>Площа стоїть на двох українських мовних моделях, і поділ праці між ними —
       найважливіше рішення в усьому проєкті. Mamay розписує порядок розмови: хто говорить
       наступним, яким ходом, кому у відповідь і що при цьому робить тілом. Lapa промовляє
       саме речення. Формула вартості з цього виходить така: один виклик дорогої моделі плюс
       N викликів дешевої плюс рідкі втручання — тобто дорогий слот кличеться одиниці разів
       за розмову, а не на кожен такт. Обидві моделі відкриті й доступні через API
-      Lapathoniia: Lapa — це LapaLLM-Gemma-3-12B-instruct, Mamay — MamayLM-Gemma-3-27B-IT-v2.0.</p>
+      Lapathoniia: Lapa — це <a href="https://huggingface.co/lapa-llm" rel="nofollow noopener" target="_blank">LapaLLM-Gemma-3-12B-instruct</a>, Mamay — <a href="https://huggingface.co/INSAIT-Institute/MamayLM-Gemma-3-27B-IT-v2.0" rel="nofollow noopener" target="_blank">MamayLM-Gemma-3-27B-IT-v2.0</a>.</p>
 
-      <h2>Виконавцеві не дають вибору</h2>
+      <h2 id="vykonavtsevi-ne-dayut-vyboru">Виконавцеві не дають вибору</h2>
 
       <p>Схема відповіді, з якою кличуть Lapa, має рівно одне поле: «репліка». Не «хто
       наступний», не «чи взяти інструмент», не «чи я впорався». Усе, що є вибором, або
@@ -72,6 +141,18 @@
       закриті переліки, тому такт із неіснуючим селянином неможливо навіть висловити. Голос
       на голосуванні — перелік із трьох значень плюс короткий рядок причини, рівно те, що
       дешева модель тягне надійно.</p>
+
+      <p>Шлях однієї репліки, крок за кроком:</p>
+
+      <ol class="krokY">
+        <li>Гість пише тему на Дошці-віснику, і суддя змісту вирішує, чи вона взагалі йде в село.</li>
+        <li>Хеш від теми збирає каст: та сама новина завжди виводить на віче тих самих людей.</li>
+        <li>Mamay пише партитуру хвилями — перші дві короткі, по три й пʼять тактів, далі повні по десять.</li>
+        <li>Код бере з партитури наступний такт: хто говорить, яким ходом і кому у відповідь.</li>
+        <li>Lapa промовляє саме речення за пакетом, у якому немає нічого зайвого.</li>
+        <li>Сторожі повторів і гейти змісту дивляться на репліку до того, як її побачить глядач.</li>
+        <li>Подія йде на сцену через заморожений контракт, і конверт чужої форми фронт мовчки відкидає.</li>
+      </ol>
 
       <p>Це не педантизм, а наслідок замірів. Коли моделі лишали свободу, вона нею
       користувалася не так, як хотілося: одиночний виклик Lapa починав репліку зі слова
@@ -90,7 +171,7 @@
       в хроніці — перелік із трьох слів замість числа, бо на типі «число» шлюз просто вішав
       генерацію.</p>
 
-      <h2>Хвилі: чому перше слово лунає одразу</h2>
+      <h2 id="khvyli-chomu-pershe-slovo-lunaye-odrazu">Хвилі: чому перше слово лунає одразу</h2>
 
       <p>Спочатку партитуру писали одну на всю розмову, і глядач дивився на напис «Село думу
       думає» рівно стільки, скільки Mamay її писав: 28.6 секунди до готового плану і 30.3
@@ -110,7 +191,7 @@
       39 секунд із 70. Десять тактів пишуться близько чотирнадцяти секунд, а вимовляються
       близько десяти — отже, однієї хвилі наперед не вистачає, і потрібні дві.</p>
 
-      <h2>Що вирішує код, а не модель</h2>
+      <h2 id="shcho-vyrishuye-kod-a-ne-model">Що вирішує код, а не модель</h2>
 
       <p>Склад учасників дає хеш від теми: та сама новина завжди збирає тих самих людей.
       Спонтанність дає кубик за сідом — базова ймовірність перебивання 0.28, стеля чотири
@@ -133,7 +214,7 @@
       токени проти 1719 у дешевої, тобто дефект виконавця оплачувався оркестратором і вся
       економія задуму зникала.</p>
 
-      <h2>Боротьба з повторами</h2>
+      <h2 id="borotba-z-povtoramy">Боротьба з повторами</h2>
 
       <p>Найбільша частина коду віча — не сама вистава, а боротьба з тим, що дешевий актор
       повторюється. Кожну репліку просять у трьох варіантах, а вибирає код: спершу той, у
@@ -158,7 +239,7 @@
         повтор змісту впав із 0.164 до 0.097.</p>
       </div>
 
-      <h2>Запобіжники змісту</h2>
+      <h2 id="zapobizhnyky-zmistu">Запобіжники змісту</h2>
 
       <p>Село розмовляє про те, що йому принесли, а принести можуть будь-що. Тому на вході й
       на виходах стоять три яруси охорони, і між ними поділена не важливість, а кількість
@@ -197,7 +278,7 @@
       на вході, включно з темою з самих пробілів і темою з самої емодзі, теж не валить
       прогін: сім із семи.</p>
 
-      <h2>Як це видно ззовні</h2>
+      <h2 id="yak-tse-vydno-zzovni">Як це видно ззовні</h2>
 
       <p>Усе, що ядро робить, воно спершу записує кроком, а вже потім проєктує в події для
       сцени. Контракт подій заморожений і має власну версію: двадцять типів, від «розмова
@@ -214,17 +295,21 @@
         <p><strong>Про походження текстів.</strong> Репліки селян, літописи, чутки й ухвали
         на цьому сайті породжуються мовними моделями в момент показу. Це не висловлювання
         живих людей і не свідчення про справжні події. Про це сказано тут відкрито
-        відповідно до вимоги статті 50 Акта ЄС про штучний інтелект, чинної з 2 серпня
+        відповідно до вимоги <a href="https://artificialintelligenceact.eu/article/50/" rel="nofollow noopener" target="_blank">статті 50 Акта ЄС про штучний інтелект</a>, чинної з 2 серпня
         2026 року. Текст цієї сторінки написаний людиною на основі коду й замірів проєкту.</p>
       </div>
 
-      <div class="pidval">
+      </article>
+
+      <footer class="pidval">
         <p>Далі: <a href="/chysla.html">числа й виміри</a> ·
         <a href="/pytannya.html">часті питання</a> ·
-        <a href="/pro.html">що таке Площа</a></p>
+        <a href="/pro.html">що таке Площа</a> ·
+        <a href="/pryvatnist.html">приватність</a></p>
         <p>Код відкритий: <a href="https://github.com/mikamika06/ploshcha" rel="noopener">github.com/mikamika06/ploshcha</a></p>
         <p><a href="/">Повернутись у село</a></p>
-      </div>
-    </article>
+      <p class="onovleno">Оновлено <time datetime="2026-08-31">31 серпня 2026</time>.</p>
+      </footer>
+    </main>
   </body>
 </html>

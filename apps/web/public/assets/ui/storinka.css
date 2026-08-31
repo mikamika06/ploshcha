@@ -160,3 +160,87 @@ th { font-weight: 700; }
 }
 
 .korotko li:last-child { margin-bottom: 0; }
+
+.zmist {
+  margin: 0 0 40px;
+  padding: 16px 20px;
+  background: rgba(70, 46, 24, 0.05);
+  border: 1px solid var(--edge);
+}
+
+.zmist-pid {
+  margin: 0 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.zmist ol {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.zmist li { margin: 0 0 4px; }
+
+.onovleno {
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--dim);
+}
+
+.tablytsia {
+  width: 100%;
+  margin: 0 0 24px;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+.tablytsia caption {
+  margin-bottom: 10px;
+  font-size: 13px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: left;
+}
+
+.tablytsia th,
+.tablytsia td {
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--edge);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tablytsia th { font-weight: 700; }
+
+.tablytsia td:last-child,
+.tablytsia th:last-child { padding-right: 0; }
+
+.krokY {
+  margin: 0 0 24px;
+  padding-left: 22px;
+}
+
+.krokY li { margin: 0 0 10px; }
+
+.znimok {
+  margin: 0 0 34px;
+}
+
+.znimok img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--edge);
+}
+
+.znimok figcaption {
+  margin-top: 10px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--dim);
+}

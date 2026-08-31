@@ -7,6 +7,11 @@
     <meta name="description" content="Чи це гра, звідки беруться репліки, які моделі за цим стоять і скільки коштує одна розмова — чотирнадцять прямих відповідей про Площу." />
     <link rel="canonical" href="https://ploshcha.org/pytannya.html" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/assets/brand/mark-180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="alternate" hreflang="uk" href="https://ploshcha.org/pytannya.html" />
+    <link rel="alternate" hreflang="x-default" href="https://ploshcha.org/pytannya.html" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <link rel="stylesheet" href="/assets/ui/storinka.css" />
     <meta name="theme-color" content="#21222f" />
     <meta property="og:type" content="article" />
@@ -148,13 +153,37 @@
         ]
       }
     </script>
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Площа",
+      "item": "https://ploshcha.org/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Часті питання",
+      "item": "https://ploshcha.org/pytannya.html"
+    }
+  ]
+}
+    </script>
   </head>
   <body>
-    <article class="arkush">
-      <p class="doroha"><a href="/">Площа</a> · <a href="/pro.html">про село</a> · часті питання</p>
+    <main class="arkush">
+      <nav class="doroha" aria-label="Шлях сторінкою"><a href="/">Площа</a> · <a href="/pro.html">про село</a> · часті питання</nav>
 
-      <h1>Часті питання</h1>
+      <article>
+
+      <h1>Часті питання про Площу — село, яким говорять моделі</h1>
       <div class="pidzahol">Коротко й по суті — про те, що люди питають найчастіше.</div>
+
+      <h2 id="korotko">Коротко</h2>
 
       <ul class="korotko">
         <li>Площа — намальоване українське село, у якому восьмеро селян обговорюють тему, що її приніс гість.</li>
@@ -162,10 +191,20 @@
         <li>Одне віче триває 12-20 тактів і коштує 24 761 токен на 21 репліку.</li>
         <li>Село відповідає не особисто тобі: твоє слово підхоплюють рівно двоє з тих, хто щойно не говорив.</li>
         <li>На небезпечну тему віче не збереться — гейти закрили 41 з 42 таких тем, не зачепивши жодної мирної з 24.</li>
-        <li>Код відкритий: github.com/mikamika06/ploshcha.</li>
+        <li>Код відкритий: <a href="https://github.com/mikamika06/ploshcha" rel="nofollow noopener" target="_blank">github.com/mikamika06/ploshcha</a>.</li>
       </ul>
 
-      <h2>Про сам проєкт</h2>
+      <nav class="zmist" aria-label="Зміст сторінки">
+        <div class="zmist-pid">На цій сторінці</div>
+        <ol>
+          <li><a href="#pro-sam-proyekt">Про сам проєкт</a></li>
+          <li><a href="#pro-te-yak-tsym-korystuvatys">Про те, як цим користуватись</a></li>
+          <li><a href="#pro-mezhi-y-bezpeku">Про межі й безпеку</a></li>
+          <li><a href="#pro-pokhodzhennya-y-kod">Про походження й код</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="pro-sam-proyekt">Про сам проєкт</h2>
 
       <h3>Що таке Площа?</h3>
       <p>Площа — це намальоване українське село, у якому восьмеро селян обговорюють тему, що
@@ -185,17 +224,17 @@
       <p>Ні, жодне слово в Площі не належить живій людині. Усі репліки, літописи, чутки й
       ухвали породжуються мовними моделями в момент показу; імена, характери й біографії
       селян вигадані й не стосуються реальних осіб. Це сказано відкрито відповідно до вимоги
-      статті 50 Акта ЄС про штучний інтелект, чинної з 2 серпня 2026 року. Текст
+      <a href="https://artificialintelligenceact.eu/article/50/" rel="nofollow noopener" target="_blank">статті 50 Акта ЄС про штучний інтелект</a>, чинної з 2 серпня 2026 року. Текст
       пояснювальних сторінок сайту, на відміну від реплік села, написаний людиною.</p>
 
       <h3>Які саме моделі стоять за Площею?</h3>
       <p>Площа працює на двох відкритих моделях через API Lapathoniia: Lapa
-      (LapaLLM-Gemma-3-12B-instruct) і Mamay (MamayLM-Gemma-3-27B-IT-v2.0). Поділ праці між
+      (<a href="https://huggingface.co/lapa-llm" rel="nofollow noopener" target="_blank">LapaLLM-Gemma-3-12B-instruct</a>) і Mamay (<a href="https://huggingface.co/INSAIT-Institute/MamayLM-Gemma-3-27B-IT-v2.0" rel="nofollow noopener" target="_blank">MamayLM-Gemma-3-27B-IT-v2.0</a>). Поділ праці між
       ними жорсткий: Mamay розписує порядок розмови — хто говорить, яким ходом і кому у
       відповідь, — а Lapa промовляє саме речення. Дорога модель кличеться одиниці разів за
       розмову, дешева — на кожен такт, і саме на цьому тримається вартість віча.</p>
 
-      <h2>Про те, як цим користуватись</h2>
+      <h2 id="pro-te-yak-tsym-korystuvatys">Про те, як цим користуватись</h2>
 
       <h3>Що станеться, коли я напишу тему на Дошці?</h3>
       <p>Тема лягає в чергу ядра, і за кілька секунд селяни починають сходитись на віче.
@@ -232,7 +271,7 @@
       одночасно ядро тримає не більше двохсот таких сіл. Репутація людини теж памʼятається
       й має наслідок: кому спростували чутку, того слухають менше.</p>
 
-      <h2>Про межі й безпеку</h2>
+      <h2 id="pro-mezhi-y-bezpeku">Про межі й безпеку</h2>
 
       <h3>Що буде, якщо я напишу щось небезпечне?</h3>
       <p>Тему не обговорюватимуть, а гість отримає коротку відповідь із телефоном допомоги.
@@ -250,7 +289,7 @@
       темі про корову, що побила город, і саме через це присуд віддали моделі, а не
       спискам.</p>
 
-      <h2>Про походження й код</h2>
+      <h2 id="pro-pokhodzhennya-y-kod">Про походження й код</h2>
 
       <h3>Чи це той самий підхід, що в стенфордських Generative Agents?</h3>
       <p>Так, за родоводом Площа стоїть у тій самій лінії, що робота Park et al. 2023 про
@@ -278,16 +317,21 @@
         <p><strong>Про походження текстів.</strong> Репліки селян, літописи, чутки й ухвали
         на цьому сайті породжуються мовними моделями в момент показу. Це не висловлювання
         живих людей і не свідчення про справжні події. Про це сказано тут відкрито
-        відповідно до вимоги статті 50 Акта ЄС про штучний інтелект, чинної з 2 серпня
+        відповідно до вимоги <a href="https://artificialintelligenceact.eu/article/50/" rel="nofollow noopener" target="_blank">статті 50 Акта ЄС про штучний інтелект</a>, чинної з 2 серпня
         2026 року.</p>
       </div>
 
-      <div class="pidval">
+      </article>
+
+      <footer class="pidval">
         <p>Далі: <a href="/pro.html">що таке Площа</a> ·
         <a href="/yak-pracyuye.html">як воно влаштовано</a> ·
-        <a href="/chysla.html">числа й виміри</a></p>
+        <a href="/chysla.html">числа й виміри</a> ·
+        <a href="/pryvatnist.html">приватність</a></p>
         <p><a href="/">Повернутись у село</a></p>
-      </div>
-    </article>
+              <p>Код відкритий: <a href="https://github.com/mikamika06/ploshcha" rel="nofollow noopener" target="_blank">github.com/mikamika06/ploshcha</a></p>
+        <p class="onovleno">Оновлено <time datetime="2026-08-31">31 серпня 2026</time>.</p>
+      </footer>
+    </main>
   </body>
 </html>

@@ -7,6 +7,11 @@
     <meta name="description" content="Виміряні числа Площі: 24 761 токен на віче, 1.3 секунди до першого слова замість 30.3, 41 закрита небезпечна тема з 42 і понад 1700 тестів у ядрі." />
     <link rel="canonical" href="https://ploshcha.org/chysla.html" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/assets/brand/mark-180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="alternate" hreflang="uk" href="https://ploshcha.org/chysla.html" />
+    <link rel="alternate" hreflang="x-default" href="https://ploshcha.org/chysla.html" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <link rel="stylesheet" href="/assets/ui/storinka.css" />
     <meta name="theme-color" content="#21222f" />
     <meta property="og:type" content="article" />
@@ -24,28 +29,80 @@
     <meta name="twitter:image" content="https://ploshcha.org/assets/brand/lockup.png" />
     <script type="application/ld+json">
       {
-        "@context": "https://schema.org",
-        "@type": "Article",
-        "@id": "https://ploshcha.org/chysla.html#article",
-        "headline": "Числа Площі: скільки коштує й скільки триває віче",
-        "description": "Виміряні числа проєкту Площа: вартість однієї розмови, час до першого слова, точність гейтів змісту на корпусі з 74 живих тем і розмір тестової бази ядра.",
-        "inLanguage": "uk",
-        "url": "https://ploshcha.org/chysla.html",
-        "mainEntityOfPage": { "@type": "WebPage", "@id": "https://ploshcha.org/chysla.html" },
-        "isPartOf": { "@type": "WebSite", "@id": "https://ploshcha.org/#site" },
-        "publisher": { "@type": "Organization", "@id": "https://ploshcha.org/#org", "name": "Площа" },
-        "image": "https://ploshcha.org/assets/brand/lockup.png",
-        "about": ["виміри агентної системи", "вартість мовних моделей", "латентність", "тестування"],
-        "disambiguatingDescription": "Репліки села породжуються мовними моделями в момент показу і не є висловлюваннями живих людей."
-      }
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "@id": "https://ploshcha.org/chysla.html#article",
+  "headline": "Числа Площі: скільки коштує й скільки триває віче",
+  "description": "Виміряні числа проєкту Площа: вартість однієї розмови, час до першого слова, точність гейтів змісту на корпусі з 74 живих тем і розмір тестової бази ядра.",
+  "inLanguage": "uk",
+  "url": "https://ploshcha.org/chysla.html",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://ploshcha.org/chysla.html"
+  },
+  "isPartOf": {
+    "@type": "WebSite",
+    "@id": "https://ploshcha.org/#site"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "@id": "https://ploshcha.org/#org",
+    "name": "Площа",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://ploshcha.org/assets/brand/mark.png",
+      "width": 512,
+      "height": 512
+    }
+  },
+  "image": "https://ploshcha.org/assets/brand/lockup.png",
+  "about": [
+    "виміри агентної системи",
+    "вартість мовних моделей",
+    "латентність",
+    "тестування"
+  ],
+  "disambiguatingDescription": "Репліки села породжуються мовними моделями в момент показу і не є висловлюваннями живих людей.",
+  "author": {
+    "@type": "Organization",
+    "@id": "https://ploshcha.org/#org",
+    "name": "Площа"
+  },
+  "datePublished": "2026-08-30",
+  "dateModified": "2026-08-31"
+}
+    </script>
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Площа",
+      "item": "https://ploshcha.org/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Числа й виміри",
+      "item": "https://ploshcha.org/chysla.html"
+    }
+  ]
+}
     </script>
   </head>
   <body>
-    <article class="arkush">
-      <p class="doroha"><a href="/">Площа</a> · <a href="/pro.html">про село</a> · числа</p>
+    <main class="arkush">
+      <nav class="doroha" aria-label="Шлях сторінкою"><a href="/">Площа</a> · <a href="/pro.html">про село</a> · числа</nav>
 
-      <h1>Числа й виміри</h1>
+      <article>
+
+      <h1>Числа Площі: скільки коштує й скільки триває віче</h1>
       <div class="pidzahol">Усе, що в Площі можна порахувати, тут порахували — і записали причину.</div>
+
+      <h2 id="korotko">Коротко</h2>
 
       <ul class="korotko">
         <li>Повне віче — 24 761 токен на 21 репліку; закриття розмови коштує 4 218 токенів і лягає цілком у кінець.</li>
@@ -56,13 +113,43 @@
         <li>Тестів у ядрі понад 1700, і жоден не ходить у мережу й не кличе модель.</li>
       </ul>
 
+      <nav class="zmist" aria-label="Зміст сторінки">
+        <div class="zmist-pid">На цій сторінці</div>
+        <ol>
+          <li><a href="#skilky-koshtuye-odna-rozmova">Скільки коштує одна розмова</a></li>
+          <li><a href="#skilky-chekaty-pershoho-slova">Скільки чекати першого слова</a></li>
+          <li><a href="#skilky-v-seli-lyudey-i-chym-vony-rizni">Скільки в селі людей і чим вони різні</a></li>
+          <li><a href="#storozhi-povtoriv">Сторожі повторів</a></li>
+          <li><a href="#hey-ty-zmistu">Гейти змісту</a></li>
+          <li><a href="#skilky-koshtuye-miryaty">Скільки коштує міряти</a></li>
+          <li><a href="#testy-y-kontrakt">Тести й контракт</a></li>
+        </ol>
+      </nav>
+
+      <table class="tablytsia">
+        <caption>Головні числа Площі</caption>
+        <thead>
+          <tr><th scope="col">Що міряли</th><th scope="col">Значення</th><th scope="col">Звідки число</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Повне віче</td><td>24 761 токен на 21 репліку</td><td>живе ядро, 28 серпня 2026, прод-умова</td></tr>
+          <tr><td>Віче до появи судді змісту</td><td>15 852 токени на 24 репліки</td><td>середнє на 25 записаних прогонах</td></tr>
+          <tr><td>Закриття розмови</td><td>4 218 токенів</td><td>зведення, сумнів, голоси й літопис</td></tr>
+          <tr><td>Кинутий гостем прогін</td><td>18 902 токени, 76 відсотків</td><td>вихід на пʼятій репліці</td></tr>
+          <tr><td>Час до першої репліки</td><td>1.3 секунди замість 30.3</td><td>після того, як перше слово склав код</td></tr>
+          <tr><td>Сума пауз у розмові</td><td>34.6 секунди замість 70.5</td><td>той самий прогін до і після хвиль</td></tr>
+          <tr><td>Довжина розмови</td><td>12-20 тактів</td><td>залежить від місця</td></tr>
+          <tr><td>Перебивання</td><td>ймовірність 0.28, стеля чотири</td><td>кубик у коді, не модель</td></tr>
+        </tbody>
+      </table>
+
       <p>У цьому проєкті є правило, яке важить більше за будь-яку архітектурну красу: перш
       ніж записати «система погана», треба перевірити прилад. Воно з'явилося не з теорії, а
       з практики — три з трьох «негативних результатів» однієї гілки виявились дефектами
       вимірювання, а не системи. Тому кожне число нижче має поруч умови, за яких його
       зняли, і жодне з них не є оцінкою на пальцях.</p>
 
-      <h2>Скільки коштує одна розмова</h2>
+      <h2 id="skilky-koshtuye-odna-rozmova">Скільки коштує одна розмова</h2>
 
       <p>Повне віче — це <strong>24 761 токен на 21 репліку</strong> за заміром на живому
       ядрі 28 серпня 2026 року, у прод-умові, через той самий шлюз, що працює на сайті.
@@ -84,7 +171,7 @@
       вердикт; уся розмова за 25.7 секунди. Це і є формула «один дорогий виклик плюс N
       дешевих», записана реальними числами.</p>
 
-      <h2>Скільки чекати першого слова</h2>
+      <h2 id="skilky-chekaty-pershoho-slova">Скільки чекати першого слова</h2>
 
       <p>Колись партитуру писали одну на всю розмову, і глядач дивився на порожній екран
       рівно стільки, скільки її писали: <strong>28.6 секунди</strong> до готового плану й
@@ -103,7 +190,7 @@
       паузи зʼїли <strong>39 секунд із 70</strong>. Після перебудови сума пауз у розмові
       впала з 70.5 до 34.6 секунди.</p>
 
-      <h2>Скільки в селі людей і чим вони різні</h2>
+      <h2 id="skilky-v-seli-lyudey-i-chym-vony-rizni">Скільки в селі людей і чим вони різні</h2>
 
       <p>На віче виходить <strong>вісім</strong> ролей із села, до них додаються староста й
       піп, а одинадцятою роллю в гурті стоїть сам гість. Норов кожного розкладений на
@@ -119,7 +206,7 @@
       шість тактів із пʼятнадцяти, і він же дав пʼять повторів із пʼяти. На слово гостя
       відповідають рівно <strong>двоє</strong>.</p>
 
-      <h2>Сторожі повторів</h2>
+      <h2 id="storozhi-povtoriv">Сторожі повторів</h2>
 
       <p>Дешева модель повторюється, і в Площі проти цього стоїть окремий шар. Кожну репліку
       просять у <strong>трьох</strong> варіантах в одному виклику — окремими викликами це не
@@ -140,7 +227,7 @@
       <strong>3 532 токени проти 1 719</strong> у дешевої — тому ремонт іде драбиною, а не
       стрибком.</p>
 
-      <h2>Гейти змісту</h2>
+      <h2 id="hey-ty-zmistu">Гейти змісту</h2>
 
       <p>Головний замір охорони зроблено на корпусі з <strong>74 живих тем</strong>, поданих
       двічі — як тема прогону й як слово гостя посеред розмови. Корпус навмисно кривий:
@@ -178,7 +265,7 @@
       перевіриш: чотири випадки прогнано наскрізь на живому ядрі з читанням баз після
       прогону — у хроніках, чутках і ухвалах <strong>не осіло нічого</strong>.</p>
 
-      <h2>Скільки коштує міряти</h2>
+      <h2 id="skilky-koshtuye-miryaty">Скільки коштує міряти</h2>
 
       <p>Дешевий замір самих гейтів — 148 викликів судді з паузами — коштував
       <strong>близько 120 тисяч токенів</strong> за півгодини. Той самий висновок, знятий
@@ -187,7 +274,7 @@
       присуди міряються гейтами, протікання тексту в бази — прогонами, і прогонів треба
       стільки, скільки є різних шляхів тексту, а не скільки є рядків.</p>
 
-      <h2>Тести й контракт</h2>
+      <h2 id="testy-y-kontrakt">Тести й контракт</h2>
 
       <p>У ядрі <strong>понад 1700 тестів</strong> — на день написання цієї сторінки рівно
       <strong>1727</strong>, — і жоден із них не ходить у мережу й не кличе модель: усе, що
@@ -205,17 +292,22 @@
         <p><strong>Про походження текстів.</strong> Репліки селян, літописи, чутки й ухвали
         на цьому сайті породжуються мовними моделями в момент показу. Це не висловлювання
         живих людей і не свідчення про справжні події. Про це сказано тут відкрито
-        відповідно до вимоги статті 50 Акта ЄС про штучний інтелект, чинної з 2 серпня
+        відповідно до вимоги <a href="https://artificialintelligenceact.eu/article/50/" rel="nofollow noopener" target="_blank">статті 50 Акта ЄС про штучний інтелект</a>, чинної з 2 серпня
         2026 року. Числа на цій сторінці зняті людиною з коду, замірів і записаних прогонів
         проєкту.</p>
       </div>
 
-      <div class="pidval">
+      </article>
+
+      <footer class="pidval">
         <p>Далі: <a href="/yak-pracyuye.html">як воно влаштовано</a> ·
         <a href="/pytannya.html">часті питання</a> ·
-        <a href="/pro.html">що таке Площа</a></p>
+        <a href="/pro.html">що таке Площа</a> ·
+        <a href="/pryvatnist.html">приватність</a></p>
         <p><a href="/">Повернутись у село</a></p>
-      </div>
-    </article>
+              <p>Код відкритий: <a href="https://github.com/mikamika06/ploshcha" rel="nofollow noopener" target="_blank">github.com/mikamika06/ploshcha</a></p>
+        <p class="onovleno">Оновлено <time datetime="2026-08-31">31 серпня 2026</time>.</p>
+      </footer>
+    </main>
   </body>
 </html>
