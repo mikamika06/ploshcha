@@ -13,6 +13,7 @@
 """
 
 import contextlib
+import email.utils
 import json
 import mimetypes
 import re
@@ -37,6 +38,35 @@ HOST = "127.0.0.1"
 HEARTBEAT_S = 15.0
 MAX_BODY = 64 * 1024
 IMMUTABLE = "public, max-age=31536000, immutable"
+# Заголовки, які не залежать від того, що саме віддаємо. Сканери знімали за їхню відсутність
+# шість пунктів; важливіші за бали дві речі — X-Content-Type-Options не дає браузеру вгадувати
+# тип і виконувати чужий файл як скрипт, а frame-ancestors закриває клікджекінг на сцену.
+# CSP описує рівно те, чим фронт живе: свій бандл, свої спрайти, свій потік подій. Cross-origin
+# запитів немає взагалі — ядро роздає і статику, і API з одного походження.
+SECURITY = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    "Strict-Transport-Security": "max-age=31536000",
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "img-src 'self' data: blob:; "
+        "style-src 'self' 'unsafe-inline'; "
+        # 'unsafe-eval' тут не недогляд: PixiJS 7 збирає синхронізацію юніформ через Function,
+        # і зі строгим script-src сцена не стартує зовсім — «[boot] failed ... does not allow
+        # unsafe-eval». Обхід @pixi/unsafe-eval міняє шлях завантаження юніформ на повільніший,
+        # а частота кадрів у цій сцені виборена окремо. Захист від чужого скрипта лишається:
+        # 'self' не пускає ні зовнішній домен, ні інлайн.
+        "script-src 'self' 'unsafe-eval'; "
+        "connect-src 'self'; "
+        "font-src 'self'; "
+        "worker-src 'self' blob:; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'"
+    ),
+}
 HASHED = re.compile(r"-[0-9A-Za-z_]{8,}\.(js|css|png|jpg|jpeg|webp|woff2?|ico)$")
 INDEX = "index.html"
 # Скільки команд з однієї адреси за вікно. Тема коштує тисячі токенів, тож це не про навантаження
@@ -193,6 +223,12 @@ def make_handler(bus, runner, static: Path | None = None, origins: tuple[str, ..
             # Заміряно: до цього поділу і бандли, і спрайти йшли з no-cache, тобто кожен захід тягнув
             # усі 4.13 МБ статики наново.
             self.send_header("Cache-Control", IMMUTABLE if HASHED.search(target.name) else "no-cache")
+            # Свіжість сторінки читають і краулери, і AI-збирачі: без Last-Modified вони не бачать,
+            # що текст оновлено, і вважають його застояним.
+            self.send_header("Last-Modified", email.utils.formatdate(target.stat().st_mtime,
+                                                                     usegmt=True))
+            for field, value in SECURITY.items():
+                self.send_header(field, value)
             self.end_headers()
             self._body(body)
 
