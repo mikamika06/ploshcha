@@ -17,6 +17,15 @@ const PACE_MS = 1400;
 const PACE_MIN_MS = 260;
 const PACE_BACKLOG = 6;
 const PACED = new Set(["utterance.spoken"]);
+/** ★ Кінець розмови СТОЇТЬ У ТІЙ САМІЙ ЧЕРЗІ, що й репліки.
+ *
+ *  Літопис їхав повз притримку, бо в `PACED` його не було, — і виходив на екран у ту мить, коли
+ *  ядро його дописало. А закриття ядро робить пачкою: зведення старости, сумнів попа й голоси
+ *  всього касту народжуються за секунди й лягають у чергу, яка грає по одній репліці на
+ *  `PACE_MS`. Тому підсумок з ухвалою бачили ТОДІ, коли село ще казало «за» і «проти», — рівно
+ *  те, на що скаржився гість. Пропустити його через чергу дешевше й чесніше за будь-який
+ *  таймер: порядок подій тоді той самий, що в ядрі, і не залежить від швидкості мережі. */
+const TAIL = new Set(["report.compiled"]);
 
 export class LiveDriver implements EventSourcePort {
   private source: EventSource | undefined;
@@ -92,8 +101,9 @@ export class LiveDriver implements EventSourcePort {
           this.run = ev.runId;
           this.queue = this.queue.filter((q) => q.runId === ev.runId);
         }
-        if (this.run !== undefined && ev.runId !== this.run && PACED.has(ev.type)) return;
-        if (ev.known && PACED.has(ev.type)) {
+        const held = PACED.has(ev.type) || TAIL.has(ev.type);
+        if (this.run !== undefined && ev.runId !== this.run && held) return;
+        if (ev.known && held) {
           this.queue.push(ev);
           this.drain(onEvent);
         } else {
