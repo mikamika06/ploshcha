@@ -954,18 +954,29 @@ class Viche(AgentPort):
             # `viche_chronicle_lost`. Тому йде той самий запасний шлях, що й при втраченому
             # літописі: лічба, якщо голоси встигли, і сухий підсумок замість оповіді.
             hushed = self._hushed.is_set()
-            if not hushed:
-                # Староста зводить не всюди: у шинку модератора немає, і саме тому там кажуть інше.
-                if self.mode.summary:
-                    summary = self._summary(task, said, seed, budget, incidents)
-                    if summary is not None:
-                        said.append(summary)
-                if self.mode.doubt:
-                    doubt = self._doubt(task, said, seed, budget, incidents)
-                    if doubt is not None:
-                        said.append(doubt)
+            if not hushed and self.mode.doubt:
+                # Сумнів попа належить РОЗМОВІ, а не підсумку: він чіпляється до твердження без
+                # підстави, тобто мусить прозвучати доти, доки на нього ще можна відповісти голосом.
+                doubt = self._doubt(task, said, seed, budget, incidents)
+                if doubt is not None:
+                    said.append(doubt)
             votes = self._vote(task, cast, said, stances, seed, budget, incidents)
             said += votes.pop("репліки", [])
+            # ★ СТАРОСТА ЗВОДИТЬ ПІСЛЯ ГОЛОСІВ, А НЕ ПЕРЕД НИМИ.
+            #
+            # Доти зведення стояло перед голосуванням, і на екрані виходило те, на що скаржився
+            # гість: староста оголошував, до чого дійшло віче, коли половина села ще не сказала
+            # «за» чи «проти». Це не косметика — зведенню бракувало найголовнішого зі сказаного:
+            # у пакеті не було жодного голосу, тож про ухвалу воно могло тільки здогадуватись.
+            # Тепер у `said` уже лежать усі голоси, і староста зводить те, що справді сталось.
+            #
+            # Стеля перевіряється вдруге: гість міг піти саме під час голосування, і платити
+            # дорогим ярусом за останнє слово для порожньої зали ми не станемо.
+            if not hushed and not self._hushed.is_set() and self.mode.summary:
+                # Староста зводить не всюди: у шинку модератора немає, і саме тому там кажуть інше.
+                summary = self._summary(task, said, seed, budget, incidents)
+                if summary is not None:
+                    said.append(summary)
             if hushed or self._hushed.is_set():
                 # Голоси, що встигли прозвучати до тиші, — це вже пораховане число, і воно
                 # належить глядачеві. Ті, що не встигли, не переказуються нізвідки.

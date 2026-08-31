@@ -4655,3 +4655,31 @@ def test_a_reply_that_gives_the_packet_back_is_counted_and_a_clean_one_is_not():
     agent.plan_ahead = False
     clean = agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
     assert not [i for i in clean.incidents if i.startswith("viche_leak")]
+
+
+def test_the_starosta_sums_up_only_after_every_voice_has_voted():
+    """★ Зведення старости стоїть ПІСЛЯ голосів, а не перед ними.
+
+    Скарга гостя була дослівно про це: староста оголошував висновок посеред віча, коли село ще
+    не сказало «за» й «проти». Причина була в порядку закриття — зведення йшло першим, голоси
+    другими, тож і на сцену вони виходили саме так.
+
+    Крім вигляду, це коштувало й змісту: у пакеті зведення не було жодного голосу, і староста
+    зводив розмову, не знаючи, чим вона скінчилась.
+    """
+    from ploshcha_sim.adapters import InMemoryTrace
+
+    pair = [p.role for p in cast_for(NEWS, 2)]
+    trace = InMemoryTrace()
+    agent, _ = build([score(beat(pair[0]), beat(pair[1], "піддакнути", 1))] + lines(8)
+                     + [chron((pair[0], "Отак."))], width=2, trace=trace)
+    agent.run(NEWS, seed=1, budget=Budget(max_steps=40, max_tokens=99_999))
+
+    spoken = [e for e in _events(trace) if e["type"] == "utterance.spoken"]
+    votes = [i for i, e in enumerate(spoken)
+             if e["payload"]["text"].startswith(("за", "проти", "утримуюсь"))]
+    summary = [i for i, e in enumerate(spoken) if e["payload"].get("agentId") == "starosta"]
+    assert votes, "тест ні про що, якщо голосів не було"
+    assert summary, "тест ні про що, якщо староста не зводив"
+    assert min(summary) > max(votes), \
+        f"зведення на {min(summary)} мусить іти після останнього голосу на {max(votes)}"
